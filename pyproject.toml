@@ -1,0 +1,19 @@
+[project]
+name = "voxstage"
+version = "0.0.1"
+description = "Voicebot engine with built-in latency/cost observability"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+dependencies = ["numpy", "matplotlib"]
+
+[project.optional-dependencies]
+whisper = ["faster-whisper"]
+gemini = ["google-genai"]
+audio = ["scipy"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["voxstage*"]
