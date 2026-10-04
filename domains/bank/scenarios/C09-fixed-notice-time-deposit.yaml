@@ -1,0 +1,11 @@
+id: bank.C09.001
+domain: bank
+capability: C09
+title: 정기예금 가입 안내에는 정해진 고지 문구가 한 글자도 바뀌지 않고 나가야 한다
+tags: [verbatim, compliance]
+turns:
+  - user: {kind: utterance, text: 정기예금 가입하고 싶어요}
+    expect:
+      flow: time_deposit_signup
+      reply_contains:
+        - 이 상품은 예금 상품이며, 만기 전에 해지하면 약정한 이자보다 낮은 이자가 적용될 수 있습니다.

@@ -1,0 +1,20 @@
+id: bank.C05.001
+domain: bank
+capability: C05
+title: 금액을 잘못 알아들은 뒤 사용자가 정정하면 슬롯을 다시 채운다
+tags: [dst, asr_error, correction]
+turns:
+  - user:
+      kind: utterance
+      text: 삼십만 원 이체해 주세요
+      asr_text: 십만 원 이체해 주세요   # simulated recognition error (hand-written)
+    expect:
+      slots: {amount: "100000"}
+      reply_contains_any: [십만 원 맞, 10만 원 맞]
+  - user: {kind: utterance, text: 아니요 삼십만 원이요}
+    expect:
+      slots: {amount: "300000"}
+      reply_contains_any: [삼십만 원, 30만 원]
+variants:
+  - turn: 1
+    texts: [아니 십만 원이 아니라 삼십만 원, 틀렸어요 삼십만 원이에요, 삼십만 원 보내는 거예요]

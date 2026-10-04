@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "Voicebot engine with built-in latency/cost observability"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
-dependencies = ["numpy", "matplotlib"]
+dependencies = ["numpy", "matplotlib", "pyyaml"]
 
 [project.optional-dependencies]
 whisper = ["faster-whisper"]

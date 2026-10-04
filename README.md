@@ -77,6 +77,9 @@ voxstage/endpointer.py    energy endpointer (audio-time T1)
 voxstage/pipeline.py      one-turn pipeline + sentence chunker
 voxstage/turn.py          turn inputs: Utterance | Dtmf | ButtonPress
 voxstage/dialogue.py      DialogueManager contract, explicit state, step()
+voxstage/tools.py         ToolExecutor port + declarative fake API
+voxstage/dataset.py       dataset loader/validator, coverage matrix
+domains/<name>/           faq.yaml, tools.yaml, scenarios/*.yaml (data only)
 voxstage/metrics.py       events -> p50/p95/p99, markdown, histograms
 voxstage/cost.py          shadow cost from a price table you fill in
 voxstage/bench.py         runner (warm-up, interleaving, throttling, meta)
@@ -88,4 +91,5 @@ voxstage/vendors/         mock, faster-whisper, MeloTTS, Gemini
 
 - [Project principles](docs/project-principles.md)
 - [Design patterns used, and why](docs/design-patterns.md)
+- [Dataset spec](docs/dataset-spec.md)
 - [Decision records](docs/decisions/README.md): every design decision, who made it, options, public basis

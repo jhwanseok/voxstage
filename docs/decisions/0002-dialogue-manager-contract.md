@@ -47,16 +47,21 @@ We will use option 1. See `voxstage/dialogue.py` (`DialogueManager`, `DialogueSt
   dicts. Managers are required to use `evolve` (which copies them); this is enforced by
   tests and review, not by the type system.
 
-## Open questions (to be decided before S3)
+## Open questions
 
-- `reply` is a complete string. An LLM-backed manager streams tokens, and the existing
-  latency segments T3 (first token) and T3b (first speakable sentence) depend on that.
-  Options when S3 starts: (a) add a streaming variant of `respond`, (b) keep the string
-  contract and measure LLM latency inside the manager's trace. Not decided yet.
-- Where tool calls execute. Currently a manager can only *return* actions
-  (`HandOff`, `EndCall`); nothing runs external APIs. Decide when the "answer from API
-  results" capability is implemented.
+- None open. Both questions raised at acceptance were decided on 2026-10-05; see the
+  amendment below and [0004](0004-dummy-api-tool-executor.md).
+
+## Amendment 2026-10-05: streaming waits for S5
+
+`reply` stays a complete string until S5. A streaming `respond` is not added now.
+Decided by jhwanseok. Consequence: before S5 the LLM-backed managers (S3, S4) cannot expose
+first-token timing through this contract, so the existing T3 / T3b segments apply only to the
+original pipeline path. Latency of an LLM manager before S5 is recorded as total manager
+time (`wall_s` on `dm_response`). The streaming interface is designed when S5 starts.
+
+Where tool calls execute: decided in 0004 (a `ToolExecutor` port; managers call it).
 
 ## Decider's note
 
-(none recorded)
+On streaming: "스트리밍은 S5에 적용하자. 너무 복잡해질것 같아."

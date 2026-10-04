@@ -1,0 +1,20 @@
+# Fake backend API for the bank domain. Answers depend only on the arguments (see docs/decisions/0004).
+tools:
+  get_balance:
+    params: [account_last4]
+    rules:
+      - when: {account_last4: "4821"}
+        return: {balance: 1250000, currency: KRW}
+      - when: {account_last4: "7310"}
+        return: {balance: 3000000, currency: KRW}
+    default:
+      error: not_found
+  get_transfer_fee:
+    params: [amount, grade]
+    rules:
+      - when: {grade: gold}
+        return: {fee: 0}
+      - when: {grade: basic}
+        return: {fee: 500}
+    default:
+      error: not_found

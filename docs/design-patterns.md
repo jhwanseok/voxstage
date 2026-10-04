@@ -13,6 +13,7 @@ at the bottom and is decided by the owner before code depends on it.
 | Interpreter | S1 rule engine running `flows/*.yaml` (planned) | Keeps domains as data so the core never imports domain code; fair, realistic rule baseline | Hand-written per-domain state machine | [0003](decisions/0003-rule-engine-representation.md) |
 | Adapter | `voxstage/vendors/*` wrapping faster-whisper, MeloTTS, Gemini | Vendors differ; the pipeline sees only `ASR`, `LLM`, `TTS` | Calling vendor SDKs from the pipeline | not yet recorded |
 | Simple factory | `voxstage.vendors.build(kind, name, **opts)` | Pick a vendor by name from a CLI flag | Registry with plugin discovery (more machinery than needed now) | not yet recorded |
+| Port and fake adapter | `ToolExecutor` and `FakeApiExecutor` (`voxstage/tools.py`) | Managers depend on a port; the fake backend is data in the domain pack, deterministic and swappable for a real client | Per-domain Python fakes loaded by the core; a mock HTTP server for every run | [0004](decisions/0004-dummy-api-tool-executor.md) |
 | Actions as data | `HandOff`, `EndCall` returned in `DMResult.actions` | A manager says *what should happen*; something else decides how | Managers performing side effects directly | [0002](decisions/0002-dialogue-manager-contract.md) |
 
 ## Considered and not used
@@ -23,11 +24,14 @@ at the bottom and is decided by the owner before code depends on it.
 - **Observer for events**: the event log is an append-only record read after the fact, not
   something components subscribe to.
 
+## Decided since the first version
+
+- **Streaming through the manager**: waits for S5; replies stay complete strings until then
+  ([0002 amendment](decisions/0002-dialogue-manager-contract.md)).
+- **Who executes tool calls**: a `ToolExecutor` port that managers call, with a declarative
+  fake backend ([0004](decisions/0004-dummy-api-tool-executor.md)).
+
 ## Open questions for the owner
 
-1. **Streaming through the manager** (before S3): string reply vs streaming `respond`.
-   Affects the T3 / T3b latency segments. See ADR 0002.
-2. **Who executes actions and tool calls**: a separate executor component, or the pipeline.
-   Decide when the "answer from API results" capability starts.
-3. **Adapter and factory records**: those two choices predate this log. Write their records
+1. **Adapter and factory records**: those two choices predate this log. Write their records
    if you want them on the same footing as the others.
