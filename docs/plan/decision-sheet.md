@@ -55,7 +55,8 @@ Open details raised on 2026-10-05 (the run uses the default unless you change it
 
 | ID | Question | Default used | Answer |
 |---|---|---|---|
-| D-17 | Language scope of rule packs: English only for R0 to R5 with Korean rules in a later pass, or both from R1. Korean needs a tokenisation choice (particles). | English only; Korean rule pack is a separate later step. | |
+| D-17 | Language scope of rule packs: English only for R0 to R5 with Korean rules in a later pass, or both from R1. Korean needs a tokenisation choice (particles). | English only; Korean rule pack is a separate later step. | **both languages from R1** (decided 2026-10-05: "한국어까지 해줘"). R1 and R2 wait for R1-4. |
+| R1-4 | Korean tokenisation for rule matching: morphological analyzer, hand-written suffix stripping, or character n-grams. | morphological analyzer (Kiwi) as an optional dependency, with space-insensitive matching of noun groups. | *pending* |
 | D-R0 | Canonical-form lists: which currency symbols and words. | symbols `$ € £ ¥ ₩`; words dollar(s), usd, 달러, 불, won, krw, 원, yen, jpy, 엔. | |
 | D-R1 | Default N for the miss counter and its default action. | N = 3, hand off. | |
 | D-R2 | Expression grammar boundary. | Comparison, and/or/not, `+ - * / // %`, `in`, attribute and constant-index access, conditional expression, and calls only to whitelisted functions (`len`, `lower`, `upper`, `int`, `str`; formatters added in R4). No lambdas, comprehensions, assignments or imports. | |

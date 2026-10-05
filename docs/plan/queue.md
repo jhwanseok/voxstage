@@ -7,8 +7,8 @@ owner, one queue item per run, from the spec file of that item. Nothing here is 
 | # | Item | Spec | Depends on | Status | Handoff note |
 |---|---|---|---|---|---|
 | 1 | R0 evaluation harness and ledger | [R0](specs/R0-evaluation-harness.md) | none | ready | |
-| 2 | R1 FAQ rule manager (English) | [R1](specs/R1-faq-rule-manager.md) | R0 | ready | |
-| 3 | R2 flow interpreter | [R2](specs/R2-flow-interpreter.md) | R1 | ready | |
+| 2 | R1 FAQ rule manager (English) | [R1](specs/R1-faq-rule-manager.md) | R0 | needs decisions (R1-4 Korean tokenisation; spec to be extended to ko) | |
+| 3 | R2 flow interpreter | [R2](specs/R2-flow-interpreter.md) | R1 | needs decisions (waits for R1; spec to be extended to ko) | |
 | 4 | R3 button and DTMF | not written | R2 | needs decisions (decision sheet R3-1, R3-2) | |
 | 5 | R4 attribute and API answers | not written | R2 | needs decisions (R4-1, R4-2) | |
 | 6 | R5 fixed notices | not written | R2 | needs decisions (R5-1, R5-2) | |

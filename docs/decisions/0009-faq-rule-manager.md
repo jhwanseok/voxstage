@@ -41,7 +41,8 @@ Step R1 is the simplest rule engine: a question in, the verbatim answer out, a s
 - `HandOff` and `EndCall` are used in R1; the miss counter lives in `state.meta`.
 - A fresh session that reads only `question` and `answer` writes the patterns. The held-out guarantee is
   procedural; a command prints the author's view of the data without the held-out fields.
-- Korean rules need a tokenisation decision (particles) and are not part of R1 (see decision sheet, item 17).
+- Rule packs cover English and Korean from R1 (the decider's call on 2026-10-05, decision sheet D-17). Korean
+  rules need a tokenisation decision (particles, word spacing), recorded separately as R1-4 before R1 is built.
 
 ## Decider's note
 
