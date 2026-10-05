@@ -51,12 +51,21 @@ produce them. A test enforces the twin rule.
 
 ## Open questions
 
-- Whether the shared dollar amounts are acceptable for a Korean-speaking review, or whether
-  Korean should get won-based values (needs a tool-spec change shared by both languages).
-- Whether twin slots should be relaxed so Korean can use a more natural ASR error in C05.
-- Korean-only cases (counter words, native-Korean numerals such as 열흘, honorific mismatch)
-  are not written yet.
+All four open points were answered by the decider on 2026-10-05 and are collected in
+[data-enhancement-backlog.md](../plan/data-enhancement-backlog.md), to be handled together
+after S3:
+
+- Currencies: major currencies (dollar, won, yen, ...) should each be supported (D1).
+- Korean ASR errors: classify error types for Korean itself (D2).
+- Bot-response wording: revise after real bot replies exist (D3).
+- Korean-only cases: same stage as the currency work (D4).
+
+The Korean C09 fixed notices were reviewed and approved as written.
 
 ## Decider's note
 
 "한글 데이터셋이어야지 내가 더 잘 피드백 줄 수 있을것 같아. 기존영어 놔두고 한국어 데이터셋을 추가해서 진행해줘"
+
+On review of the Korean draft (2026-10-05): currencies, the Korean ASR error types and Korean-only
+cases wait for a joint data-enhancement stage after S3; the C09 notices are fine; bot-response
+wording is revised once a bot answers.

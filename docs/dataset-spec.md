@@ -112,7 +112,8 @@ All three domains (bank, shop, telecom) have the full set in English and in Kore
 entries and sixteen scenarios per domain and language, 72 cases per language
 (`python -m voxstage.dataset coverage [dir] [en|ko]`). The bank pilot slice in English was
 reviewed and approved; everything else is a first draft awaiting review. Korean cases are twins
-of the English ones, not translations (ADR 0007).
+of the English ones, not translations (ADR 0007). Known weaknesses are parked in
+[plan/data-enhancement-backlog.md](plan/data-enhancement-backlog.md) for a joint pass after S3.
 
 Integrity tests: every domain covers every capability; fake-API calls expected by a scenario
 are answerable by that domain's `tools.yaml` (including expected failures); the phrase a C09

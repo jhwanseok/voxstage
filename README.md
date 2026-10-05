@@ -95,3 +95,4 @@ voxstage/vendors/         mock, faster-whisper, MeloTTS, Gemini
 - [Decision records](docs/decisions/README.md): every design decision, who made it, options, public basis
 - [Workflow: dev and main branches](docs/workflow.md)
 - [Rule-engine step plan (R0–R15)](docs/plan/rule-engine-steps.md)
+- [Data enhancement backlog (after S3)](docs/plan/data-enhancement-backlog.md)
