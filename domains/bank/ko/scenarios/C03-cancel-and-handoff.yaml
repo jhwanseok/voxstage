@@ -1,0 +1,24 @@
+id: bank.C03.001
+lang: ko
+domain: bank
+capability: C03
+title: "취소하면 흐름에서 나가고, 사람을 찾으면 상담원에게 연결된다"
+tags: [cancel, handoff]
+turns:
+  - user: {kind: utterance, text: 이체하려고 하는데요}
+    expect:
+      flow: transfer
+  - user: {kind: utterance, text: 아 됐어요 그냥 취소할게요}
+    expect:
+      flow: main_menu
+      slots: {}
+      actions: []
+  - user: {kind: utterance, text: 사람이랑 얘기할 수 있어요}
+    expect:
+      actions: [HandOff]
+      reply_contains_any: [상담원, 연결]
+variants:
+  - turn: 1
+    texts: [이체 안 할래요, 그만할게요, 마음이 바뀌었어요]
+  - turn: 2
+    texts: [상담원 바꿔 주세요, 직원 연결해 줘요, 진짜 사람이랑 통화하고 싶은데요]

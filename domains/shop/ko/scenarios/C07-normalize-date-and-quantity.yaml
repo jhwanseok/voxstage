@@ -1,0 +1,15 @@
+id: shop.C07.001
+lang: ko
+domain: shop
+capability: C07
+title: "상대적인 배송 날짜와 말로 한 수량이 시나리오 시계 기준의 정확한 값이 된다"
+tags: [normalization, date, number]
+setup:
+  now: "2026-10-05T09:00:00"   # a Monday
+turns:
+  - user: {kind: utterance, text: "두 개 내일 오전에 보내 주세요"}
+    expect:
+      slots: {quantity: "2", delivery_date: "2026-10-06", delivery_window: morning}
+variants:
+  - turn: 0
+    texts: ["한 쌍이요 내일 아침 중으로 받고 싶어요", "내일 점심 전에 두 개 와야 돼요"]

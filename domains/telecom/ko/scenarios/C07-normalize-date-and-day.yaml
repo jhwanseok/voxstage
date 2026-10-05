@@ -1,0 +1,16 @@
+id: telecom.C07.001
+lang: ko
+domain: telecom
+capability: C07
+title: "말로 한 날짜와 상대적 시작 시점이 시나리오 시계를 기준으로 정확한 값이 된다"
+tags: [normalization, date, number]
+setup:
+  now: "2026-10-05T09:00:00"   # 월요일
+turns:
+  - user: {kind: utterance, text: 다음 달부터 청구일을 이십 일로 바꿔 주세요}
+    expect:
+      flow: change_bill_date
+      slots: {bill_day: "20", effective_from: "2026-11-01"}
+variants:
+  - turn: 0
+    texts: [요금 청구일 20일로 변경하고 싶은데 다음 달부터요, 담달부터는 이십일에 낼게요]

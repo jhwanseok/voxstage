@@ -23,6 +23,7 @@ reading an analysis, the record says that, and the decider may add their own wor
 | [0004](0004-dummy-api-tool-executor.md) | Tool calls go through a ToolExecutor port with a declarative fake API | accepted |
 | [0005](0005-dataset-first-development.md) | Datasets come first; capabilities are built one problem at a time | accepted |
 | [0006](0006-english-first.md) | Datasets are English first; Korean is added later | accepted |
+| [0007](0007-korean-dataset-alongside-english.md) | A Korean dataset is added alongside the English one | accepted |
 
 ## Template
 

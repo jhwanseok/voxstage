@@ -1,0 +1,12 @@
+id: telecom.C09.001
+lang: ko
+domain: telecom
+capability: C09
+title: "요금제를 낮출 때는 필수 안내 문구가 그대로 나가야 한다"
+tags: [verbatim, compliance]
+turns:
+  - user: {kind: utterance, text: 기본 요금제로 낮추고 싶어요}
+    expect:
+      flow: change_plan
+      reply_contains:
+        - 낮은 요금제로의 변경은 다음 청구 주기부터 적용되며 30일 동안은 되돌릴 수 없습니다.

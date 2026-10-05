@@ -1,0 +1,13 @@
+id: telecom.C12.001
+lang: ko
+domain: telecom
+capability: C12
+title: "정책 버전 1: 연체 유예 기간은 10일"
+tags: [policy, change_impact]
+setup:
+  policy: {version: v1, late_payment_grace_days: "10"}
+turns:
+  - user: {kind: utterance, text: 요금을 늦게 내면 유예 기간이 며칠이에요}
+    expect:
+      reply_contains_any: [10일, 십 일, 열흘]
+      reply_not_contains: [14일, 십사 일, 열나흘]

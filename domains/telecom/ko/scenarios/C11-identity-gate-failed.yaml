@@ -1,0 +1,18 @@
+id: telecom.C11.002
+lang: ko
+domain: telecom
+capability: C11
+title: "비밀번호가 틀리면 청구 내역은 계속 잠겨 있다"
+tags: [verification, gate, negative]
+setup:
+  customer: {account_last4: "5580"}
+turns:
+  - user: {kind: utterance, text: 이번 달 요금이 얼마예요}
+    expect:
+      tool_calls: []
+  - user: {kind: dtmf, digits: "1111"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {account_last4: "5580", pin: "1111"}, error: invalid_credentials}
+      reply_contains_any: [일치하지, 틀렸, 다시 시도, 확인하지 못]
+      reply_not_contains: [45달러, 사십오 달러]

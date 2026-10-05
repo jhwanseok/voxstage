@@ -1,0 +1,44 @@
+# 가상 이동통신사용 합성 FAQ. 이 프로젝트를 위해 처음부터 새로 작성함.
+# `answer`는 그대로 나가는 답변. `asr_variants`는 손으로 쓴 그럴듯한 인식 오류.
+lang: ko
+entries:
+  - id: telecom.faq.check_usage
+    question: 데이터 사용량은 어떻게 확인해요
+    answer: 데이터 사용량은 앱의 사용량 메뉴에서 언제든 확인하실 수 있고, 요금제 데이터의 80퍼센트를 쓰시면 문자로 알려 드려요.
+    paraphrases: [데이터를 얼마나 썼는지 알고 싶어요, 남은 데이터는 어디서 봐요, 데이터 한도가 거의 다 됐나요]
+    asr_variants: [대이터 사용량은 어떻게 화인해요, 데이터 사용 량은 어떻게 확인 해여]
+  - id: telecom.faq.change_plan
+    question: 요금제는 어떻게 변경해요
+    answer: 요금제는 앱의 요금제 메뉴에서 바꾸실 수 있고, 새 요금제는 다음 청구 주기부터 적용돼요.
+    paraphrases: [다른 요금제로 바꾸고 싶어요, 요금제 변경 가능한가요, 요금제를 올리려면 어떻게 해야 돼요]
+    asr_variants: [요근제는 어떻게 변경해요, 요금 제는 어떡게 변경해여]
+  - id: telecom.faq.bill_due
+    question: 요금 납부일이 언제예요
+    answer: 요금은 매달 같은 날이 납부일이고, 정확한 날짜는 앱의 청구 메뉴에서 확인하실 수 있어요.
+    paraphrases: [요금은 며칠까지 내야 해요, 언제까지 납부하면 돼요, 납부 기한은 어디서 봐요]
+    asr_variants: [요근 납부리 언제에요, 요금 남부일이 언제예여]
+  - id: telecom.faq.report_outage
+    question: 서비스가 안 돼요
+    answer: 먼저 휴대폰을 껐다 켜 보시고, 그래도 서비스가 안 되면 앱의 고객지원 메뉴에서 문제를 접수해 주세요. 사용하시는 지역을 확인해 드릴게요.
+    paraphrases: [신호가 안 잡혀요, 인터넷이 안 돼요, 전화를 못 걸겠어요]
+    asr_variants: [써비스가 안 되요, 서비스가 안돼여]
+  - id: telecom.faq.roaming
+    question: 해외에서 휴대폰을 어떻게 써요
+    answer: 앱의 여행 메뉴에서 해외 로밍을 켜실 수 있고, 요금은 방문하시는 나라에 따라 달라요.
+    paraphrases: [외국에서도 폰을 쓸 수 있나요, 다음 주에 여행 가는데 로밍해야 돼요, 로밍은 어떻게 신청해요]
+    asr_variants: [애외에서 휴대폰을 어떻게 서요, 해외에서 휴대폰을 어떻게 써여]
+  - id: telecom.faq.replace_sim
+    question: 유심 카드를 어떻게 교체해요
+    answer: 앱에서 교체용 유심을 주문하실 수 있고, 영업일 기준 이삼 일 안에 개통 방법 안내와 함께 도착해요.
+    paraphrases: [유심을 잃어버렸어요, 유심이 망가졌어요, 새 유심을 받을 수 있나요]
+    asr_variants: [유심 카드를 어떻게 교채해요, 유심카드를 어떻게 교체 해요]
+  - id: telecom.faq.keep_number
+    question: 번호 그대로 옮겨 올 수 있나요
+    answer: 네, 쓰시던 번호 그대로 옮기실 수 있고, 현재 통신사의 계정 번호와 이동 비밀번호만 있으면 돼요.
+    paraphrases: [번호이동 되나요, 지금 번호 그대로 쓰고 싶어요, 통신사를 바꿔도 번호는 그대로인가요]
+    asr_variants: [번호 그대로 올겨 올 수 있나요, 번호 그대로 옮겨 올수 있나요]
+  - id: telecom.faq.pay_bill
+    question: 요금은 어떻게 내요
+    answer: 앱에서 바로 내시거나 자동 납부를 설정하실 수 있고, 제휴 매장에서 계정 번호로 내셔도 돼요.
+    paraphrases: [요금은 어디서 내요, 자동이체 설정할 수 있나요, 요금 납부는 어떻게 하는 거예요]
+    asr_variants: [요근은 어떻게 내요, 요금은 어떻게 네요]

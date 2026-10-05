@@ -1,0 +1,21 @@
+id: bank.C05.001
+lang: ko
+domain: bank
+capability: C05
+title: "금액을 잘못 알아들은 뒤 고객의 정정으로 슬롯이 다시 채워진다"
+tags: [dst, asr_error, correction]
+turns:
+  - user:
+      kind: utterance
+      text: 삼십 달러 이체해 주세요
+      asr_text: 십삼 달러 이체해 주세요   # 모의 인식 오류 (직접 작성)
+    expect:
+      slots: {amount: "13"}
+      reply_contains_any: [십삼, "13"]
+  - user: {kind: utterance, text: 아니요 삼십 달러라고 했어요}
+    expect:
+      slots: {amount: "30"}
+      reply_contains_any: [삼십, "30"]
+variants:
+  - turn: 1
+    texts: [아니 십삼이 아니고 삼십이요, 그게 아니라 삼십 달러 보낸다고요, 십삼 말고 삼십 달러요 삼십]

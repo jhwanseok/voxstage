@@ -1,0 +1,16 @@
+id: bank.C10.001
+lang: ko
+domain: bank
+capability: C10
+title: "잔액 조회 API가 시간 초과되면, 숫자를 지어내지 않고 사실을 알리며 다음 방법을 안내한다"
+tags: [api_failure, fallback]
+turns:
+  - user: {kind: button, button_id: menu_balance}
+    expect:
+      flow: balance_inquiry
+  - user: {kind: dtmf, digits: "0000"}
+    expect:
+      tool_calls:
+        - {name: get_balance, args: {account_last4: "0000"}, error: timeout}
+      reply_contains_any: [다시 시도, 잠시 후, 조회할 수 없, 확인할 수 없]
+      reply_not_contains: ["$", 달러]

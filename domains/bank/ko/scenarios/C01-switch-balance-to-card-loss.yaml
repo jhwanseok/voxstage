@@ -1,0 +1,18 @@
+id: bank.C01.001
+lang: ko
+domain: bank
+capability: C01
+title: "잔액 조회 중 카드 분실을 말하면 분실 신고 흐름으로 전환된다"
+tags: [switch, priority]
+turns:
+  - user: {kind: utterance, text: 잔액 좀 확인하고 싶은데요}
+    expect:
+      flow: balance_inquiry
+      reply_contains_any: [계좌]
+  - user: {kind: utterance, text: 아 잠깐만요 방금 카드를 잃어버렸어요}
+    expect:
+      flow: card_loss
+      reply_contains_any: [분실, 신고, 정지]
+variants:
+  - turn: 1
+    texts: [아니 체크카드를 잃어버려서요, 잔액은 됐고 카드부터 막아 주세요, 카드가 없어졌어요]

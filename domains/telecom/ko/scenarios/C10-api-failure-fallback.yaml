@@ -1,0 +1,16 @@
+id: telecom.C10.001
+lang: ko
+domain: telecom
+capability: C10
+title: "사용량 API가 시간 초과되면 그렇게 안내하고 숫자를 지어내지 않는다"
+tags: [api_failure, fallback]
+turns:
+  - user: {kind: button, button_id: menu_usage}
+    expect:
+      flow: data_usage
+  - user: {kind: dtmf, digits: "0000"}
+    expect:
+      tool_calls:
+        - {name: get_data_usage, args: {line_last4: "0000"}, error: timeout}
+      reply_contains_any: [다시 시도, 조회할 수 없, 확인할 수 없]
+      reply_not_contains: [기가, GB]

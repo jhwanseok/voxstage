@@ -13,32 +13,62 @@ from voxstage.tools import FakeApiExecutor
 ROOT = os.path.join(os.path.dirname(__file__), "..", "domains")
 
 
-class ShippedDataTest(unittest.TestCase):
-    def test_every_shipped_domain_covers_every_capability(self):
-        shipped = [d for d in dataset.DOMAINS if os.path.isdir(os.path.join(ROOT, d))]
-        self.assertIn("bank", shipped)
-        for d in shipped:
-            faq, scenarios = dataset.load_domain(os.path.join(ROOT, d))
-            self.assertEqual(len(faq), 8, d)
-            self.assertTrue(all(s.lang == "en" and s.domain == d for s in scenarios), d)
-            self.assertEqual({s.capability for s in scenarios}, set(dataset.CAPABILITIES) - {"C00"}, d)
-            # the cases that need a pair (a positive and a negative, or two policy versions)
-            for cap in ("C08", "C09", "C11", "C12"):
-                self.assertGreaterEqual(sum(s.capability == cap for s in scenarios), 2, f"{d} {cap}")
+HANGUL = lambda text: any("\uac00" <= ch <= "\ud7a3" for ch in text)
+SHIPPED_LANGS = ("en", "ko")
 
+
+class ShippedDataTest(unittest.TestCase):
     def shipped(self):
         return [d for d in dataset.DOMAINS if os.path.isdir(os.path.join(ROOT, d))]
 
-    def test_faq_answers_are_unique(self):
+    def each(self):
+        """Every (domain, lang, faq, scenarios) that ships. Languages share ids and structure."""
         for d in self.shipped():
-            faq, _ = dataset.load_domain(os.path.join(ROOT, d))
-            self.assertEqual(len({e.answer for e in faq}), len(faq), d)
+            for lang in SHIPPED_LANGS:
+                faq, scenarios = dataset.load_domain(os.path.join(ROOT, d), lang)
+                yield d, lang, faq, scenarios
+
+    def test_every_shipped_domain_covers_every_capability(self):
+        self.assertIn("bank", self.shipped())
+        for d, lang, faq, scenarios in self.each():
+            where = f"{d}/{lang}"
+            self.assertEqual(len(faq), 8, where)
+            self.assertTrue(all(s.lang == lang and s.domain == d for s in scenarios), where)
+            self.assertEqual({s.capability for s in scenarios}, set(dataset.CAPABILITIES) - {"C00"}, where)
+            # the cases that need a pair (a positive and a negative, or two policy versions)
+            for cap in ("C08", "C09", "C11", "C12"):
+                self.assertGreaterEqual(sum(s.capability == cap for s in scenarios), 2, f"{where} {cap}")
+
+    def test_languages_are_twins(self):
+        """ko mirrors en: same ids, and the same flow/slots/tool_calls/actions per turn.
+        Only the language-bearing parts (utterances, expected wording, variants) may differ."""
+        for d in self.shipped():
+            en_faq, en_sc = dataset.load_domain(os.path.join(ROOT, d), "en")
+            ko_faq, ko_sc = dataset.load_domain(os.path.join(ROOT, d), "ko")
+            self.assertEqual([e.id for e in en_faq], [e.id for e in ko_faq], d)
+            self.assertEqual(sorted(s.id for s in en_sc), sorted(s.id for s in ko_sc), d)
+            ko_by_id = {s.id: s for s in ko_sc}
+            for en in en_sc:
+                ko = ko_by_id[en.id]
+                self.assertEqual((en.capability, en.setup), (ko.capability, ko.setup), en.id)
+                self.assertEqual(len(en.turns), len(ko.turns), en.id)
+                for te, tk in zip(en.turns, ko.turns):
+                    self.assertEqual(te.user["kind"], tk.user["kind"], en.id)
+                    if te.user["kind"] != "utterance":
+                        self.assertEqual(te.user, tk.user, en.id)  # buttons and digits are language-free
+                    for key in ("flow", "slots", "tool_calls", "actions"):
+                        self.assertEqual(te.expect.get(key), tk.expect.get(key), f"{en.id} {key}")
+                    for key in ("reply_contains", "reply_not_contains"):  # same constraints, not same words
+                        self.assertEqual(bool(te.expect.get(key)), bool(tk.expect.get(key)), f"{en.id} {key}")
+
+    def test_faq_answers_are_unique(self):
+        for d, lang, faq, _ in self.each():
+            self.assertEqual(len({e.answer for e in faq}), len(faq), f"{d}/{lang}")
 
     def test_scenario_tool_calls_match_the_fake_api(self):
         """Every tool call a scenario expects must be answerable by the domain's tools.yaml."""
-        for d in self.shipped():
+        for d, lang, _, scenarios in self.each():
             api = FakeApiExecutor.from_yaml(os.path.join(ROOT, d, "tools.yaml"))  # shared across languages
-            _, scenarios = dataset.load_domain(os.path.join(ROOT, d))
             for s in scenarios:
                 for t in s.turns:
                     for call in t.expect.get("tool_calls", []):
@@ -48,19 +78,26 @@ class ShippedDataTest(unittest.TestCase):
                         else:
                             self.assertTrue(result.ok, f"{s.id}: {call}")
 
-    def test_dataset_is_english_and_contains_no_korean(self):
-        """English first (ADR 0006): no Hangul in any English data file."""
+    def test_language_files_use_their_own_script(self):
+        """en files contain no Hangul (ADR 0006); ko utterances and FAQ text do contain Hangul.
+        tools.yaml is shared and language-free."""
         import glob
         files = glob.glob(os.path.join(ROOT, "*", "en", "**", "*.yaml"), recursive=True)
         files += glob.glob(os.path.join(ROOT, "*", "tools.yaml"))
         for path in files:
             with open(path, encoding="utf-8") as f:
-                text = f.read()
-            self.assertFalse(any("\uac00" <= ch <= "\ud7a3" for ch in text), path)
+                self.assertFalse(HANGUL(f.read()), path)
+        for d in self.shipped():
+            faq, scenarios = dataset.load_domain(os.path.join(ROOT, d), "ko")
+            for e in faq:
+                self.assertTrue(HANGUL(e.question) and HANGUL(e.answer), e.id)
+            for s in scenarios:
+                for t in s.turns:
+                    if t.user["kind"] == "utterance":
+                        self.assertTrue(HANGUL(t.user["text"]), s.id)
 
     def test_asr_variants_differ_from_the_question_and_paraphrases(self):
-        for d in self.shipped():
-            faq, _ = dataset.load_domain(os.path.join(ROOT, d))
+        for d, lang, faq, _ in self.each():
             for e in faq:
                 for v in e.asr_variants:
                     self.assertNotEqual(v.lower(), e.question.lower(), e.id)
@@ -68,32 +105,31 @@ class ShippedDataTest(unittest.TestCase):
 
     def test_negative_c09_phrase_is_part_of_the_required_notice(self):
         """Guards drift between the positive and negative fixed-answer cases of a domain."""
-        for d in self.shipped():
-            _, scenarios = dataset.load_domain(os.path.join(ROOT, d))
+        for d, lang, _, scenarios in self.each():
             c09 = [s for s in scenarios if s.capability == "C09"]
             required = [p for s in c09 for t in s.turns for p in t.expect.get("reply_contains", [])]
             forbidden = [p for s in c09 for t in s.turns for p in t.expect.get("reply_not_contains", [])]
-            self.assertTrue(required and forbidden, d)
+            self.assertTrue(required and forbidden, f"{d}/{lang}")
             for f in forbidden:
-                self.assertTrue(any(f in r for r in required), f"{d}: {f!r}")
+                self.assertTrue(any(f in r for r in required), f"{d}/{lang}: {f!r}")
 
     def test_policy_and_clock_setup_are_well_formed(self):
         from datetime import datetime
-        for d in self.shipped():
-            _, scenarios = dataset.load_domain(os.path.join(ROOT, d))
+        for d, lang, _, scenarios in self.each():
             for s in scenarios:
                 if "now" in s.setup:
                     datetime.fromisoformat(s.setup["now"])
             versions = sorted(s.setup["policy"]["version"] for s in scenarios if s.capability == "C12")
-            self.assertEqual(versions, ["v1", "v2"], d)
+            self.assertEqual(versions, ["v1", "v2"], f"{d}/{lang}")
 
     def test_coverage_counts(self):
-        counts = dataset.coverage(ROOT)
-        self.assertEqual(counts[("bank", "C00")], 8)
-        self.assertEqual(counts[("bank", "C08")], 2)
-        self.assertEqual(counts[("telecom", "C01")], 1)
-        self.assertEqual(sum(counts.values()), 3 * (8 + 16))  # 24 cases per domain
-        self.assertIn("C05", dataset.format_coverage(counts))
+        for lang in SHIPPED_LANGS:
+            counts = dataset.coverage(ROOT, lang)
+            self.assertEqual(counts[("bank", "C00")], 8, lang)
+            self.assertEqual(counts[("bank", "C08")], 2, lang)
+            self.assertEqual(counts[("telecom", "C01")], 1, lang)
+            self.assertEqual(sum(counts.values()), 3 * (8 + 16), lang)  # 24 cases per domain
+            self.assertIn("C05", dataset.format_coverage(counts))
 
 
 class ValidationTest(unittest.TestCase):

@@ -1,0 +1,14 @@
+id: shop.C08.002
+lang: ko
+domain: shop
+capability: C08
+title: "같은 질문이라도 베이직 등급 고객에게는 다른 답이 나온다 (6달러)"
+tags: [attribute, api]
+setup:
+  customer: {tier: basic}
+turns:
+  - user: {kind: utterance, text: "배송비 얼마예요"}
+    expect:
+      tool_calls:
+        - {name: get_shipping_fee, args: {tier: basic}}
+      reply_contains_any: ["6달러", "육 달러"]

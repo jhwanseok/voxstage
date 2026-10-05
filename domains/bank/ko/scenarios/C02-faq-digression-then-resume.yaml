@@ -1,0 +1,23 @@
+id: bank.C02.001
+lang: ko
+domain: bank
+capability: C02
+title: "이체 중 곁다리 질문에 답한 뒤 멈췄던 이체 흐름으로 돌아온다"
+tags: [digression, resume]
+turns:
+  - user: {kind: utterance, text: 이체하려고 하는데요}
+    expect:
+      flow: transfer
+      reply_contains_any: [얼마, 금액]
+  - user: {kind: utterance, text: 아 잠깐 몇 시까지 하세요}
+    expect:
+      flow: transfer
+      reply_contains: [오전 9시]
+      reply_contains_any: [얼마, 금액]
+  - user: {kind: utterance, text: 오십 달러요}
+    expect:
+      flow: transfer
+      slots: {amount: "50"}
+variants:
+  - turn: 1
+    texts: [하나만 물어볼게요 주말에도 열어요, 잠시만요 지점은 언제 가면 되죠, 그 전에 영업시간부터 알려 주세요]

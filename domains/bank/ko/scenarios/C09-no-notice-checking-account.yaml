@@ -1,0 +1,12 @@
+id: bank.C09.002
+lang: ko
+domain: bank
+capability: C09
+title: "조건 밖의 상품(입출금 통장)에는 예금 고지 문구가 나오면 안 된다"
+tags: [verbatim, compliance, negative]
+turns:
+  - user: {kind: utterance, text: 입출금 통장 만들고 싶어요}
+    expect:
+      flow: checking_signup
+      reply_not_contains:
+        - 약정된 이율보다 낮은 이율이 적용될 수 있습니다

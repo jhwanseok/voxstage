@@ -1,0 +1,17 @@
+id: shop.C04.001
+lang: ko
+domain: shop
+capability: C04
+title: "메뉴 선택은 버튼으로, 주문번호는 키패드 숫자로 입력된다"
+tags: [dtmf, button]
+turns:
+  - user: {kind: button, button_id: menu_track}
+    expect:
+      flow: order_status
+      reply_contains: ["주문번호"]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      slots: {order_id: "1001"}
+      tool_calls:
+        - {name: get_order_status, args: {order_id: "1001"}}
+      reply_contains_any: ["배송 중", "10월 8일", "10/08"]

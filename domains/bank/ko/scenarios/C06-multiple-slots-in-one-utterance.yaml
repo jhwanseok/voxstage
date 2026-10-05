@@ -1,0 +1,14 @@
+id: bank.C06.001
+lang: ko
+domain: bank
+capability: C06
+title: "한 문장에 담긴 여러 슬롯을 모두 잡고, 이어지는 말에서는 언급한 슬롯만 바꾼다"
+tags: [multi_slot, carry_over]
+turns:
+  - user: {kind: utterance, text: 내 저축 계좌로 이백 달러 보내 주세요}
+    expect:
+      flow: transfer
+      slots: {amount: "200", to_account: savings}
+  - user: {kind: utterance, text: 아니 삼백 달러로 할게요}
+    expect:
+      slots: {amount: "300", to_account: savings}

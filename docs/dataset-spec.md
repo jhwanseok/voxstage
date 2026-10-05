@@ -10,7 +10,7 @@ from scratch.
 ```
 domains/<domain>/          domain = bank | shop | telecom
   tools.yaml               fake backend API (rules keyed by arguments, ADR 0004); shared by all languages
-  <lang>/                  en first; ko is added later as a parallel directory (ADR 0006)
+  <lang>/                  en and ko, parallel twins with the same ids (ADR 0006, 0007)
     faq.yaml               C00: FAQ entries with paraphrase and recognition-error variants
     scenarios/*.yaml       one capability case per file
 ```
@@ -108,12 +108,14 @@ not exact wording, except where wording is the requirement (C09).
 
 ## Status
 
-All three domains (bank, shop, telecom) have the full set in English: eight FAQ entries and
-sixteen scenarios each, 72 cases in total (`python -m voxstage.dataset coverage`). The bank
-pilot slice was reviewed and approved; everything else is a first draft awaiting review.
-Korean comes later, as a parallel `ko/` directory with the same ids.
+All three domains (bank, shop, telecom) have the full set in English and in Korean: eight FAQ
+entries and sixteen scenarios per domain and language, 72 cases per language
+(`python -m voxstage.dataset coverage [dir] [en|ko]`). The bank pilot slice in English was
+reviewed and approved; everything else is a first draft awaiting review. Korean cases are twins
+of the English ones, not translations (ADR 0007).
 
 Integrity tests: every domain covers every capability; fake-API calls expected by a scenario
 are answerable by that domain's `tools.yaml` (including expected failures); the phrase a C09
 negative case forbids is part of the notice its positive case requires; no Hangul in English
-files; ASR variants differ from the question and its paraphrases.
+files and Hangul in Korean utterances; Korean and English twins share ids, setup, flow, slots,
+tool calls and actions; ASR variants differ from the question and its paraphrases.

@@ -1,0 +1,21 @@
+id: telecom.C05.001
+lang: ko
+domain: telecom
+capability: C05
+title: "요금제 용량을 잘못 알아들은 뒤 고객의 정정으로 슬롯을 다시 채운다"
+tags: [dst, asr_error, correction]
+turns:
+  - user:
+      kind: utterance
+      text: 사십 기가 요금제로 할게요
+      asr_text: 십사 기가 요금제로 할게요   # 인식 오류 시뮬레이션 (직접 작성)
+    expect:
+      slots: {plan_gb: "14"}
+      reply_contains_any: [십사, "14"]
+  - user: {kind: utterance, text: 아니요 십사 말고 사십이요}
+    expect:
+      slots: {plan_gb: "40"}
+      reply_contains_any: [사십, "40"]
+variants:
+  - turn: 1
+    texts: [아뇨 사십이라고 했는데요, 잘못 들으셨어요 40기가예요, 사십 기가요 십사 아니고]

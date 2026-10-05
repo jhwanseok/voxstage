@@ -1,0 +1,18 @@
+id: shop.C01.001
+lang: ko
+domain: shop
+capability: C01
+title: "배송 조회 중 취소를 요청하면 주문 취소 흐름으로 전환된다"
+tags: [switch]
+turns:
+  - user: {kind: utterance, text: "제 주문 어디쯤 왔어요"}
+    expect:
+      flow: order_status
+      reply_contains_any: ["주문번호", "어떤 주문"]
+  - user: {kind: utterance, text: "아 그냥 그거 취소할게요"}
+    expect:
+      flow: cancel_order
+      reply_contains_any: ["취소", "주문번호"]
+variants:
+  - turn: 1
+    texts: ["조회 말고 취소해 주세요", "생각이 바뀌어서요 안 받을래요", "그냥 주문 없던 걸로 하고 싶어요"]

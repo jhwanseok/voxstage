@@ -1,0 +1,12 @@
+id: telecom.C09.002
+lang: ko
+domain: telecom
+capability: C09
+title: "요금제를 올릴 때는 낮출 때의 안내 문구가 나가면 안 된다"
+tags: [verbatim, compliance, negative]
+turns:
+  - user: {kind: utterance, text: 플러스 요금제로 올리고 싶어요}
+    expect:
+      flow: change_plan
+      reply_not_contains:
+        - 30일 동안은 되돌릴 수 없습니다

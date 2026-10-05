@@ -1,0 +1,14 @@
+id: telecom.C08.002
+lang: ko
+domain: telecom
+capability: C08
+title: "같은 질문이라도 월 단위 약정이면 다른 답이 나온다 (25달러)"
+tags: [attribute, api]
+setup:
+  customer: {contract: monthly}
+turns:
+  - user: {kind: utterance, text: 플러스 요금제는 얼마예요}
+    expect:
+      tool_calls:
+        - {name: get_plan_price, args: {plan: plus, contract: monthly}}
+      reply_contains_any: [25달러, 이십오 달러]

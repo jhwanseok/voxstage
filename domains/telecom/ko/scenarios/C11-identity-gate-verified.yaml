@@ -1,0 +1,19 @@
+id: telecom.C11.001
+lang: ko
+domain: telecom
+capability: C11
+title: "비밀번호 확인이 끝나기 전에는 청구 내역을 알려 주지 않고 확인 후에 알려 준다"
+tags: [verification, gate]
+setup:
+  customer: {account_last4: "5580"}
+turns:
+  - user: {kind: utterance, text: 이번 달 요금이 얼마예요}
+    expect:
+      tool_calls: []
+      reply_contains_any: [본인 확인, 인증, 비밀번호, PIN]
+  - user: {kind: dtmf, digits: "1357"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {account_last4: "5580", pin: "1357"}}
+        - {name: get_bill, args: {account_last4: "5580"}}
+      reply_contains_any: [45달러, 사십오 달러]

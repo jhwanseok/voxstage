@@ -1,0 +1,17 @@
+id: bank.C04.001
+lang: ko
+domain: bank
+capability: C04
+title: "메뉴 선택은 버튼으로, 계좌 끝 네 자리는 키패드로 들어온다 (인식 오류 없음)"
+tags: [dtmf, button]
+turns:
+  - user: {kind: button, button_id: menu_balance}
+    expect:
+      flow: balance_inquiry
+      reply_contains: [네 자리]
+  - user: {kind: dtmf, digits: "4821"}
+    expect:
+      slots: {account_last4: "4821"}
+      tool_calls:
+        - {name: get_balance, args: {account_last4: "4821"}}
+      reply_contains_any: [잔액, "1,250", 천이백오십]

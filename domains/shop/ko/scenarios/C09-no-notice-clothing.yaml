@@ -1,0 +1,12 @@
+id: shop.C09.002
+lang: ko
+domain: shop
+capability: C09
+title: "의류 반품에는 전자제품 안내 문구가 나오면 안 된다"
+tags: [verbatim, compliance, negative]
+turns:
+  - user: {kind: utterance, text: "티셔츠 반품할게요"}
+    expect:
+      flow: return_request
+      reply_not_contains:
+        - "개봉한 제품은 불량인 경우에만 접수됩니다"

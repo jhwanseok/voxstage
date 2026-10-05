@@ -1,0 +1,13 @@
+id: shop.C12.001
+lang: ko
+domain: shop
+capability: C12
+title: "정책 버전 1: 50달러 초과 주문은 무료 배송"
+tags: [policy, change_impact]
+setup:
+  policy: {version: v1, free_shipping_threshold: "50"}
+turns:
+  - user: {kind: utterance, text: "얼마 이상 사야 배송비 안 내요"}
+    expect:
+      reply_contains_any: ["50달러", "오십 달러"]
+      reply_not_contains: ["75달러", "칠십오 달러"]

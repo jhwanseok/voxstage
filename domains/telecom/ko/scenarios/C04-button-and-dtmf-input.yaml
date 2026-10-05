@@ -1,0 +1,17 @@
+id: telecom.C04.001
+lang: ko
+domain: telecom
+capability: C04
+title: "메뉴 선택은 버튼으로 들어오고 회선 뒷자리 네 자리는 키패드로 입력된다"
+tags: [dtmf, button]
+turns:
+  - user: {kind: button, button_id: menu_usage}
+    expect:
+      flow: data_usage
+      reply_contains: [뒤 네 자리]
+  - user: {kind: dtmf, digits: "5580"}
+    expect:
+      slots: {line_last4: "5580"}
+      tool_calls:
+        - {name: get_data_usage, args: {line_last4: "5580"}}
+      reply_contains_any: [12기가, 12 기가, 십이 기가, 12GB]

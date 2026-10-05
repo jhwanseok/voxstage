@@ -1,0 +1,26 @@
+id: shop.C03.001
+lang: ko
+domain: shop
+capability: C03
+title: "한 단계 뒤로 가도 앞서 말한 값이 유지되고, 상담원을 요청하면 연결된다"
+tags: [back, handoff]
+turns:
+  - user: {kind: utterance, text: "배송지 좀 바꾸려고요"}
+    expect:
+      flow: change_address
+      reply_contains_any: ["주문번호", "어떤 주문"]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      slots: {order_id: "1001"}
+      reply_contains_any: ["새 주소", "주소"]
+  - user: {kind: utterance, text: "아 뒤로 갈게요"}
+    expect:
+      flow: change_address
+      slots: {order_id: "1001"}
+      reply_contains_any: ["주문번호", "어떤 주문"]
+  - user: {kind: utterance, text: "그냥 상담원 연결해 주세요"}
+    expect:
+      actions: [HandOff]
+variants:
+  - turn: 2
+    texts: ["한 단계만 전으로요", "이전으로 돌아가 주세요", "아니 그거 다시 할게요"]

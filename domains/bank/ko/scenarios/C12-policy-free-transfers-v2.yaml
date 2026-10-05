@@ -1,0 +1,13 @@
+id: bank.C12.002
+lang: ko
+domain: bank
+capability: C12
+title: "정책 버전 2: 매달 무료 이체 5회 (같은 질문, 바뀐 규칙)"
+tags: [policy, change_impact]
+setup:
+  policy: {version: v2, free_transfers_per_month: "5"}
+turns:
+  - user: {kind: utterance, text: 한 달에 무료 이체가 몇 번이에요}
+    expect:
+      reply_contains_any: [다섯, 오 회, "5"]
+      reply_not_contains: [세 번, 세 건, 삼 회]

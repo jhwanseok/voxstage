@@ -1,0 +1,12 @@
+id: shop.C09.001
+lang: ko
+domain: shop
+capability: C09
+title: "전자제품 반품에는 고정 안내 문구가 그대로 포함되어야 한다"
+tags: [verbatim, compliance]
+turns:
+  - user: {kind: utterance, text: "노트북 반품하려고 하는데요"}
+    expect:
+      flow: return_request
+      reply_contains:
+        - "전자제품은 미개봉 시 14일 이내에 반품할 수 있으며, 개봉한 제품은 불량인 경우에만 접수됩니다."

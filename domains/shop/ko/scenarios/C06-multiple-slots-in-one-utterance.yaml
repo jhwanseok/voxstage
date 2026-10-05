@@ -1,0 +1,14 @@
+id: shop.C06.001
+lang: ko
+domain: shop
+capability: C06
+title: "상품, 주문, 사이즈를 한 문장에 말하고, 이어지는 말로 사이즈만 바뀐다"
+tags: [multi_slot, carry_over]
+turns:
+  - user: {kind: utterance, text: "천일 주문에서 산 파란 재킷 반품할 건데 사이즈는 미디엄이었어요"}
+    expect:
+      flow: return_request
+      slots: {item: blue jacket, order_id: "1001", size: medium}
+  - user: {kind: utterance, text: "아 라지로 해 주세요"}
+    expect:
+      slots: {item: blue jacket, order_id: "1001", size: large}

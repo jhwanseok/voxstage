@@ -1,0 +1,14 @@
+id: shop.C08.001
+lang: ko
+domain: shop
+capability: C08
+title: "회원 등급(속성)과 API 결과로 배송비를 안내한다 (골드: 무료)"
+tags: [attribute, api]
+setup:
+  customer: {tier: gold}
+turns:
+  - user: {kind: utterance, text: "배송비 얼마예요"}
+    expect:
+      tool_calls:
+        - {name: get_shipping_fee, args: {tier: gold}}
+      reply_contains_any: ["무료", "배송비가 없", "배송비는 없"]

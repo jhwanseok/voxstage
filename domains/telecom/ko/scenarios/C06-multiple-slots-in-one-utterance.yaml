@@ -1,0 +1,14 @@
+id: telecom.C06.001
+lang: ko
+domain: telecom
+capability: C06
+title: "회선, 부가서비스, 기간이 한 문장으로 들어오고 후속 발화는 기간만 바꾼다"
+tags: [multi_slot, carry_over]
+turns:
+  - user: {kind: utterance, text: 5580으로 끝나는 번호에 해외 로밍 십 일만 추가해 주세요}
+    expect:
+      flow: roaming_setup
+      slots: {line_last4: "5580", feature: roaming, duration_days: "10"}
+  - user: {kind: utterance, text: 십사 일로 해 주세요}
+    expect:
+      slots: {line_last4: "5580", feature: roaming, duration_days: "14"}

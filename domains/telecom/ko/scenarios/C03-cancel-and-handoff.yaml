@@ -1,0 +1,24 @@
+id: telecom.C03.001
+lang: ko
+domain: telecom
+capability: C03
+title: "취소하면 흐름에서 나오고 상담원을 요청하면 상담원에게 연결한다"
+tags: [cancel, handoff]
+turns:
+  - user: {kind: utterance, text: 요금제 변경하려고요}
+    expect:
+      flow: change_plan
+  - user: {kind: utterance, text: 아 됐어요 그냥 안 할게요}
+    expect:
+      flow: main_menu
+      slots: {}
+      actions: []
+  - user: {kind: utterance, text: 상담원 연결해 주세요}
+    expect:
+      actions: [HandOff]
+      reply_contains_any: [상담원, 연결]
+variants:
+  - turn: 1
+    texts: [취소할게요, 그만할래요 아무것도 안 바꿀래요, 없던 걸로 해 주세요]
+  - turn: 2
+    texts: [사람이랑 얘기하고 싶어요, 고객센터로 돌려 주세요, 상담사 바꿔 줘요]

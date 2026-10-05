@@ -1,0 +1,18 @@
+id: telecom.C01.001
+lang: ko
+domain: telecom
+capability: C01
+title: "요금제 변경 중에 서비스가 안 된다고 하면 장애 접수 흐름으로 전환한다"
+tags: [switch, priority]
+turns:
+  - user: {kind: utterance, text: 요금제 변경하려고요}
+    expect:
+      flow: change_plan
+      reply_contains_any: [요금제]
+  - user: {kind: utterance, text: 잠깐만요 지금 인터넷이 안 돼요}
+    expect:
+      flow: outage_report
+      reply_contains_any: [껐다 켜, 재부팅, 장애, 서비스]
+variants:
+  - turn: 1
+    texts: [아 근데 신호가 아예 안 잡혀요, 잠시만요 폰이 먹통이에요, 요금제는 됐고 전화가 안 걸려요]

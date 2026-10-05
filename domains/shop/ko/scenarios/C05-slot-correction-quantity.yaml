@@ -1,0 +1,21 @@
+id: shop.C05.001
+lang: ko
+domain: shop
+capability: C05
+title: "수량을 잘못 알아들은 뒤 고객의 정정으로 슬롯이 다시 채워진다"
+tags: [dst, asr_error, correction]
+turns:
+  - user:
+      kind: utterance
+      text: "수량을 십오 개로 바꿔 주세요"
+      asr_text: "수량을 오십 개로 바꿔 주세요"   # simulated recognition error (hand-written)
+    expect:
+      slots: {quantity: "50"}
+      reply_contains_any: ["오십", "50"]
+  - user: {kind: utterance, text: "아니요 십오요 일 오 십오 개요"}
+    expect:
+      slots: {quantity: "15"}
+      reply_contains_any: ["십오", "15"]
+variants:
+  - turn: 1
+    texts: ["아뇨 십오라고 했는데요", "그게 아니고 십오 개예요", "오십 말고 십오요"]

@@ -1,0 +1,20 @@
+id: shop.C02.001
+lang: ko
+domain: shop
+capability: C02
+title: "반품 중 배송 기간 질문에 답한 뒤 반품 흐름이 보류했던 질문을 다시 묻는다"
+tags: [digression, resume]
+turns:
+  - user: {kind: utterance, text: "반품하고 싶은데요"}
+    expect:
+      flow: return_request
+      reply_contains_any: ["주문번호", "어떤 주문"]
+  - user: {kind: utterance, text: "아 잠깐만요 근데 배송은 보통 며칠 걸려요"}
+    expect:
+      flow: return_request
+      reply_contains: ["일반 배송은 영업일 기준 3일에서 5일"]
+      reply_contains_any: ["주문번호", "어떤 주문"]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      flow: return_request
+      slots: {order_id: "1001"}

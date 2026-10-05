@@ -1,0 +1,20 @@
+id: telecom.C02.001
+lang: ko
+domain: telecom
+capability: C02
+title: "요금제 변경 중 요금 납부일 질문에 답한 뒤 다시 요금제 질문으로 돌아온다"
+tags: [digression, resume]
+turns:
+  - user: {kind: utterance, text: 요금제 변경하려고요}
+    expect:
+      flow: change_plan
+      reply_contains_any: [요금제]
+  - user: {kind: utterance, text: 그 전에 요금 납부일이 언제예요}
+    expect:
+      flow: change_plan
+      reply_contains: [매달 같은 날]
+      reply_contains_any: [요금제]
+  - user: {kind: utterance, text: 플러스 요금제로요}
+    expect:
+      flow: change_plan
+      slots: {plan: plus}

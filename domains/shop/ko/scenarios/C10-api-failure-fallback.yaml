@@ -1,0 +1,16 @@
+id: shop.C10.001
+lang: ko
+domain: shop
+capability: C10
+title: "주문 조회 API가 시간 초과되면 그렇게 안내하고 상태를 지어내지 않는다"
+tags: [api_failure, fallback]
+turns:
+  - user: {kind: button, button_id: menu_track}
+    expect:
+      flow: order_status
+  - user: {kind: dtmf, digits: "9999"}
+    expect:
+      tool_calls:
+        - {name: get_order_status, args: {order_id: "9999"}, error: timeout}
+      reply_contains_any: ["다시 시도", "확인할 수 없", "조회하지 못"]
+      reply_not_contains: ["배송 중", "배송 완료", "준비 중"]

@@ -1,0 +1,19 @@
+id: shop.C11.001
+lang: ko
+domain: shop
+capability: C11
+title: "우편번호 확인이 끝나기 전에는 주문 정보를 알려 주지 않고, 통과하면 안내한다"
+tags: [verification, gate]
+setup:
+  customer: {order_id: "1001"}
+turns:
+  - user: {kind: utterance, text: "제 주문 어디쯤 왔어요"}
+    expect:
+      tool_calls: []
+      reply_contains_any: ["우편번호", "본인 확인"]
+  - user: {kind: dtmf, digits: "12345"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {order_id: "1001", zip_code: "12345"}}
+        - {name: get_order_status, args: {order_id: "1001"}}
+      reply_contains_any: ["배송 중", "10월 8일"]

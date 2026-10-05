@@ -1,0 +1,16 @@
+id: bank.C07.001
+lang: ko
+domain: bank
+capability: C07
+title: "말로 한 금액과 상대적 날짜가 시나리오의 시계 기준으로 정확한 값이 된다"
+tags: [normalization, date, number]
+setup:
+  now: "2026-10-05T09:00:00"   # 월요일. 상대 날짜는 이 시각을 기준으로 계산한다
+turns:
+  - user: {kind: utterance, text: 다음 달 십오일에 이천오백 달러 예약 이체 걸어 주세요}
+    expect:
+      flow: scheduled_transfer
+      slots: {amount: "2500", date: "2026-11-15"}
+variants:
+  - turn: 0
+    texts: [이천오백 불을 다음 달 15일에 자동으로 보내 주세요, 십일월 십오일에 이천오백 달러 송금 예약할게요, 담달 보름에 이천오백 달러 예약 이체 부탁해요]
