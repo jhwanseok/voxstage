@@ -1,17 +1,17 @@
 # Spec R2: flow interpreter
 
-Read first: this file, [queue.md](../queue.md), ADR 0003, 0004, 0010, `voxstage/dialogue.py`, `voxstage/tools.py`,
+Read first: this file, [queue.md](../queue.md), ADR 0003, 0004, 0010, 0011, `voxstage/dialogue.py`, `voxstage/tools.py`,
 `voxstage/rules/faq.py` (from R1), `voxstage/evaluate.py`. Do not read other plan files.
 
 ## Goal
 Domains describe conversations as YAML; one generic interpreter runs them. After this step the core never changes
-when a flow is added. English only.
+when a flow is added. English and Korean.
 
 ## Decisions already made (do not reopen)
 ADR 0010: state-machine map with explicit `next`; `{}` template fields plus a small expression language and
 `branch` nodes for conditions; node types dispatched through a registry; validation at load time.
 
-## Schema (`domains/<d>/en/flows/<id>.yaml`)
+## Schema (`domains/<d>/<lang>/flows/<id>.yaml`)
 ```yaml
 id: balance_inquiry
 triggers: {any_of: [balance, how much money]}   # same word-group language as R1
@@ -47,8 +47,11 @@ Used in `branch` conditions and in template fields as `{expr}`; plain `{slot}` a
 3. Load-time validation in `voxstage/rules/flows.py`: unknown node types, missing or unreachable nodes, unknown
    `next` targets, `start` missing, `branch` without `else`, tool names that are not in `tools.yaml`, expression
    errors, slot names used in templates that no `ask` or `call` can have filled.
-4. First flows, English: `balance_inquiry` (bank), `order_status` (shop), `data_usage` (telecom), each a
-   lookup flow without the identity gate (that is R13). Use tools and values from the domain's `tools.yaml`.
+4. First flows, in English and Korean: `balance_inquiry` (bank), `order_status` (shop), `data_usage` (telecom),
+   each a lookup flow without the identity gate (that is R13). Use tools and values from the domain's `tools.yaml`.
+   The Korean flow is a twin of the English one: same flow id, node ids, `next` links, tools and arguments;
+   only prompts, texts and `triggers` are Korean (triggers use the Kiwi matcher of R1). A test enforces the twin rule.
+   Spoken Korean numbers are not extracted here (R11); `digits` accepts digits only.
 5. Pattern note: add the registry and the expression evaluator to `docs/design-patterns.md` (where, why, what was rejected).
 
 ## Metrics
@@ -57,7 +60,7 @@ per flow, lines per flow, expression operators used, and the core diff when the 
 first flow is added (target: zero lines under `voxstage/`).
 
 ## Done when
-- Each of the three flows runs end to end against the fake API in a test, including the error branch
+- Each of the three flows, in both languages, runs end to end against the fake API in a test, including the error branch
   (`0000` timeouts), and the lookup parts of the C04 and C08 scenarios behave as their `expect` says where they
   do not depend on later steps; list the ones that must wait.
 - Validation tests: one failing example per check; expression tests: allowed forms evaluate, each disallowed
