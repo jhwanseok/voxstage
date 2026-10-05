@@ -1,0 +1,15 @@
+id: bank.C08.001
+lang: en
+domain: bank
+capability: C08
+title: "Customer grade (attribute) plus API result gives the transfer fee answer (gold: no fee)"
+tags: [attribute, api]
+setup:
+  customer: {grade: gold}
+turns:
+  - user: {kind: utterance, text: What is the fee if I transfer five hundred dollars}
+    expect:
+      slots: {amount: "500"}
+      tool_calls:
+        - {name: get_transfer_fee, args: {amount: "500", grade: gold}}
+      reply_contains_any: [no fee, free, waived, zero]

@@ -1,0 +1,12 @@
+id: bank.C09.001
+lang: en
+domain: bank
+capability: C09
+title: "The time deposit sign-up reply must contain the required notice exactly as written"
+tags: [verbatim, compliance]
+turns:
+  - user: {kind: utterance, text: I want to open a time deposit}
+    expect:
+      flow: time_deposit_signup
+      reply_contains:
+        - This is a deposit product, and if you close it before maturity, a lower interest rate than agreed may apply.

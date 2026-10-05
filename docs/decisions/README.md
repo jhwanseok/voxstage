@@ -22,6 +22,7 @@ reading an analysis, the record says that, and the decider may add their own wor
 | [0003](0003-rule-engine-representation.md) | S1 rules are declarative YAML run by an interpreter | accepted |
 | [0004](0004-dummy-api-tool-executor.md) | Tool calls go through a ToolExecutor port with a declarative fake API | accepted |
 | [0005](0005-dataset-first-development.md) | Datasets come first; capabilities are built one problem at a time | accepted |
+| [0006](0006-english-first.md) | Datasets are English first; Korean is added later | accepted |
 
 ## Template
 

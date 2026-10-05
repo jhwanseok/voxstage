@@ -1,0 +1,45 @@
+# Synthetic FAQ for a fictional bank. Written from scratch for this project.
+# `answer` is the verbatim reply. `asr_variants` are hand-written plausible recognition errors
+# (similar sounds, dropped words); they are NOT real ASR output. Real noise comes in audio mode later.
+lang: en
+entries:
+  - id: bank.faq.hours
+    question: What are your opening hours
+    answer: Our branches are open from 9 a.m. to 4 p.m. on weekdays and closed on weekends and public holidays.
+    paraphrases: [What time do you close, When can I visit a branch, Are you open on Saturdays]
+    asr_variants: [What are your opening ours, What are your open in hours]
+  - id: bank.faq.card_loss
+    question: What should I do if I lose my debit card
+    answer: You can report a lost card in the app or by calling customer support, and the card is blocked as soon as you report it.
+    paraphrases: [I lost my card what do I do, My debit card is missing how do I block it, I think someone stole my card]
+    asr_variants: [I lust my card what do I do, My debit card is missing how do I black it]
+  - id: bank.faq.transfer_limit
+    question: What is my transfer limit
+    answer: Transfer limits depend on your account type and verification method, and you can check or change them under Limits in the app.
+    paraphrases: [How much can I send per day, I want to raise my transfer limit, Is there a cap on how much I can transfer]
+    asr_variants: [What is my transfer limits, How much can I sin per day]
+  - id: bank.faq.password_locked
+    question: My password is locked after too many attempts
+    answer: If your account is locked after failed password attempts, you can reset it in the app after verifying your identity.
+    paraphrases: [I can't log in because I entered the wrong password, How do I unlock my online banking, I got locked out of my account]
+    asr_variants: [My pass word is locked after too many a tempts, I can't login because I entered the wrong past word]
+  - id: bank.faq.statement_copy
+    question: How do I get a copy of my statement
+    answer: You can download statements in the app under Documents, or ask for a printed copy at any branch with a photo ID.
+    paraphrases: [Where can I find my bank statements, I need last month's statement, Can I get a printed statement]
+    asr_variants: [How do I get a copy of my state meant, I need last month's statement meant]
+  - id: bank.faq.recurring_payment
+    question: How do I change or cancel a recurring payment
+    answer: You can change the amount or date of a recurring payment, or cancel it, under Recurring Payments in the app.
+    paraphrases: [I want to stop my automatic payment, How do I change my standing order amount, Can I move my payment date]
+    asr_variants: [How do I change or counsel a recurring payment, I want to stop my auto matic payment]
+  - id: bank.faq.international_transfer
+    question: Can I send money abroad
+    answer: International transfers are available at branches and in the app, and the fee and arrival time depend on the destination country.
+    paraphrases: [I want to wire money overseas, How do I send money to another country, What does an international transfer cost]
+    asr_variants: [Can I send money a broad, What does an international transfer cast]
+  - id: bank.faq.loan_payoff
+    question: Can I pay off my loan early
+    answer: You can pay part or all of a loan early under Loans in the app, and an early repayment fee may apply depending on your terms.
+    paraphrases: [I want to repay my loan ahead of schedule, Is there a fee for paying off a loan early, How do I clear the rest of my loan at once]
+    asr_variants: [Can I pay off my low an early, Can I pay of my loan yearly]

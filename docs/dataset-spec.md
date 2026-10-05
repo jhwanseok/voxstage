@@ -9,12 +9,17 @@ from scratch.
 
 ```
 domains/<domain>/          domain = bank | shop | telecom
-  faq.yaml                 C00: FAQ entries with paraphrase and recognition-error variants
-  tools.yaml               fake backend API (rules keyed by arguments, see ADR 0004)
-  scenarios/*.yaml         one capability case per file
+  tools.yaml               fake backend API (rules keyed by arguments, ADR 0004); shared by all languages
+  <lang>/                  en first; ko is added later as a parallel directory (ADR 0006)
+    faq.yaml               C00: FAQ entries with paraphrase and recognition-error variants
+    scenarios/*.yaml       one capability case per file
 ```
 
-Check the files and see progress with `python -m voxstage.dataset coverage`. Loading is strict:
+Every `faq.yaml` and scenario file carries `lang:`, which must match its directory. Ids are
+shared across languages (`bank.C05.001` is the same case in `en` and `ko`), so a translated
+case keeps its id.
+
+Check the files and see progress with `python -m voxstage.dataset coverage [domains_dir] [lang]`. Loading is strict:
 unknown keys, wrong capability ids, unquoted digits and mismatched directories all fail at
 load time with the file name.
 
@@ -39,6 +44,7 @@ load time with the file name.
 ## FAQ entry
 
 ```yaml
+lang: en
 entries:
   - id: bank.faq.hours
     question: canonical question
@@ -54,6 +60,7 @@ output. They stand in for noise until audio mode exists.
 
 ```yaml
 id: bank.C05.001               # <domain>.<capability>.<number>, must match the directory and fields
+lang: en                       # must match the <lang>/ directory
 domain: bank
 capability: C05
 title: "quote titles that contain a colon"
@@ -63,8 +70,8 @@ setup:                         # optional fixtures, e.g. customer attributes
 turns:
   - user:                      # exactly one of three input kinds
       kind: utterance          # text (+ optional asr_text: what the recognizer "heard")
-      text: 삼십만 원 이체해 주세요
-      asr_text: 십만 원 이체해 주세요
+      text: Transfer thirty dollars please
+      asr_text: Transfer thirteen dollars please
     expect:                    # all keys optional
       flow: transfer
       slots: {amount: "100000"}
@@ -94,5 +101,6 @@ not exact wording, except where wording is the requirement (C09).
 
 ## Status
 
-Pilot slice (bank): C00 plus C01, C04, C05, C08, C09. The remaining capabilities and the
-shop and telecom domains follow after the pilot is reviewed.
+Pilot slice (bank, English): C00 plus C01, C04, C05, C08, C09, reviewed and approved. The
+remaining capabilities and the shop and telecom domains follow. Korean comes later, as a
+parallel `ko/` directory with the same ids.

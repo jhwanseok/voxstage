@@ -1,0 +1,12 @@
+id: bank.C09.002
+lang: en
+domain: bank
+capability: C09
+title: "A product outside the condition (checking account) must not get the deposit notice"
+tags: [verbatim, compliance, negative]
+turns:
+  - user: {kind: utterance, text: I want to open a checking account}
+    expect:
+      flow: checking_signup
+      reply_not_contains:
+        - a lower interest rate than agreed may apply

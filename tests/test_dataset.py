@@ -17,6 +17,7 @@ class ShippedDataTest(unittest.TestCase):
     def test_bank_pilot_loads(self):
         faq, scenarios = dataset.load_domain(os.path.join(ROOT, "bank"))
         self.assertEqual(len(faq), 8)
+        self.assertTrue(all(s.lang == "en" for s in scenarios))
         self.assertEqual({s.capability for s in scenarios}, {"C01", "C04", "C05", "C08", "C09"})
 
     def test_faq_answers_are_unique(self):
@@ -25,33 +26,50 @@ class ShippedDataTest(unittest.TestCase):
 
     def test_scenario_tool_calls_match_the_fake_api(self):
         """Every tool call a scenario expects must be answerable by the domain's tools.yaml."""
-        api = FakeApiExecutor.from_yaml(os.path.join(ROOT, "bank", "tools.yaml"))
+        api = FakeApiExecutor.from_yaml(os.path.join(ROOT, "bank", "tools.yaml"))  # shared across languages
         _, scenarios = dataset.load_domain(os.path.join(ROOT, "bank"))
         for s in scenarios:
             for t in s.turns:
                 for call in t.expect.get("tool_calls", []):
                     self.assertTrue(api.call(call["name"], call["args"]).ok, f"{s.id}: {call}")
 
+    def test_dataset_is_english_and_contains_no_korean(self):
+        """English first (ADR 0006): no Hangul in any English data file."""
+        import glob
+        files = glob.glob(os.path.join(ROOT, "bank", "en", "**", "*.yaml"), recursive=True)
+        files.append(os.path.join(ROOT, "bank", "tools.yaml"))
+        for path in files:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertFalse(any("\uac00" <= ch <= "\ud7a3" for ch in text), path)
+
+    def test_asr_variants_differ_from_the_question_and_paraphrases(self):
+        faq, _ = dataset.load_domain(os.path.join(ROOT, "bank"))
+        for e in faq:
+            for v in e.asr_variants:
+                self.assertNotEqual(v.lower(), e.question.lower(), e.id)
+                self.assertNotIn(v, e.paraphrases, e.id)
+
     def test_coverage_counts(self):
         counts = dataset.coverage(ROOT)
         self.assertEqual(counts[("bank", "C00")], 8)
         self.assertEqual(counts[("bank", "C08")], 2)
         self.assertEqual(counts[("telecom", "C01")], 0)
-        self.assertIn("C05 슬롯 오기입 재채움", dataset.format_coverage(counts))
+        self.assertIn("C05", dataset.format_coverage(counts))
 
 
 class ValidationTest(unittest.TestCase):
-    def write(self, body, domain="bank", name="x.yaml"):
+    def write(self, body, domain="bank", name="x.yaml", lang="en"):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        d = os.path.join(self.tmp.name, domain, "scenarios")
+        d = os.path.join(self.tmp.name, domain, lang, "scenarios")
         os.makedirs(d)
         p = os.path.join(d, name)
         with open(p, "w", encoding="utf-8") as f:
             f.write(body)
         return p
 
-    BASE = ("id: bank.C01.900\ndomain: bank\ncapability: C01\ntitle: t\nturns:\n"
+    BASE = ("id: bank.C01.900\nlang: en\ndomain: bank\ncapability: C01\ntitle: t\nturns:\n"
             "  - user: {kind: utterance, text: 안녕}\n")
 
     def test_valid_minimal(self):
@@ -73,6 +91,12 @@ class ValidationTest(unittest.TestCase):
             dataset.load_scenario(self.write(self.BASE + "    expect: {replys: [a]}\n"))
         with self.assertRaises(dataset.DatasetError):
             dataset.load_scenario(self.write(self.BASE + "variants:\n  - {turn: 5, texts: [a]}\n"))
+
+    def test_rejects_missing_or_mismatched_lang(self):
+        with self.assertRaises(dataset.DatasetError):
+            dataset.load_scenario(self.write(self.BASE.replace("lang: en\n", "")))
+        with self.assertRaises(dataset.DatasetError):
+            dataset.load_scenario(self.write(self.BASE, lang="ko"))  # file says en, sits in ko/
 
     def test_rejects_wrong_domain_directory(self):
         with self.assertRaises(dataset.DatasetError):

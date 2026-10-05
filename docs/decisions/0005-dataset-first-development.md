@@ -47,8 +47,9 @@ Cases are synthetic and written from scratch; no employer scenario is used or ad
 
 ## Consequences
 
-- `domains/<name>/` holds `faq.yaml`, `tools.yaml` and `scenarios/*.yaml`; the core only
-  reads them through `voxstage/dataset.py`.
+- `domains/<name>/` holds `tools.yaml` plus per-language `faq.yaml` and `scenarios/*.yaml`
+  (language layout: see [0006](0006-english-first.md)); the core only reads them through
+  `voxstage/dataset.py`.
 - The plan's earlier `kb.md` becomes `faq.yaml`, so paraphrase and recognition-error
   variants are structured data.
 - Recognition-error variants are hand-written at first. Real ASR noise enters in audio mode.

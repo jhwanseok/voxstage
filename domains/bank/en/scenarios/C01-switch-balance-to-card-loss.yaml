@@ -1,0 +1,18 @@
+id: bank.C01.001
+lang: en
+domain: bank
+capability: C01
+title: "Mentioning a lost card during a balance check switches to the card-loss flow"
+tags: [switch, priority]
+turns:
+  - user: {kind: utterance, text: I'd like to check my balance}
+    expect:
+      flow: balance_inquiry
+      reply_contains_any: [which account, account]
+  - user: {kind: utterance, text: Oh wait I just lost my card}
+    expect:
+      flow: card_loss
+      reply_contains_any: [report, block, freeze]
+variants:
+  - turn: 1
+    texts: [Actually I lost my debit card, Forget the balance I need to block my card, My card is missing]

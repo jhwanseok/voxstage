@@ -1,10 +1,11 @@
 """Loader and validator for domain datasets (FAQ entries and capability scenarios).
 
-A dataset is data only: `domains/<domain>/faq.yaml`, `tools.yaml`, `scenarios/*.yaml`.
+A dataset is data only: `domains/<domain>/tools.yaml` (shared by all languages) and, per
+language, `domains/<domain>/<lang>/faq.yaml` and `domains/<domain>/<lang>/scenarios/*.yaml`.
 Validation is strict on purpose: a typo in a scenario should fail at load time, not turn into
 a silently wrong experiment. Format reference: docs/dataset-spec.md.
 
-CLI: python -m voxstage.dataset coverage [domains_dir]   # capability x domain matrix
+CLI: python -m voxstage.dataset coverage [domains_dir] [lang]   # capability x domain matrix
 """
 
 from __future__ import annotations
@@ -18,21 +19,22 @@ from typing import Optional
 import yaml
 
 DOMAINS = ("bank", "shop", "telecom")
+LANGS = ("en", "ko")
 
 CAPABILITIES = {
-    "C00": "FAQ 응답 (기준선)",
-    "C01": "시나리오 전환",
-    "C02": "곁가지 후 복귀",
-    "C03": "취소·뒤로가기·상담사 연결",
-    "C04": "버튼·DTMF 입력",
-    "C05": "슬롯 오기입 재채움",
-    "C06": "다중 슬롯·생략·지시어",
-    "C07": "숫자·날짜·시간 정규화",
-    "C08": "속성과 API 결과로 답변 생성",
-    "C09": "조건별 고정 답변",
-    "C10": "외부 API 실패·지연 폴백",
-    "C11": "본인확인 전 정보 제공 차단",
-    "C12": "정책 변경 영향 범위",
+    "C00": "FAQ answer (baseline)",
+    "C01": "Scenario switch",
+    "C02": "Return after a side question",
+    "C03": "Cancel, back, hand off to an agent",
+    "C04": "Button / DTMF input",
+    "C05": "Slot re-fill after misrecognition",
+    "C06": "Multiple slots, omissions, references",
+    "C07": "Number, date, time normalisation",
+    "C08": "Answer from attributes and API results",
+    "C09": "Condition-specific fixed answer",
+    "C10": "External API failure or delay fallback",
+    "C11": "Block information before identity check",
+    "C12": "Policy-change impact",
 }
 
 INPUT_KINDS = {
@@ -43,7 +45,7 @@ INPUT_KINDS = {
 
 EXPECT_KEYS = {"flow", "slots", "reply_contains", "reply_contains_any", "reply_not_contains",
                "tool_calls", "actions"}
-SCENARIO_KEYS = {"id", "domain", "capability", "title", "setup", "turns", "variants", "tags"}
+SCENARIO_KEYS = {"id", "lang", "domain", "capability", "title", "setup", "turns", "variants", "tags"}
 
 
 @dataclass(frozen=True)
@@ -55,6 +57,7 @@ class Turn:
 @dataclass(frozen=True)
 class Scenario:
     id: str
+    lang: str
     domain: str
     capability: str
     title: str
@@ -111,17 +114,20 @@ def load_scenario(path: str) -> Scenario:
     extra = set(raw) - SCENARIO_KEYS
     if extra:
         _fail(path, f"unknown keys {sorted(extra)}")
-    for key in ("id", "domain", "capability", "title", "turns"):
+    for key in ("id", "lang", "domain", "capability", "title", "turns"):
         if key not in raw:
             _fail(path, f"missing '{key}'")
+    if raw["lang"] not in LANGS:
+        _fail(path, f"lang must be one of {LANGS}")
     if raw["domain"] not in DOMAINS:
         _fail(path, f"domain must be one of {DOMAINS}")
     if raw["capability"] not in CAPABILITIES:
         _fail(path, f"capability must be one of {sorted(CAPABILITIES)}")
     if not str(raw["id"]).startswith(f"{raw['domain']}.{raw['capability']}."):
         _fail(path, f"id must start with '{raw['domain']}.{raw['capability']}.'")
-    if os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(path)))) != raw["domain"]:
-        _fail(path, "file is not under domains/<domain>/scenarios/ matching its domain")
+    parts = os.path.abspath(path).split(os.sep)
+    if len(parts) < 5 or parts[-2] != "scenarios" or parts[-3] != raw["lang"] or parts[-4] != raw["domain"]:
+        _fail(path, "file must be under domains/<domain>/<lang>/scenarios/ matching its domain and lang")
     turns = raw["turns"]
     if not isinstance(turns, list) or not turns:
         _fail(path, "turns must be a non-empty list")
@@ -142,7 +148,7 @@ def load_scenario(path: str) -> Scenario:
             _fail(path, "each variant needs a valid 'turn' index and a non-empty 'texts' list")
         if turns[v["turn"]]["user"]["kind"] != "utterance":
             _fail(path, f"variant for turn {v['turn']}: only utterance turns can have text variants")
-    return Scenario(id=raw["id"], domain=raw["domain"], capability=raw["capability"],
+    return Scenario(id=raw["id"], lang=raw["lang"], domain=raw["domain"], capability=raw["capability"],
                     title=raw["title"], turns=tuple(parsed), setup=raw.get("setup") or {},
                     variants=tuple(variants), tags=tuple(raw.get("tags") or ()), path=path)
 
@@ -150,7 +156,11 @@ def load_scenario(path: str) -> Scenario:
 def load_faq(path: str) -> list[FaqEntry]:
     raw = _load_yaml(path)
     if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list):
-        _fail(path, "must be a mapping with an 'entries' list")
+        _fail(path, "must be a mapping with 'lang' and an 'entries' list")
+    if raw.get("lang") not in LANGS or set(raw) - {"lang", "entries"}:
+        _fail(path, f"needs 'lang' (one of {LANGS}) and 'entries' only")
+    if os.path.basename(os.path.dirname(os.path.abspath(path))) != raw["lang"]:
+        _fail(path, "faq.yaml must sit in the directory named after its lang")
     out, seen = [], set()
     for e in raw["entries"]:
         extra = set(e) - {"id", "question", "answer", "paraphrases", "asr_variants"}
@@ -171,24 +181,25 @@ def load_faq(path: str) -> list[FaqEntry]:
     return out
 
 
-def load_domain(domain_dir: str) -> tuple[list[FaqEntry], list[Scenario]]:
-    faq_path = os.path.join(domain_dir, "faq.yaml")
+def load_domain(domain_dir: str, lang: str = "en") -> tuple[list[FaqEntry], list[Scenario]]:
+    base = os.path.join(domain_dir, lang)
+    faq_path = os.path.join(base, "faq.yaml")
     faq = load_faq(faq_path) if os.path.exists(faq_path) else []
-    scenarios = [load_scenario(p) for p in sorted(glob.glob(os.path.join(domain_dir, "scenarios", "*.yaml")))]
+    scenarios = [load_scenario(p) for p in sorted(glob.glob(os.path.join(base, "scenarios", "*.yaml")))]
     ids = [s.id for s in scenarios]
     if len(ids) != len(set(ids)):
         raise DatasetError(f"{domain_dir}: duplicate scenario ids")
     return faq, scenarios
 
 
-def coverage(domains_dir: str) -> dict:
+def coverage(domains_dir: str, lang: str = "en") -> dict:
     """{(domain, capability): count}. C00 counts FAQ entries, the others count scenarios."""
     counts = {(d, c): 0 for d in DOMAINS for c in CAPABILITIES}
     for d in DOMAINS:
         path = os.path.join(domains_dir, d)
         if not os.path.isdir(path):
             continue
-        faq, scenarios = load_domain(path)
+        faq, scenarios = load_domain(path, lang)
         counts[(d, "C00")] = len(faq)
         for s in scenarios:
             counts[(d, s.capability)] += 1
@@ -196,7 +207,7 @@ def coverage(domains_dir: str) -> dict:
 
 
 def format_coverage(counts: dict) -> str:
-    lines = ["| 기능 | " + " | ".join(DOMAINS) + " |", "|---|" + "---|" * len(DOMAINS)]
+    lines = ["| Capability | " + " | ".join(DOMAINS) + " |", "|---|" + "---|" * len(DOMAINS)]
     for cap, name in CAPABILITIES.items():
         cells = [str(counts[(d, cap)]) if counts[(d, cap)] else "-" for d in DOMAINS]
         lines.append(f"| {cap} {name} | " + " | ".join(cells) + " |")
@@ -206,6 +217,7 @@ def format_coverage(counts: dict) -> str:
 if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1] == "coverage":
         root = sys.argv[2] if len(sys.argv) > 2 else "domains"
-        print(format_coverage(coverage(root)))
+        lang = sys.argv[3] if len(sys.argv) > 3 else "en"
+        print(format_coverage(coverage(root, lang)))
     else:
         print(__doc__)

@@ -1,0 +1,21 @@
+id: bank.C05.001
+lang: en
+domain: bank
+capability: C05
+title: "After a misheard amount, the user's correction refills the slot"
+tags: [dst, asr_error, correction]
+turns:
+  - user:
+      kind: utterance
+      text: Transfer thirty dollars please
+      asr_text: Transfer thirteen dollars please   # simulated recognition error (hand-written)
+    expect:
+      slots: {amount: "13"}
+      reply_contains_any: [thirteen dollars, "$13"]
+  - user: {kind: utterance, text: No I said thirty dollars}
+    expect:
+      slots: {amount: "30"}
+      reply_contains_any: [thirty dollars, "$30"]
+variants:
+  - turn: 1
+    texts: [No not thirteen thirty, That's wrong it's thirty dollars, I want to send thirty not thirteen]

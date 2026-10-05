@@ -1,16 +1,17 @@
 id: bank.C04.001
+lang: en
 domain: bank
 capability: C04
-title: 메뉴는 버튼으로, 계좌 뒤 네 자리는 키패드로 받는다 (인식 오류 없는 입력 경로)
+title: "The menu choice arrives as a button press and the last four digits as keypad input (no recognition error)"
 tags: [dtmf, button]
 turns:
   - user: {kind: button, button_id: menu_balance}
     expect:
       flow: balance_inquiry
-      reply_contains: [뒤 네 자리]
+      reply_contains: [last four digits]
   - user: {kind: dtmf, digits: "4821"}
     expect:
       slots: {account_last4: "4821"}
       tool_calls:
         - {name: get_balance, args: {account_last4: "4821"}}
-      reply_contains_any: [잔액, 125만, 백이십오만, 1,250,000]
+      reply_contains_any: [balance, "1,250", twelve hundred]
