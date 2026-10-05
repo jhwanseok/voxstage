@@ -96,3 +96,4 @@ voxstage/vendors/         mock, faster-whisper, MeloTTS, Gemini
 - [Workflow: dev and main branches](docs/workflow.md)
 - [Rule-engine step plan (R0–R15)](docs/plan/rule-engine-steps.md)
 - [Data enhancement backlog (after S3)](docs/plan/data-enhancement-backlog.md)
+- [Decision sheet](docs/plan/decision-sheet.md) and [run queue](docs/plan/queue.md)

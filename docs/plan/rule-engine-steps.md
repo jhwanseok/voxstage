@@ -25,8 +25,10 @@ and the ledger row is filled in.
   A weak baseline makes the later comparison meaningless.
 - Do not tune rules to the exact test wording. Paraphrase and recognition-error variants are the
   held-out part; the authored rules may only use the canonical question and the capability spec.
-- A rule added after seeing a failure is recorded in the ledger as a *reactive* rule, separately
-  from rules written up front. The share of reactive rules is itself a finding.
+- Every rule counts the same in the effort measure, whenever it was written. There is no separate
+  label for rules added after a failure; git history shows when each rule arrived (ADR 0008).
+- Authors of rules read only the canonical question, the answer and the capability spec. They do not
+  read `paraphrases` or `asr_variants`, nor the other held-out text of a case (ADR 0009).
 
 ## Dependencies
 
@@ -64,18 +66,19 @@ rule base costs. Everything later is judged by it.
 - Report: pass rate per capability and domain, list of failing checks with the reason, JSON and
   Markdown output. `compare a.json b.json` lists regressions and fixes (used by R14).
 - Effort ledger: `python -m voxstage.ledger` counts, per step and domain, YAML lines and nodes in
-  `flows/`, number of rules and patterns, interpreter and rule-code lines, and the share of
-  reactive rules; appends a row to `docs/ledger/effort.md`.
+  `flows/`, number of rules and patterns, interpreter and rule-code lines;
+  appends a row to `docs/ledger/effort.md`.
 - A `NullDM` (answers nothing) and an `OracleDM` (replays the expected values) to prove the
   scorer's floor (0 percent) and ceiling (100 percent).
 
 **Decisions for the owner.**
+*Decided 2026-10-05: see [ADR 0008](../decisions/0008-evaluation-harness.md) and the decision sheet.*
 1. How a manager gets tools and scenario setup: constructor arguments (`tools`, domain pack) with
    `setup` copied into `state.meta`, or passed on every call. Recommendation: constructor plus
    `state.meta`, consistent with the stateless contract.
 2. Whether `slots` comparison is exact string match or after light normalisation. Recommendation:
    exact, because normalisation is a capability (C07) being measured.
-3. What counts as a *reactive* rule and who labels it. Recommendation: the owner labels it at commit
+3. (Dropped by the owner, see ADR 0008.) What counts as a *reactive* rule and who labels it. Recommendation: the owner labels it at commit
    time with a tag in the ledger.
 
 **Tests.** Scorer unit tests with hand-built results, `NullDM` = 0 and `OracleDM` = 100 on all 72
@@ -103,6 +106,7 @@ the experiment itself.
   domain) to measure false accepts. Needs the owner's approval of the wording.
 
 **Decisions for the owner.**
+*Decided 2026-10-05: see [ADR 0009](../decisions/0009-faq-rule-manager.md). Fallback escalation now belongs to R1, not R8.*
 1. Pattern language: word groups (as above), regular expressions, or both. Recommendation: word
    groups first; regexes only when a word group cannot express the rule, logged as such.
 2. Fallback behaviour: one generic apology, or a counter that escalates to a hand-off after N misses
@@ -114,7 +118,7 @@ the experiment itself.
 the unanswerable lists.
 
 **Metrics.** Top-1 accuracy on paraphrases, on ASR variants, false-accept rate, patterns per entry,
-reactive-rule share.
+patterns per entry counted the same whenever written.
 
 **Public basis to find.** None for hand-written keyword rules. [BEIR](https://arxiv.org/abs/2104.08663)
 supports using BM25 as the baseline once retrieval arrives in S2; that comparison is planned there,
@@ -139,6 +143,7 @@ them. After this step the core never changes when a flow is added.
 - The first flows: `balance_inquiry`, `order_status`, `data_usage` (lookup flows), enough for R3, R4.
 
 **Decisions for the owner.**
+*Decided 2026-10-05: see [ADR 0010](../decisions/0010-flow-interpreter.md). The template language gains a small expression language.*
 1. Schema shape: a node list with implicit order, or a state-machine map with explicit transitions.
    The map is more verbose but makes jumps (R6 to R8) explicit.
 2. Template language: Python-style `{}` fields only, or a small expression language. Recommendation:
@@ -392,7 +397,7 @@ a change; a second run where the same value is hard-coded in several replies, to
 
 **Decisions for the owner.**
 1. Which interactions to include. The assistant proposes a list with the reasoning for each.
-2. Whether S1 is declared finished or reactive rules continue.
+2. Whether S1 is declared finished or more rules continue.
 
 **Write-up hook.** "Rule explosion: it is not the features, it is the pairs."
 

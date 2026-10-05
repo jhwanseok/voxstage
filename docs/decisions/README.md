@@ -24,6 +24,9 @@ reading an analysis, the record says that, and the decider may add their own wor
 | [0005](0005-dataset-first-development.md) | Datasets come first; capabilities are built one problem at a time | accepted |
 | [0006](0006-english-first.md) | Datasets are English first; Korean is added later | accepted |
 | [0007](0007-korean-dataset-alongside-english.md) | A Korean dataset is added alongside the English one | accepted |
+| [0008](0008-evaluation-harness.md) | Evaluation harness: constructor wiring, canonical slot comparison, no reactive-rule label | accepted |
+| [0009](0009-faq-rule-manager.md) | FAQ rule manager: word groups, held-out text, configurable N-miss escalation | accepted |
+| [0010](0010-flow-interpreter.md) | Flow interpreter: state-machine map, small expression language, handler registry, load-time validation | accepted |
 
 ## Template
 

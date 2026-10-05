@@ -9,16 +9,16 @@ Decided by: jhwanseok. Nothing in this sheet is a decision until the Answer colu
 
 | ID | Question | Recommendation | Answer |
 |---|---|---|---|
-| R0-1 | How a manager gets tools and scenario setup: constructor arguments (`tools`, domain pack) with `setup` copied into `state.meta`, or passed on every call. | constructor plus `state.meta`, consistent with the stateless contract. |  |
-| R0-2 | Whether `slots` comparison is exact string match or after light normalisation. | exact, because normalisation is a capability (C07) being measured. |  |
-| R0-3 | What counts as a *reactive* rule and who labels it. | the owner labels it at commit time with a tag in the ledger. |  |
-| R1-1 | Pattern language: word groups (as above), regular expressions, or both. | word groups first; regexes only when a word group cannot express the rule, logged as such. |  |
-| R1-2 | Fallback behaviour: one generic apology, or a counter that escalates to a hand-off after N misses (the latter overlaps with R8). | generic reply now, escalation in R8. |  |
-| R1-3 | Whether the authored patterns may look at `asr_variants` while writing. | no, they are held out. |  |
-| R2-1 | Schema shape: a node list with implicit order, or a state-machine map with explicit transitions. The map is more verbose but makes jumps (R6 to R8) explicit. | state-machine map with explicit transitions: more verbose, but jumps (R6 to R8) and reachability checks stay explicit. |  |
-| R2-2 | Template language: Python-style `{}` fields only, or a small expression language. | `{}` fields only; conditions live in `branch` nodes. |  |
-| R2-3 | How node types dispatch: registry of handlers, `match` statement, or a class per node. Affects the design-patterns record; the assistant presents the three with a short code sketch. | registry of handlers keyed by node type, so a later step adds a node type without touching core code (the step's done-criterion). |  |
-| R2-4 | Where validation of a flow happens (load time, with node reachability checks). | load time. |  |
+| R0-1 | How a manager gets tools and scenario setup: constructor arguments (`tools`, domain pack) with `setup` copied into `state.meta`, or passed on every call. | constructor plus `state.meta`, consistent with the stateless contract. | A (ADR 0008) |
+| R0-2 | Whether `slots` comparison is exact string match or after light normalisation. | exact, because normalisation is a capability (C07) being measured. | exact after a light canonical form: currency symbols/words and thousands separators ignored (ADR 0008) |
+| R0-3 | What counts as a *reactive* rule and who labels it. | the owner labels it at commit time with a tag in the ledger. | dropped: no reactive label, every rule counts the same (ADR 0008) |
+| R1-1 | Pattern language: word groups (as above), regular expressions, or both. | word groups first; regexes only when a word group cannot express the rule, logged as such. | as recommended (ADR 0009) |
+| R1-2 | Fallback behaviour: one generic apology, or a counter that escalates to a hand-off after N misses (the latter overlaps with R8). | generic reply now, escalation in R8. | changed: escalate after N misses, N configurable, action configurable: hand off or end call (ADR 0009) |
+| R1-3 | Whether the authored patterns may look at `asr_variants` while writing. | no, they are held out. | changed: both `paraphrases` and `asr_variants` held out (ADR 0009) |
+| R2-1 | Schema shape: a node list with implicit order, or a state-machine map with explicit transitions. The map is more verbose but makes jumps (R6 to R8) explicit. | state-machine map with explicit transitions: more verbose, but jumps (R6 to R8) and reachability checks stay explicit. | state-machine map (ADR 0010) |
+| R2-2 | Template language: Python-style `{}` fields only, or a small expression language. | `{}` fields only; conditions live in `branch` nodes. | changed: `{}` fields plus a small expression language; `branch` nodes stay (ADR 0010) |
+| R2-3 | How node types dispatch: registry of handlers, `match` statement, or a class per node. Affects the design-patterns record; the assistant presents the three with a short code sketch. | registry of handlers keyed by node type, so a later step adds a node type without touching core code (the step's done-criterion). | registry (ADR 0010) |
+| R2-4 | Where validation of a flow happens (load time, with node reachability checks). | load time. | load time (ADR 0010) |
 | R3-1 | Spoken input at a keypad prompt: accept it, ignore it, or re-prompt. | accept a spoken value through the same extractor, because real callers do it. |  |
 | R3-2 | Invalid keypad input: re-prompt count before escalation. | two, then hand off (needs R8). |  |
 | R4-1 | Number formatting for speech: digits (`$1,250`), words, or both options in the template language. | a formatter per type (`money`, `date`, `count`) chosen in the template, so the choice is data. |  |
@@ -49,5 +49,15 @@ Decided by: jhwanseok. Nothing in this sheet is a decision until the Answer colu
 | R14-2 | Which change to simulate beyond the shipped v1 to v2 pairs. | one threshold change (a fee amount) to show how many rules a different kind of change touches. |  |
 | R15-1 | Which interactions to include. The assistant proposes a list with the reasoning for each. | (none given: the assistant will propose options when asked) | **later** |
 | R15-2 | Whether S1 is declared finished or reactive rules continue. | (none given: the assistant will propose options when asked) | **later** |
+
+
+Open details raised on 2026-10-05 (the run uses the default unless you change it):
+
+| ID | Question | Default used | Answer |
+|---|---|---|---|
+| D-17 | Language scope of rule packs: English only for R0 to R5 with Korean rules in a later pass, or both from R1. Korean needs a tokenisation choice (particles). | English only; Korean rule pack is a separate later step. | |
+| D-R0 | Canonical-form lists: which currency symbols and words. | symbols `$ € £ ¥ ₩`; words dollar(s), usd, 달러, 불, won, krw, 원, yen, jpy, 엔. | |
+| D-R1 | Default N for the miss counter and its default action. | N = 3, hand off. | |
+| D-R2 | Expression grammar boundary. | Comparison, and/or/not, `+ - * / // %`, `in`, attribute and constant-index access, conditional expression, and calls only to whitelisted functions (`len`, `lower`, `upper`, `int`, `str`; formatters added in R4). No lambdas, comprehensions, assignments or imports. | |
 
 Step titles: R0 = Evaluation harness (text mode) and effort ledger; R1 = FAQ with keyword rules (C00, the STT, FAQ, TTS start point without STT and TTS); R2 = Flow interpreter; R3 = Button and DTMF input (C04); R4 = Answers from attributes and API results (C08); R5 = Condition-specific fixed answers (C09); R6 = Scenario switching (C01); R7 = Side question, then return (C02); R8 = Cancel, back, hand-off (C03); R9 = Slot correction after misrecognition (C05); R10 = Many slots at once, carry-over, references (C06); R11 = Normalisation of numbers, dates and times (C07); R12 = API failure and delay fallback (C10); R13 = Identity gate (C11); R14 = Policy change (C12); R15 = Interactions and the complexity report

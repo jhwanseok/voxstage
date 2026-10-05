@@ -11,9 +11,10 @@ Rules:
 
 1. Nothing is pushed to `main` directly. `dev` is merged into `main` when the owner says so.
 2. Every commit is authored as the repo owner. No co-author trailers.
-3. A step is only started when the owner asks for it (see the
-   [rule-engine steps](plan/rule-engine-steps.md)). Each step begins with a decision brief; the
-   owner decides, the decision is recorded in `docs/decisions/`, then the code is written.
+3. Work is planned in the evening and run during the day. The owner makes the decisions in conversation; each
+   decision is recorded in `docs/decisions/` and collected in the
+   [decision sheet](plan/decision-sheet.md). Only items marked `ready` in the [run queue](plan/queue.md) are built,
+   one per run, from their spec file, following the run protocol there. The assistant does not decide.
 4. Tests must pass on `dev` before it is merged into `main`.
 
 ## Releasing `dev` to `main`
