@@ -1,0 +1,18 @@
+id: telecom.C11.002
+lang: en
+domain: telecom
+capability: C11
+title: "A wrong PIN keeps the billing details locked"
+tags: [verification, gate, negative]
+setup:
+  customer: {account_last4: "5580"}
+turns:
+  - user: {kind: utterance, text: What is my current bill}
+    expect:
+      tool_calls: []
+  - user: {kind: dtmf, digits: "1111"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {account_last4: "5580", pin: "1111"}, error: invalid_credentials}
+      reply_contains_any: [incorrect, try again, couldn't verify]
+      reply_not_contains: ["$45", forty five]

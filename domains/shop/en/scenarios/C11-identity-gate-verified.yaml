@@ -1,0 +1,19 @@
+id: shop.C11.001
+lang: en
+domain: shop
+capability: C11
+title: "Order details are withheld until the ZIP code check passes, then released"
+tags: [verification, gate]
+setup:
+  customer: {order_id: "1001"}
+turns:
+  - user: {kind: utterance, text: Where is my order}
+    expect:
+      tool_calls: []
+      reply_contains_any: [ZIP, verify]
+  - user: {kind: dtmf, digits: "12345"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {order_id: "1001", zip_code: "12345"}}
+        - {name: get_order_status, args: {order_id: "1001"}}
+      reply_contains_any: [shipped, October 8]

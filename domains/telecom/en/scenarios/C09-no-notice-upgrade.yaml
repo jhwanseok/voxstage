@@ -1,0 +1,12 @@
+id: telecom.C09.002
+lang: en
+domain: telecom
+capability: C09
+title: "Upgrading a plan must not get the downgrade notice"
+tags: [verbatim, compliance, negative]
+turns:
+  - user: {kind: utterance, text: I want to upgrade to the plus plan}
+    expect:
+      flow: change_plan
+      reply_not_contains:
+        - cannot be reversed for 30 days

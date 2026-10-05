@@ -1,0 +1,20 @@
+id: telecom.C02.001
+lang: en
+domain: telecom
+capability: C02
+title: "A billing question during a plan change is answered, then the plan question comes back"
+tags: [digression, resume]
+turns:
+  - user: {kind: utterance, text: I want to change my plan}
+    expect:
+      flow: change_plan
+      reply_contains_any: [which plan, plan]
+  - user: {kind: utterance, text: Before that when is my bill due}
+    expect:
+      flow: change_plan
+      reply_contains: [Your bill is due on the same day each month]
+      reply_contains_any: [which plan, plan]
+  - user: {kind: utterance, text: The plus plan}
+    expect:
+      flow: change_plan
+      slots: {plan: plus}

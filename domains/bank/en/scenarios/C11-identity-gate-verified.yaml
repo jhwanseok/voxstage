@@ -1,0 +1,19 @@
+id: bank.C11.001
+lang: en
+domain: bank
+capability: C11
+title: "Account information is withheld until the caller passes the PIN check, then released"
+tags: [verification, gate]
+setup:
+  customer: {account_last4: "4821"}
+turns:
+  - user: {kind: utterance, text: What's my balance}
+    expect:
+      tool_calls: []
+      reply_contains_any: [verify, PIN]
+  - user: {kind: dtmf, digits: "2468"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {account_last4: "4821", pin: "2468"}}
+        - {name: get_balance, args: {account_last4: "4821"}}
+      reply_contains_any: [balance, "1,250", twelve hundred]

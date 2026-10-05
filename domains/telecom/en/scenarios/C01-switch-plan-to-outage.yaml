@@ -1,0 +1,18 @@
+id: telecom.C01.001
+lang: en
+domain: telecom
+capability: C01
+title: "Reporting no service during a plan change switches to the outage-report flow"
+tags: [switch, priority]
+turns:
+  - user: {kind: utterance, text: I want to change my plan}
+    expect:
+      flow: change_plan
+      reply_contains_any: [which plan, plan]
+  - user: {kind: utterance, text: Hold on my internet is down right now}
+    expect:
+      flow: outage_report
+      reply_contains_any: [restart, outage, service]
+variants:
+  - turn: 1
+    texts: [Actually I have no signal at all, Wait my phone has no service, Forget the plan I can't make calls]

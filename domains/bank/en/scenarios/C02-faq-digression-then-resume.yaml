@@ -1,0 +1,23 @@
+id: bank.C02.001
+lang: en
+domain: bank
+capability: C02
+title: "A side question during a transfer gets answered, then the transfer flow resumes where it stopped"
+tags: [digression, resume]
+turns:
+  - user: {kind: utterance, text: I want to make a transfer}
+    expect:
+      flow: transfer
+      reply_contains_any: [how much, amount]
+  - user: {kind: utterance, text: Wait what time do you close}
+    expect:
+      flow: transfer
+      reply_contains: [9 a.m. to 4 p.m.]
+      reply_contains_any: [how much, amount]
+  - user: {kind: utterance, text: Fifty dollars}
+    expect:
+      flow: transfer
+      slots: {amount: "50"}
+variants:
+  - turn: 1
+    texts: [Quick question are you open on weekends, Hold on when can I visit a branch, Before that what are your opening hours]

@@ -1,0 +1,44 @@
+# Synthetic FAQ for a fictional online shop. Written from scratch for this project.
+# `answer` is the verbatim reply. `asr_variants` are hand-written plausible recognition errors.
+lang: en
+entries:
+  - id: shop.faq.shipping_time
+    question: How long does shipping take
+    answer: Standard shipping takes three to five business days, and express shipping takes one to two business days.
+    paraphrases: [When will my order arrive, How many days for delivery, What are the delivery times]
+    asr_variants: [How long does shipping tick, How long does ship in take]
+  - id: shop.faq.return_how
+    question: How do I return an item
+    answer: Start a return from Your Orders in the app, print the prepaid label, and drop the package at any carrier location.
+    paraphrases: [I want to send something back, What is the return process, How can I return a product I bought]
+    asr_variants: [How do I re turn an item, How do I a turn an item]
+  - id: shop.faq.track_order
+    question: How can I track my order
+    answer: Open Your Orders in the app and select the order to see its tracking status, or use the tracking link in your confirmation email.
+    paraphrases: [Where is my package, How do I see where my order is, Is there a tracking number]
+    asr_variants: [How can I tack my order, Where is my pack age]
+  - id: shop.faq.change_address
+    question: Can I change my delivery address
+    answer: You can change the delivery address until the order ships, from Your Orders in the app.
+    paraphrases: [I entered the wrong address, How do I update where it is delivered, Can I send my order somewhere else]
+    asr_variants: [Can I change my delivery a dress, Can I change my delivery add dress]
+  - id: shop.faq.payment_methods
+    question: Which payment methods do you accept
+    answer: We accept major credit and debit cards, gift cards, and bank wallets available in your region.
+    paraphrases: [Can I pay with a gift card, What cards do you take, How can I pay for my order]
+    asr_variants: [Which payment method do you except, Which pay meant methods do you accept]
+  - id: shop.faq.gift_wrap
+    question: Do you offer gift wrapping
+    answer: Gift wrapping is available at checkout for a small fee, and you can add a handwritten note.
+    paraphrases: [Can you wrap my order as a gift, I want to add a gift message, Is there a gift option]
+    asr_variants: [Do you offer gift rapping, Do you offer give wrapping]
+  - id: shop.faq.cancel_order
+    question: How do I cancel an order
+    answer: You can cancel an order from Your Orders in the app as long as it has not shipped yet.
+    paraphrases: [I want to cancel my purchase, Can I stop my order, How do I cancel what I just bought]
+    asr_variants: [How do I counsel an order, How do I cancel an odor]
+  - id: shop.faq.use_coupon
+    question: How do I use a coupon code
+    answer: Enter the coupon code in the promo field at checkout, and the discount appears before you pay.
+    paraphrases: [Where do I put my discount code, My promo code is not working, How can I apply a voucher]
+    asr_variants: [How do I use a coop on code, How do I use a coupon cold]

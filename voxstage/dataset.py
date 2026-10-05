@@ -43,6 +43,7 @@ INPUT_KINDS = {
     "button": {"required": {"button_id"}, "optional": {"value"}},
 }
 
+ACTION_NAMES = {"HandOff", "EndCall"}
 EXPECT_KEYS = {"flow", "slots", "reply_contains", "reply_contains_any", "reply_not_contains",
                "tool_calls", "actions"}
 SCENARIO_KEYS = {"id", "lang", "domain", "capability", "title", "setup", "turns", "variants", "tags"}
@@ -107,6 +108,30 @@ def _check_user(path: str, where: str, user) -> None:
             _fail(path, f"{where}: {k} must be a non-empty string (quote digits so YAML keeps them as text)")
 
 
+def _check_expect(path: str, where: str, expect: dict) -> None:
+    """Shape checks for `expect`. `tool_calls` is the exact ordered list of calls the manager
+    must make (an empty list means none); an entry with `error` expects that failure."""
+    if "slots" in expect and not isinstance(expect["slots"], dict):
+        _fail(path, f"{where}: slots must be a mapping")
+    for key in ("reply_contains", "reply_contains_any", "reply_not_contains"):
+        if key in expect and (not isinstance(expect[key], list) or not all(isinstance(x, str) and x for x in expect[key])):
+            _fail(path, f"{where}: {key} must be a list of non-empty strings")
+    if "actions" in expect:
+        bad = [a for a in expect["actions"] if a not in ACTION_NAMES]
+        if not isinstance(expect["actions"], list) or bad:
+            _fail(path, f"{where}: actions must be a list drawn from {sorted(ACTION_NAMES)}")
+    if "tool_calls" in expect:
+        calls = expect["tool_calls"]
+        if not isinstance(calls, list):
+            _fail(path, f"{where}: tool_calls must be a list")
+        for c in calls:
+            if (not isinstance(c, dict) or not isinstance(c.get("name"), str) or not isinstance(c.get("args"), dict)
+                    or set(c) - {"name", "args", "error"}):
+                _fail(path, f"{where}: each tool call needs name, args and optionally error")
+            if not all(isinstance(v, str) for v in c["args"].values()):
+                _fail(path, f"{where}: tool call args must be strings (quote numbers)")
+
+
 def load_scenario(path: str) -> Scenario:
     raw = _load_yaml(path)
     if not isinstance(raw, dict):
@@ -140,6 +165,7 @@ def load_scenario(path: str) -> Scenario:
         bad = set(expect) - EXPECT_KEYS
         if bad:
             _fail(path, f"turn {i}: unknown expect keys {sorted(bad)}")
+        _check_expect(path, f"turn {i}", expect)
         parsed.append(Turn(user=t["user"], expect=expect))
     variants = raw.get("variants") or []
     for v in variants:

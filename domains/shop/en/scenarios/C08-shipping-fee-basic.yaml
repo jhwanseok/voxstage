@@ -1,0 +1,14 @@
+id: shop.C08.002
+lang: en
+domain: shop
+capability: C08
+title: "The same question gets a different answer for a basic tier customer (6 dollars)"
+tags: [attribute, api]
+setup:
+  customer: {tier: basic}
+turns:
+  - user: {kind: utterance, text: How much is shipping}
+    expect:
+      tool_calls:
+        - {name: get_shipping_fee, args: {tier: basic}}
+      reply_contains_any: ["$6", six dollars]

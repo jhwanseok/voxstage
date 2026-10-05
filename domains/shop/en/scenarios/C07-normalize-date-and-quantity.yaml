@@ -1,0 +1,15 @@
+id: shop.C07.001
+lang: en
+domain: shop
+capability: C07
+title: "A relative delivery date and a spoken quantity become exact values using the scenario's clock"
+tags: [normalization, date, number]
+setup:
+  now: "2026-10-05T09:00:00"   # a Monday
+turns:
+  - user: {kind: utterance, text: Deliver two of them tomorrow morning}
+    expect:
+      slots: {quantity: "2", delivery_date: "2026-10-06", delivery_window: morning}
+variants:
+  - turn: 0
+    texts: [I'd like a pair delivered tomorrow in the morning, Send two tomorrow before noon]

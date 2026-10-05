@@ -1,0 +1,18 @@
+id: shop.C11.002
+lang: en
+domain: shop
+capability: C11
+title: "A wrong ZIP code keeps the order details locked"
+tags: [verification, gate, negative]
+setup:
+  customer: {order_id: "1001"}
+turns:
+  - user: {kind: utterance, text: Where is my order}
+    expect:
+      tool_calls: []
+  - user: {kind: dtmf, digits: "99999"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {order_id: "1001", zip_code: "99999"}, error: invalid_credentials}
+      reply_contains_any: [incorrect, try again, couldn't verify]
+      reply_not_contains: [shipped, delivered, processing]

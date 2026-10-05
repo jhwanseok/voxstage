@@ -1,0 +1,24 @@
+id: bank.C03.001
+lang: en
+domain: bank
+capability: C03
+title: "Cancelling leaves the flow, and asking for a person hands off to an agent"
+tags: [cancel, handoff]
+turns:
+  - user: {kind: utterance, text: I want to make a transfer}
+    expect:
+      flow: transfer
+  - user: {kind: utterance, text: Actually forget it cancel that}
+    expect:
+      flow: main_menu
+      slots: {}
+      actions: []
+  - user: {kind: utterance, text: Can I talk to a real person}
+    expect:
+      actions: [HandOff]
+      reply_contains_any: [agent, connect]
+variants:
+  - turn: 1
+    texts: [Never mind stop the transfer, Cancel please, I changed my mind]
+  - turn: 2
+    texts: [Let me speak to an agent, Transfer me to a human, I need a representative]

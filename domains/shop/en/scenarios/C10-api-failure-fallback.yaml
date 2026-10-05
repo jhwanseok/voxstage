@@ -1,0 +1,16 @@
+id: shop.C10.001
+lang: en
+domain: shop
+capability: C10
+title: "When the order-status API times out, the reply says so and does not invent a status"
+tags: [api_failure, fallback]
+turns:
+  - user: {kind: button, button_id: menu_track}
+    expect:
+      flow: order_status
+  - user: {kind: dtmf, digits: "9999"}
+    expect:
+      tool_calls:
+        - {name: get_order_status, args: {order_id: "9999"}, error: timeout}
+      reply_contains_any: [try again, unable, couldn't]
+      reply_not_contains: [shipped, delivered, processing]

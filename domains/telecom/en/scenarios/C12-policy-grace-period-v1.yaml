@@ -1,0 +1,13 @@
+id: telecom.C12.001
+lang: en
+domain: telecom
+capability: C12
+title: "Policy version 1: a ten day grace period for late payments"
+tags: [policy, change_impact]
+setup:
+  policy: {version: v1, late_payment_grace_days: "10"}
+turns:
+  - user: {kind: utterance, text: How long is the grace period for a late payment}
+    expect:
+      reply_contains_any: [ten days, "10 days"]
+      reply_not_contains: [fourteen, "14 days"]

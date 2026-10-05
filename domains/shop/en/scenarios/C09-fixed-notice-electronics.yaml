@@ -1,0 +1,12 @@
+id: shop.C09.001
+lang: en
+domain: shop
+capability: C09
+title: "Returning electronics must include the return notice exactly as written"
+tags: [verbatim, compliance]
+turns:
+  - user: {kind: utterance, text: I want to return a laptop}
+    expect:
+      flow: return_request
+      reply_contains:
+        - Electronics can be returned within 14 days if unopened, and opened items are only accepted if defective.

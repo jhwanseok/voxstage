@@ -65,8 +65,10 @@ domain: bank
 capability: C05
 title: "quote titles that contain a colon"
 tags: [dst, correction]
-setup:                         # optional fixtures, e.g. customer attributes
-  customer: {grade: gold}
+setup:                         # optional fixtures, all free-form mappings
+  customer: {grade: gold}      # attributes the manager may use
+  now: "2026-10-05T09:00:00"   # the scenario's clock; relative dates resolve against it (a Monday)
+  policy: {version: v1, ...}   # business-rule values that a policy-change case swaps
 turns:
   - user:                      # exactly one of three input kinds
       kind: utterance          # text (+ optional asr_text: what the recognizer "heard")
@@ -78,7 +80,8 @@ turns:
       reply_contains: [...]          # each string must appear exactly (verbatim checks)
       reply_contains_any: [...]      # at least one must appear
       reply_not_contains: [...]      # none may appear
-      tool_calls: [{name: get_x, args: {k: "v"}}]
+      tool_calls: [{name: get_x, args: {k: "v"}}]   # exact ordered calls; [] means none;
+                                                    # add `error: timeout` to expect a failing call
       actions: [HandOff]
   - user: {kind: dtmf, digits: "4821"}        # quote digits so YAML keeps them as text
   - user: {kind: button, button_id: menu_balance}
@@ -86,6 +89,10 @@ variants:                      # optional: other wordings for one utterance turn
   - turn: 1
     texts: [...]
 ```
+
+Setup keys in use: `customer` (attributes), `now` (ISO time), `policy` (rule values, with a
+`version`). C12 comes as a pair per domain (`v1`, `v2`) that asks the same question under two
+policy values, so a change to one rule can be checked for regressions elsewhere.
 
 Expectations check the end state (flow, slots, tool calls, required and forbidden phrases),
 not exact wording, except where wording is the requirement (C09).
@@ -101,6 +108,12 @@ not exact wording, except where wording is the requirement (C09).
 
 ## Status
 
-Pilot slice (bank, English): C00 plus C01, C04, C05, C08, C09, reviewed and approved. The
-remaining capabilities and the shop and telecom domains follow. Korean comes later, as a
-parallel `ko/` directory with the same ids.
+All three domains (bank, shop, telecom) have the full set in English: eight FAQ entries and
+sixteen scenarios each, 72 cases in total (`python -m voxstage.dataset coverage`). The bank
+pilot slice was reviewed and approved; everything else is a first draft awaiting review.
+Korean comes later, as a parallel `ko/` directory with the same ids.
+
+Integrity tests: every domain covers every capability; fake-API calls expected by a scenario
+are answerable by that domain's `tools.yaml` (including expected failures); the phrase a C09
+negative case forbids is part of the notice its positive case requires; no Hangul in English
+files; ASR variants differ from the question and its paraphrases.

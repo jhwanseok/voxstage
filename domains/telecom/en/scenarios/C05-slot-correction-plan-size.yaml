@@ -1,0 +1,21 @@
+id: telecom.C05.001
+lang: en
+domain: telecom
+capability: C05
+title: "After a misheard plan size, the customer's correction refills the slot"
+tags: [dst, asr_error, correction]
+turns:
+  - user:
+      kind: utterance
+      text: I want the forty gigabyte plan
+      asr_text: I want the fourteen gigabyte plan   # simulated recognition error (hand-written)
+    expect:
+      slots: {plan_gb: "14"}
+      reply_contains_any: [fourteen, "14"]
+  - user: {kind: utterance, text: No forty not fourteen}
+    expect:
+      slots: {plan_gb: "40"}
+      reply_contains_any: [forty, "40"]
+variants:
+  - turn: 1
+    texts: [No I said forty, That's wrong it's forty gigabytes, Forty four zero]

@@ -1,0 +1,26 @@
+id: shop.C03.001
+lang: en
+domain: shop
+capability: C03
+title: "Going back one step keeps earlier answers, and asking for a person hands off"
+tags: [back, handoff]
+turns:
+  - user: {kind: utterance, text: I want to change my delivery address}
+    expect:
+      flow: change_address
+      reply_contains_any: [order number, which order]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      slots: {order_id: "1001"}
+      reply_contains_any: [new address, address]
+  - user: {kind: utterance, text: Go back}
+    expect:
+      flow: change_address
+      slots: {order_id: "1001"}
+      reply_contains_any: [order number, which order]
+  - user: {kind: utterance, text: I'd rather speak to a person}
+    expect:
+      actions: [HandOff]
+variants:
+  - turn: 2
+    texts: [Wait back up one step, Previous question please, Let me redo that]

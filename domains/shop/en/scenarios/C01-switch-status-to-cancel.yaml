@@ -1,0 +1,18 @@
+id: shop.C01.001
+lang: en
+domain: shop
+capability: C01
+title: "Asking to cancel while checking order status switches to the cancel-order flow"
+tags: [switch]
+turns:
+  - user: {kind: utterance, text: Where is my order}
+    expect:
+      flow: order_status
+      reply_contains_any: [order number, which order]
+  - user: {kind: utterance, text: Actually I want to cancel it}
+    expect:
+      flow: cancel_order
+      reply_contains_any: [cancel, order number]
+variants:
+  - turn: 1
+    texts: [Never mind just cancel the order, I changed my mind I want to cancel, Can you cancel it instead]

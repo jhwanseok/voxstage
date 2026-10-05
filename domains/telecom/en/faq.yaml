@@ -1,0 +1,44 @@
+# Synthetic FAQ for a fictional mobile carrier. Written from scratch for this project.
+# `answer` is the verbatim reply. `asr_variants` are hand-written plausible recognition errors.
+lang: en
+entries:
+  - id: telecom.faq.check_usage
+    question: How do I check my data usage
+    answer: You can see your data usage anytime under Usage in the app, and we send a text when you reach eighty percent of your plan.
+    paraphrases: [How much data have I used, Where can I see my data balance, Am I close to my data limit]
+    asr_variants: [How do I check my data you sage, How much date I have I used]
+  - id: telecom.faq.change_plan
+    question: How do I change my plan
+    answer: You can change your plan under Plans in the app, and the new plan starts with your next billing cycle.
+    paraphrases: [I want a different plan, Can I switch to another plan, How do I upgrade my plan]
+    asr_variants: [How do I change my plane, How do I chain my plan]
+  - id: telecom.faq.bill_due
+    question: When is my bill due
+    answer: Your bill is due on the same day each month, and you can find the exact date under Billing in the app.
+    paraphrases: [What day do I pay my bill, When do I need to pay, Where can I see my due date]
+    asr_variants: [When is my built due, When is my bell due]
+  - id: telecom.faq.report_outage
+    question: My service is not working
+    answer: Please restart your phone first, and if there is still no service, report the problem under Help in the app so we can check your area.
+    paraphrases: [I have no signal, My internet is down, I can't make calls]
+    asr_variants: [My surface is not working, My service is not walking]
+  - id: telecom.faq.roaming
+    question: How do I use my phone abroad
+    answer: You can turn on international roaming under Travel in the app, and rates depend on the country you visit.
+    paraphrases: [Can I use my phone overseas, I am traveling next week do I need roaming, How do I turn on roaming]
+    asr_variants: [How do I use my phone a broad, How do I use my phone abrupt]
+  - id: telecom.faq.replace_sim
+    question: How do I replace my SIM card
+    answer: You can order a replacement SIM in the app, and it arrives in two to three business days with activation steps included.
+    paraphrases: [I lost my SIM, My SIM card is damaged, Can I get a new SIM]
+    asr_variants: [How do I replace my sim cart, How do I replace my some card]
+  - id: telecom.faq.keep_number
+    question: Can I keep my number if I switch to you
+    answer: Yes, you can bring your existing number, and you only need your account number and transfer PIN from your current carrier.
+    paraphrases: [Can I port my number, I want to move my number over, Will my phone number stay the same]
+    asr_variants: [Can I keep my number if I switch to ewe, Can I keep my numb her if I switch to you]
+  - id: telecom.faq.pay_bill
+    question: How can I pay my bill
+    answer: You can pay in the app, set up automatic payments, or pay at a retail partner location with your account number.
+    paraphrases: [Where do I pay my bill, Can I set up autopay, How do I make a payment]
+    asr_variants: [How can I pay my built, How can I pay my build]

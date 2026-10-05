@@ -1,0 +1,13 @@
+id: bank.C12.002
+lang: en
+domain: bank
+capability: C12
+title: "Policy version 2: five free transfers per month (same question, changed rule)"
+tags: [policy, change_impact]
+setup:
+  policy: {version: v2, free_transfers_per_month: "5"}
+turns:
+  - user: {kind: utterance, text: How many free transfers do I get each month}
+    expect:
+      reply_contains_any: [five, "5"]
+      reply_not_contains: [three]

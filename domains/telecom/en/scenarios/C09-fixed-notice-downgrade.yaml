@@ -1,0 +1,12 @@
+id: telecom.C09.001
+lang: en
+domain: telecom
+capability: C09
+title: "Downgrading a plan must include the required notice exactly as written"
+tags: [verbatim, compliance]
+turns:
+  - user: {kind: utterance, text: I want to downgrade to the basic plan}
+    expect:
+      flow: change_plan
+      reply_contains:
+        - Changing to a lower plan takes effect on your next billing cycle and cannot be reversed for 30 days.

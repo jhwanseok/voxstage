@@ -1,0 +1,21 @@
+id: shop.C05.001
+lang: en
+domain: shop
+capability: C05
+title: "After a misheard quantity, the customer's correction refills the slot"
+tags: [dst, asr_error, correction]
+turns:
+  - user:
+      kind: utterance
+      text: Change the quantity to fifteen
+      asr_text: Change the quantity to fifty   # simulated recognition error (hand-written)
+    expect:
+      slots: {quantity: "50"}
+      reply_contains_any: [fifty, "50"]
+  - user: {kind: utterance, text: No fifteen one five}
+    expect:
+      slots: {quantity: "15"}
+      reply_contains_any: [fifteen, "15"]
+variants:
+  - turn: 1
+    texts: [No I said fifteen, That's wrong it's fifteen, Not fifty fifteen]

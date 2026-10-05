@@ -1,0 +1,16 @@
+id: telecom.C10.001
+lang: en
+domain: telecom
+capability: C10
+title: "When the usage API times out, the reply says so and does not invent a number"
+tags: [api_failure, fallback]
+turns:
+  - user: {kind: button, button_id: menu_usage}
+    expect:
+      flow: data_usage
+  - user: {kind: dtmf, digits: "0000"}
+    expect:
+      tool_calls:
+        - {name: get_data_usage, args: {line_last4: "0000"}, error: timeout}
+      reply_contains_any: [try again, unable, couldn't]
+      reply_not_contains: [gigabytes, GB]

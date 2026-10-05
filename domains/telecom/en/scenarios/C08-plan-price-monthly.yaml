@@ -1,0 +1,14 @@
+id: telecom.C08.002
+lang: en
+domain: telecom
+capability: C08
+title: "The same question gets a different answer on a monthly contract (25 dollars)"
+tags: [attribute, api]
+setup:
+  customer: {contract: monthly}
+turns:
+  - user: {kind: utterance, text: How much is the plus plan}
+    expect:
+      tool_calls:
+        - {name: get_plan_price, args: {plan: plus, contract: monthly}}
+      reply_contains_any: ["$25", twenty five dollars]

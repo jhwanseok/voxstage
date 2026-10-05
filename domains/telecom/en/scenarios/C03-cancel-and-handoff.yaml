@@ -1,0 +1,24 @@
+id: telecom.C03.001
+lang: en
+domain: telecom
+capability: C03
+title: "Cancelling leaves the flow, and asking for a person hands off to an agent"
+tags: [cancel, handoff]
+turns:
+  - user: {kind: utterance, text: I want to change my plan}
+    expect:
+      flow: change_plan
+  - user: {kind: utterance, text: Never mind forget it}
+    expect:
+      flow: main_menu
+      slots: {}
+      actions: []
+  - user: {kind: utterance, text: Get me an agent please}
+    expect:
+      actions: [HandOff]
+      reply_contains_any: [agent, connect]
+variants:
+  - turn: 1
+    texts: [Cancel that, Stop I don't want to change anything, Scratch that]
+  - turn: 2
+    texts: [Let me talk to a person, Connect me to customer service, I want a human]

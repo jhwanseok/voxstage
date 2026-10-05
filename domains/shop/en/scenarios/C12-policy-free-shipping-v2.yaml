@@ -1,0 +1,13 @@
+id: shop.C12.002
+lang: en
+domain: shop
+capability: C12
+title: "Policy version 2: free shipping above 75 dollars (same question, changed rule)"
+tags: [policy, change_impact]
+setup:
+  policy: {version: v2, free_shipping_threshold: "75"}
+turns:
+  - user: {kind: utterance, text: What is the minimum order for free shipping}
+    expect:
+      reply_contains_any: ["$75", seventy five dollars]
+      reply_not_contains: ["$50", fifty dollars]

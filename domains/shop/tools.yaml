@@ -1,0 +1,32 @@
+# Fake backend API for the shop domain. Answers depend only on the arguments (see docs/decisions/0004).
+# Language-independent, so it is shared by every language of the domain.
+tools:
+  get_order_status:
+    params: [order_id]
+    rules:
+      - when: {order_id: "9999"}
+        error: timeout            # used by the API-failure case (C10)
+      - when: {order_id: "1001"}
+        return: {status: shipped, eta: "2026-10-08"}
+      - when: {order_id: "1002"}
+        return: {status: processing, eta: "2026-10-10"}
+      - when: {order_id: "1003"}
+        return: {status: delivered, eta: "2026-10-01"}
+    default:
+      error: not_found
+  get_shipping_fee:
+    params: [tier]
+    rules:
+      - when: {tier: gold}
+        return: {fee: 0, currency: USD}
+      - when: {tier: basic}
+        return: {fee: 6, currency: USD}
+    default:
+      error: not_found
+  verify_identity:
+    params: [order_id, zip_code]
+    rules:
+      - when: {order_id: "1001", zip_code: "12345"}
+        return: {verified: true}
+    default:
+      error: invalid_credentials

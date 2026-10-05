@@ -1,0 +1,14 @@
+id: telecom.C06.001
+lang: en
+domain: telecom
+capability: C06
+title: "Line, feature and duration arrive in one sentence, and a follow-up changes only the duration"
+tags: [multi_slot, carry_over]
+turns:
+  - user: {kind: utterance, text: Add international roaming to the line ending 5580 for ten days}
+    expect:
+      flow: roaming_setup
+      slots: {line_last4: "5580", feature: roaming, duration_days: "10"}
+  - user: {kind: utterance, text: Make it fourteen days}
+    expect:
+      slots: {line_last4: "5580", feature: roaming, duration_days: "14"}

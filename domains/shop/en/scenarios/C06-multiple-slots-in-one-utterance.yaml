@@ -1,0 +1,14 @@
+id: shop.C06.001
+lang: en
+domain: shop
+capability: C06
+title: "Item, order and size arrive in one sentence, and a follow-up changes only the size"
+tags: [multi_slot, carry_over]
+turns:
+  - user: {kind: utterance, text: I want to return the blue jacket from order 1001 in size medium}
+    expect:
+      flow: return_request
+      slots: {item: blue jacket, order_id: "1001", size: medium}
+  - user: {kind: utterance, text: Actually make it large}
+    expect:
+      slots: {item: blue jacket, order_id: "1001", size: large}

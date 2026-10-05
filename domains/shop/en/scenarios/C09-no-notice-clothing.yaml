@@ -1,0 +1,12 @@
+id: shop.C09.002
+lang: en
+domain: shop
+capability: C09
+title: "Returning clothing must not get the electronics notice"
+tags: [verbatim, compliance, negative]
+turns:
+  - user: {kind: utterance, text: I want to return a t-shirt}
+    expect:
+      flow: return_request
+      reply_not_contains:
+        - opened items are only accepted if defective

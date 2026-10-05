@@ -1,0 +1,16 @@
+id: bank.C07.001
+lang: en
+domain: bank
+capability: C07
+title: "Spoken amounts and relative dates become exact values, using the scenario's clock"
+tags: [normalization, date, number]
+setup:
+  now: "2026-10-05T09:00:00"   # a Monday; relative dates resolve against this
+turns:
+  - user: {kind: utterance, text: Schedule a transfer of twenty five hundred dollars for the fifteenth of next month}
+    expect:
+      flow: scheduled_transfer
+      slots: {amount: "2500", date: "2026-11-15"}
+variants:
+  - turn: 0
+    texts: [Set up a payment of two thousand five hundred dollars on the 15th of next month, Send twenty five hundred dollars on November fifteenth]

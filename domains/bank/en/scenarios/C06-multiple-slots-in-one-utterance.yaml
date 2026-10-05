@@ -1,0 +1,14 @@
+id: bank.C06.001
+lang: en
+domain: bank
+capability: C06
+title: "Several slots in one sentence are all captured, and a follow-up changes only the slot it mentions"
+tags: [multi_slot, carry_over]
+turns:
+  - user: {kind: utterance, text: Transfer two hundred dollars to my savings account}
+    expect:
+      flow: transfer
+      slots: {amount: "200", to_account: savings}
+  - user: {kind: utterance, text: No make it three hundred}
+    expect:
+      slots: {amount: "300", to_account: savings}

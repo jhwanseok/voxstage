@@ -1,0 +1,13 @@
+id: shop.C12.001
+lang: en
+domain: shop
+capability: C12
+title: "Policy version 1: free shipping above 50 dollars"
+tags: [policy, change_impact]
+setup:
+  policy: {version: v1, free_shipping_threshold: "50"}
+turns:
+  - user: {kind: utterance, text: What is the minimum order for free shipping}
+    expect:
+      reply_contains_any: ["$50", fifty dollars]
+      reply_not_contains: ["$75", seventy five]

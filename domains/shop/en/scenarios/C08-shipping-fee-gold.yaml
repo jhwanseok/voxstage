@@ -1,0 +1,14 @@
+id: shop.C08.001
+lang: en
+domain: shop
+capability: C08
+title: "Membership tier (attribute) plus API result gives the shipping fee answer (gold: free)"
+tags: [attribute, api]
+setup:
+  customer: {tier: gold}
+turns:
+  - user: {kind: utterance, text: How much is shipping}
+    expect:
+      tool_calls:
+        - {name: get_shipping_fee, args: {tier: gold}}
+      reply_contains_any: [free, no charge, no shipping fee]

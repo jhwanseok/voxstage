@@ -1,0 +1,16 @@
+id: telecom.C07.001
+lang: en
+domain: telecom
+capability: C07
+title: "A spoken day of the month and a relative start become exact values using the scenario's clock"
+tags: [normalization, date, number]
+setup:
+  now: "2026-10-05T09:00:00"   # a Monday
+turns:
+  - user: {kind: utterance, text: Move my bill date to the twentieth starting next month}
+    expect:
+      flow: change_bill_date
+      slots: {bill_day: "20", effective_from: "2026-11-01"}
+variants:
+  - turn: 0
+    texts: [Change my billing day to the 20th from next month, I want to pay on the twentieth beginning next month]

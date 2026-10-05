@@ -1,0 +1,17 @@
+id: telecom.C04.001
+lang: en
+domain: telecom
+capability: C04
+title: "The menu choice is a button press and the line's last four digits arrive as keypad input"
+tags: [dtmf, button]
+turns:
+  - user: {kind: button, button_id: menu_usage}
+    expect:
+      flow: data_usage
+      reply_contains: [last four digits]
+  - user: {kind: dtmf, digits: "5580"}
+    expect:
+      slots: {line_last4: "5580"}
+      tool_calls:
+        - {name: get_data_usage, args: {line_last4: "5580"}}
+      reply_contains_any: [12 gigabytes, twelve gigabytes, "12 GB"]

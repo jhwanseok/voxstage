@@ -1,0 +1,20 @@
+id: shop.C02.001
+lang: en
+domain: shop
+capability: C02
+title: "A shipping question during a return is answered, then the return flow asks its pending question again"
+tags: [digression, resume]
+turns:
+  - user: {kind: utterance, text: I want to return an item}
+    expect:
+      flow: return_request
+      reply_contains_any: [order number, which order]
+  - user: {kind: utterance, text: Quick question how long does shipping take}
+    expect:
+      flow: return_request
+      reply_contains: [Standard shipping takes three to five business days]
+      reply_contains_any: [order number, which order]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      flow: return_request
+      slots: {order_id: "1001"}

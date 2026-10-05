@@ -1,0 +1,35 @@
+# Fake backend API for the telecom domain. Answers depend only on the arguments (see docs/decisions/0004).
+# Language-independent, so it is shared by every language of the domain.
+tools:
+  get_data_usage:
+    params: [line_last4]
+    rules:
+      - when: {line_last4: "0000"}
+        error: timeout            # used by the API-failure case (C10)
+      - when: {line_last4: "5580"}
+        return: {used_gb: 12, limit_gb: 20}
+    default:
+      error: not_found
+  get_plan_price:
+    params: [plan, contract]
+    rules:
+      - when: {plan: plus, contract: yearly}
+        return: {monthly_price: 20, currency: USD}
+      - when: {plan: plus, contract: monthly}
+        return: {monthly_price: 25, currency: USD}
+    default:
+      error: not_found
+  get_bill:
+    params: [account_last4]
+    rules:
+      - when: {account_last4: "5580"}
+        return: {amount_due: 45, currency: USD, due_date: "2026-10-20"}
+    default:
+      error: not_found
+  verify_identity:
+    params: [account_last4, pin]
+    rules:
+      - when: {account_last4: "5580", pin: "1357"}
+        return: {verified: true}
+    default:
+      error: invalid_credentials

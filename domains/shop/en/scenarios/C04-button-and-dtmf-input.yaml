@@ -1,0 +1,17 @@
+id: shop.C04.001
+lang: en
+domain: shop
+capability: C04
+title: "The menu choice is a button press and the order number arrives as keypad digits"
+tags: [dtmf, button]
+turns:
+  - user: {kind: button, button_id: menu_track}
+    expect:
+      flow: order_status
+      reply_contains: [order number]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      slots: {order_id: "1001"}
+      tool_calls:
+        - {name: get_order_status, args: {order_id: "1001"}}
+      reply_contains_any: [shipped, October 8, "10/08"]
