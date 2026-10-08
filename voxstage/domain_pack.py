@@ -60,6 +60,7 @@ class DomainPack:
     flows: Optional[dict] = field(default=None)
     ask: Optional[AskPolicy] = None
     sensitive_slots: frozenset = frozenset()   # slots that may only arrive on the keypad (R3-1)
+    missing_reply: str = "I'm sorry, I can't answer that right now. Let me connect you to an agent."
 
     @classmethod
     def load(cls, domains_dir: str, domain: str, lang: str) -> "DomainPack":
@@ -74,8 +75,10 @@ class DomainPack:
         ask = load_ask_policy(cfg_path) if os.path.exists(cfg_path) else None
         sens_path = os.path.join(domains_dir, domain, "sensitive_slots.yaml")
         sensitive = load_sensitive_slots(sens_path) if os.path.exists(sens_path) else frozenset()
+        missing = load_missing_reply(cfg_path) if os.path.exists(cfg_path) else None
+        extra = {"missing_reply": missing} if missing else {}
         return cls(domain, lang, answers, patterns, fallback,
-                   os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive)
+                   os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive, **extra)
 
 
 def _read(path: str):
@@ -135,7 +138,7 @@ def load_patterns(path: str, faq_ids: set) -> tuple:
 def load_fallback(path: str) -> Fallback:
     raw = _read(path)
     fb = raw.get("fallback") if isinstance(raw, dict) else None
-    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask"}:
+    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "flow"}:
         raise RuleError(f"{path}: needs a top-level 'fallback' mapping (and optionally 'ask') only")
     extra = set(fb) - {"reply", "exceed_reply", "max_misses", "on_exceed"}
     if extra:
@@ -179,3 +182,14 @@ def load_sensitive_slots(path: str) -> frozenset:
     if not isinstance(raw, dict) or set(raw) != {"sensitive_slots"}:
         raise RuleError(f"{path}: needs a top-level 'sensitive_slots' list only")
     return frozenset(_words(path, "sensitive_slots", raw["sensitive_slots"]))
+
+
+def load_missing_reply(path: str) -> Optional[str]:
+    raw = _read(path)
+    flow = raw.get("flow") if isinstance(raw, dict) else None
+    if flow is None:
+        return None
+    if not isinstance(flow, dict) or set(flow) != {"attribute_missing_reply"} \
+            or not isinstance(flow["attribute_missing_reply"], str) or not flow["attribute_missing_reply"].strip():
+        raise RuleError(f"{path}: 'flow' needs attribute_missing_reply (a non-empty string) only")
+    return flow["attribute_missing_reply"]

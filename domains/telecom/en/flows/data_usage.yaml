@@ -6,6 +6,6 @@ start: ask_line
 nodes:
   ask_line: {type: ask, slot: line_last4, prompt: "Please enter the last four digits of your phone number.", extractor: digits, length: 4, next: lookup}
   lookup: {type: call, tool: get_data_usage, args: {line_last4: "{line_last4}"}, on_ok: say_usage, on_error: say_fail}
-  say_usage: {type: say, text: "You have used {result.used_gb} GB of your {result.limit_gb} GB.", next: done}
+  say_usage: {type: say, text: "You have used {result.used_gb | count} GB of your {result.limit_gb | count} GB.", next: done}
   say_fail: {type: say, text: "I'm unable to check your usage right now. Please try again later.", next: done}
   done: {type: end}

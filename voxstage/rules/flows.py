@@ -17,13 +17,15 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 from dataclasses import dataclass
 from typing import Callable
 
 import yaml
 
 from ..domain_pack import Pattern, parse_pattern
-from .expr import Expr, ExprError, compile_expr
+from .expr import Expr, ExprError, MissingAttribute, compile_expr
+from .formatters import FORMATTERS
 
 EXTRACTORS = ("text", "digits", "number", "choice")
 
@@ -33,19 +35,109 @@ class FlowError(ValueError):
 
 
 @dataclass(frozen=True)
-class Template:
-    parts: tuple   # of str | Expr
+class Field:
+    """`{expr | formatter(arg) | default(value)}`: a value, formatters applied in order, and an explicit default."""
+    expr: Expr
+    filters: tuple = ()          # of (name, tuple of Expr)
+    default: Expr | None = None
 
     def render(self, env) -> str:
-        return "".join(p if isinstance(p, str) else _text(p.evaluate(env)) for p in self.parts)
+        try:
+            value = self.expr.evaluate(env)
+        except MissingAttribute:
+            if self.default is None:
+                raise
+            return _text(self.default.evaluate(env))
+        for name, args in self.filters:
+            value = FORMATTERS[name].fn(value, env.get("_lang", "en"), *[a.evaluate(env) for a in args])
+        return _text(value)
+
+
+@dataclass(frozen=True)
+class Template:
+    parts: tuple   # of str | Field
+
+    def render(self, env) -> str:
+        return "".join(p if isinstance(p, str) else p.render(env) for p in self.parts)
 
 
 def _text(value) -> str:
     return "yes" if value is True else "no" if value is False else str(value)
 
 
+def _split_filters(field: str) -> list:
+    """Split at `|` outside quotes and parentheses."""
+    out, buf, depth, quote = [], [], 0, None
+    for c in field:
+        if quote:
+            quote = None if c == quote else quote
+        elif c in "'\"":
+            quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        elif c == "|" and depth == 0:
+            out.append("".join(buf))
+            buf = []
+            continue
+        buf.append(c)
+    out.append("".join(buf))
+    return [p.strip() for p in out]
+
+
+_FILTER = re.compile(r"^(\w+)\s*(?:\((.*)\))?$", re.S)
+
+
+def _compile_field(field: str, where: str, names: frozenset) -> Field:
+    head, *rest = _split_filters(field)
+    try:
+        expr = compile_expr(head, where, names)
+        filters, default = [], None
+        for item in rest:
+            m = _FILTER.match(item)
+            if not m:
+                raise FlowError(f"{where}: cannot read the filter `{item}`")
+            name, arg_text = m.group(1), m.group(2)
+            args = tuple(compile_expr(a.strip(), where, names) for a in _split_args(arg_text)) if arg_text else ()
+            if name == "default":
+                if len(args) != 1 or default is not None:
+                    raise FlowError(f"{where}: `default` takes one value, once")
+                default = args[0]
+                continue
+            if name not in FORMATTERS:
+                raise FlowError(f"{where}: unknown formatter `{name}` (known: {sorted(FORMATTERS)} and default)")
+            f = FORMATTERS[name]
+            if not f.min_args <= len(args) <= f.max_args:
+                raise FlowError(f"{where}: formatter `{name}` takes {f.min_args} to {f.max_args} arguments")
+            filters.append((name, args))
+    except ExprError as exc:
+        raise FlowError(str(exc)) from exc
+    return Field(expr, tuple(filters), default)
+
+
+def _split_args(text: str) -> list:
+    out, buf, depth, quote = [], [], 0, None
+    for c in text:
+        if quote:
+            quote = None if c == quote else quote
+        elif c in "'\"":
+            quote = c
+        elif c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif c == "," and depth == 0:
+            out.append("".join(buf))
+            buf = []
+            continue
+        buf.append(c)
+    out.append("".join(buf))
+    return out
+
+
 def compile_template(text, where: str, names: frozenset) -> Template:
-    """`{expr}` fields; `{{` and `}}` are literal braces."""
+    """`{expr}` fields with optional filters; `{{` and `}}` are literal braces."""
     if not isinstance(text, str):
         raise FlowError(f"{where}: must be text")
     parts, buf, i = [], [], 0
@@ -61,10 +153,7 @@ def compile_template(text, where: str, names: frozenset) -> Template:
             if buf:
                 parts.append("".join(buf))
                 buf = []
-            try:
-                parts.append(compile_expr(text[i + 1:j], where, names))
-            except ExprError as exc:
-                raise FlowError(str(exc)) from exc
+            parts.append(_compile_field(text[i + 1:j], where, names))
             i = j + 1
         elif c == "}":
             raise FlowError(f"{where}: stray `}}` in {text!r}")
@@ -92,6 +181,7 @@ class Flow:
     path: str
     slots: frozenset
     buttons: tuple = ()
+    captures: tuple = ()   # of (slot, extractor spec): slots read from the words that started the flow
 
 
 @dataclass(frozen=True)
@@ -144,23 +234,38 @@ def _say(raw, ctx):
     return {"text": ctx.template(ctx.need(raw, "text"), "text"), "next": ctx.need(raw, "next")}
 
 
-@register_node_type("ask", edges=lambda d: [d["next"]], waits=True)
-def _ask(raw, ctx):
-    ctx.only(raw, {"slot", "prompt", "extractor", "length", "choices", "next"})
+def extractor_spec(raw: dict, where: str) -> dict:
+    """The extractor, its length and its choices, checked. `choices` is a list of words, or a mapping
+    word -> value when the slot value differs from the word the caller says (Korean words, English values)."""
     extractor = raw.get("extractor", "text")
     if extractor not in EXTRACTORS:
-        raise FlowError(f"{ctx.where}: extractor must be one of {EXTRACTORS}")
+        raise FlowError(f"{where}: extractor must be one of {EXTRACTORS}")
     choices = raw.get("choices")
     if (extractor == "choice") != bool(choices):
-        raise FlowError(f"{ctx.where}: `choices` goes with the choice extractor, and only with it")
+        raise FlowError(f"{where}: `choices` goes with the choice extractor, and only with it")
+    pairs = ()
+    if choices:
+        if isinstance(choices, dict):
+            pairs = tuple((str(w), str(v)) for w, v in choices.items())
+        elif isinstance(choices, list) and all(isinstance(c, str) for c in choices):
+            pairs = tuple((c, c) for c in choices)
+        else:
+            raise FlowError(f"{where}: `choices` must be a list of words or a word -> value mapping")
     length = raw.get("length")
     if length is not None and (extractor != "digits" or not isinstance(length, int) or length < 1):
-        raise FlowError(f"{ctx.where}: `length` is a positive integer for the digits extractor")
+        raise FlowError(f"{where}: `length` is a positive integer for the digits extractor")
+    return {"extractor": extractor, "length": length, "choices": pairs}
+
+
+@register_node_type("ask", edges=lambda d: [d["next"]], waits=True)
+def _ask(raw, ctx):
+    """Asks for a slot and waits. If the slot is already filled (a capture, or an earlier answer) the ask is skipped."""
+    ctx.only(raw, {"slot", "prompt", "extractor", "length", "choices", "next"})
+    spec = extractor_spec(raw, ctx.where)
     slot = ctx.need(raw, "slot")
-    if slot in ctx.sensitive and extractor != "digits":
+    if slot in ctx.sensitive and spec["extractor"] != "digits":
         raise FlowError(f"{ctx.where}: `{slot}` is a sensitive slot (keypad only), so its extractor must be digits")
-    return {"slot": slot, "prompt": ctx.template(ctx.need(raw, "prompt"), "prompt"),
-            "extractor": extractor, "length": length, "choices": tuple(choices or ()),
+    return {"slot": slot, "prompt": ctx.template(ctx.need(raw, "prompt"), "prompt"), **spec,
             "next": ctx.need(raw, "next")}
 
 
@@ -224,8 +329,19 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset()) -> Flo
         except yaml.YAMLError as exc:
             raise FlowError(f"{path}: invalid YAML ({exc})") from exc
     if not isinstance(raw, dict) or not {"id", "triggers", "start", "nodes"} <= set(raw) \
-            or set(raw) - {"id", "triggers", "start", "nodes", "buttons"}:
-        raise FlowError(f"{path}: needs id, triggers, start and nodes (and optionally buttons)")
+            or set(raw) - {"id", "triggers", "start", "nodes", "buttons", "captures"}:
+        raise FlowError(f"{path}: needs id, triggers, start and nodes (and optionally buttons, captures)")
+    raw_captures = raw.get("captures") or {}
+    if not isinstance(raw_captures, dict):
+        raise FlowError(f"{path}: `captures` must map slot names to extractors")
+    captures = []
+    for slot, body in raw_captures.items():
+        if not isinstance(body, dict) or set(body) - {"extractor", "length", "choices"}:
+            raise FlowError(f"{path}: capture {slot}: needs extractor (and length or choices)")
+        spec = extractor_spec(body, f"{path}: capture {slot}")
+        if spec["extractor"] == "text" or slot in sensitive:
+            raise FlowError(f"{path}: capture {slot}: a captured slot cannot be free text or sensitive (keypad only)")
+        captures.append((slot, spec))
     buttons = raw.get("buttons") or []
     if not isinstance(buttons, list) or not all(isinstance(b, str) and b.strip() for b in buttons):
         raise FlowError(f"{path}: `buttons` must be a list of button ids")
@@ -236,7 +352,8 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset()) -> Flo
     if os.path.splitext(os.path.basename(path))[0] != flow_id:
         raise FlowError(f"{path}: file name must be the flow id `{flow_id}`")
     names = frozenset(n["slot"] for n in raw_nodes.values()
-                      if isinstance(n, dict) and n.get("type") == "ask" and isinstance(n.get("slot"), str))
+                      if isinstance(n, dict) and n.get("type") == "ask" and isinstance(n.get("slot"), str)) \
+        | frozenset(raw_captures)
     nodes = {}
     for node_id, body in raw_nodes.items():
         if not isinstance(body, dict) or body.get("type") not in NODE_TYPES:
@@ -247,7 +364,7 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset()) -> Flo
         triggers = parse_pattern(path, {"id": flow_id, **(raw["triggers"] or {})})
     except ValueError as exc:
         raise FlowError(str(exc)) from exc
-    flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons))
+    flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons), tuple(captures))
     _validate_graph(flow)
     return flow
 

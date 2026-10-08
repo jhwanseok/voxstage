@@ -13,3 +13,7 @@ ask:
   invalid_reply: "죄송합니다, 입력하신 내용을 확인할 수 없어요."
   keypad_reply: "보안을 위해 이 정보는 키패드로 입력해 주세요."
   exceed_reply: "죄송합니다, 입력을 확인하지 못했어요. 상담사에게 연결해 드릴게요."
+
+# A value the flow needs is missing (API result or request meta): apologise, then hand off.
+flow:
+  attribute_missing_reply: "죄송합니다, 지금은 답변드리기 어려워요. 상담사에게 연결해 드릴게요."

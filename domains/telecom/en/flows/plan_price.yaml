@@ -1,0 +1,11 @@
+# Attribute plus API: the plan comes from the caller's words, the contract type from the request meta.
+id: plan_price
+triggers: {all_of: [[plan], [price, cost, much, fee]], none_of: [change, switch, upgrade, downgrade]}
+captures: {plan: {extractor: choice, choices: [basic, plus]}}
+start: ask_plan
+nodes:
+  ask_plan: {type: ask, slot: plan, prompt: "Which plan, basic or plus?", extractor: choice, choices: [basic, plus], next: lookup}
+  lookup: {type: call, tool: get_plan_price, args: {plan: "{plan}", contract: "{customer.contract}"}, on_ok: say_price, on_error: say_fail}
+  say_price: {type: say, text: "The {plan} plan costs {result.monthly_price | money(result.currency)} per month.", next: done}
+  say_fail: {type: say, text: "I'm unable to look up that price right now. Please try again later.", next: done}
+  done: {type: end}

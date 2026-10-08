@@ -16,7 +16,8 @@ from ..dialogue import DialogueManager, DMResult, EndCall, HandOff
 from ..domain_pack import DomainPack
 from ..tools import ToolExecutor
 from ..turn import ButtonPress, Dtmf, Utterance
-from .expr import ExprError
+from .expr import ExprError, MissingAttribute
+from .formatters import FormatError
 from .faq import FaqRuleManager
 from .flows import Flow, FlowError, Node, load_flows
 from .matching import Matcher
@@ -53,7 +54,8 @@ class Run:
 
     def env(self) -> dict:
         return {**self.slots, "slots": self.slots, "customer": self.meta.get("customer", {}),
-                "policy": self.meta.get("policy", {}), "result": self.meta.get("result", {})}
+                "policy": self.meta.get("policy", {}), "result": self.meta.get("result", {}),
+                "_lang": self.manager.pack.lang}
 
 
 HANDLERS: dict = {}
@@ -74,6 +76,9 @@ def run_say(run: Run, node: Node):
 
 @handler("ask")
 def run_ask(run: Run, node: Node):
+    if node.data["slot"] in run.slots:   # already known (a capture or an earlier answer): do not ask again
+        run.trace.setdefault("skipped_asks", []).append(node.id)
+        return node.data["next"]
     run.out.append(node.data["prompt"].render(run.env()))
     return Wait(node.id)
 
@@ -132,7 +137,7 @@ def extract(node: Node, turn_input, tok: Tokenizer) -> Optional[str]:
         return m.group(0) if m else None
     if kind == "choice":
         analysis = tok.analyze(text)
-        return next((c for c in node.data["choices"] if tok.has(analysis, c)), None)
+        return next((value for word, value in node.data["choices"] if tok.has(analysis, word)), None)
     return None
 
 
@@ -166,12 +171,23 @@ class FlowManager(DialogueManager):
             trigger, trace = self.matcher.match(turn_input.text)
             if trigger is not None:
                 flow = self.flows[trigger.id]
-                run = Run(self, flow, {}, {**state.meta}, trace={"flow": flow.id, "trigger": trace})
+                captured = self._capture(flow, turn_input)
+                run = Run(self, flow, captured, {**state.meta},
+                          trace={"flow": flow.id, "trigger": trace, "captured": dict(captured)})
                 return self._run(run, state, flow.start)
         if self.faq is not None:
             return self.faq.respond(state, turn_input)
         reply = "I can't help with that."
         return DMResult(reply, state, trace={"rule": "no_flow"})
+
+    def _capture(self, flow: Flow, turn_input) -> dict:
+        """Slots the first utterance already contains ("How much is the plus plan" fills `plan`)."""
+        out = {}
+        for slot, spec in flow.captures:
+            value = extract(Node(f"capture:{slot}", "capture", spec), turn_input, self.tok)
+            if value is not None:
+                out[slot] = value
+        return out
 
     def _answer_ask(self, flow: Flow, state, turn_input):
         node = flow.nodes[state.node_id]
@@ -205,6 +221,10 @@ class FlowManager(DialogueManager):
             node = run.flow.nodes[node_id]
             try:
                 outcome = HANDLERS[node.type](run, node)
+            except (MissingAttribute, FormatError) as exc:   # fail visibly: apology, then a person (decision R4-2)
+                run.trace.update(failed=node_id, error=str(exc))
+                new = state.evolve(flow_id=run.flow.id, node_id=node_id, slots=run.slots, meta=run.meta)
+                return DMResult(self.pack.missing_reply, new, (HandOff("missing_attribute"),), run.trace)
             except ExprError as exc:
                 raise FlowRuntimeError(f"{run.flow.path}: node {node_id}: {exc}") from exc
             if isinstance(outcome, (Wait, Done)):

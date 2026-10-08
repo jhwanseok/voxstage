@@ -6,6 +6,6 @@ start: ask_line
 nodes:
   ask_line: {type: ask, slot: line_last4, prompt: "휴대폰 번호 뒤 네 자리를 입력해 주세요.", extractor: digits, length: 4, next: lookup}
   lookup: {type: call, tool: get_data_usage, args: {line_last4: "{line_last4}"}, on_ok: say_usage, on_error: say_fail}
-  say_usage: {type: say, text: "{result.limit_gb}GB 중 {result.used_gb}GB를 사용하셨어요.", next: done}
+  say_usage: {type: say, text: "{result.limit_gb | count}GB 중 {result.used_gb | count}GB를 사용하셨어요.", next: done}
   say_fail: {type: say, text: "지금은 사용량을 조회할 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
   done: {type: end}

@@ -1,0 +1,17 @@
+# 속성 + API: 고객 등급(요청 meta)을 수수료 API에 넘기고, 수수료가 0이면 다르게 말한다. 영어 쌍둥이와 노드 구조가 같다.
+id: transfer_fee
+triggers: {all_of: [[수수료], [이체, 송금]], none_of: [한도, 해외]}
+captures: {amount: {extractor: number}}
+start: ask_amount
+nodes:
+  ask_amount: {type: ask, slot: amount, prompt: "얼마를 이체하실 건가요?", extractor: number, next: lookup}
+  lookup: {type: call, tool: get_transfer_fee, args: {amount: "{amount}", grade: "{customer.grade}"}, on_ok: route, on_error: say_fail}
+  route:
+    type: branch
+    cases:
+      - {when: "result.fee == 0", next: say_free}
+    else: say_fee
+  say_free: {type: say, text: "이번 이체는 수수료가 무료입니다.", next: done}
+  say_fee: {type: say, text: "이체 수수료는 {result.fee | money(result.currency)}입니다.", next: done}
+  say_fail: {type: say, text: "지금은 수수료를 조회할 수 없어요. 잠시 후에 다시 시도해 주세요.", next: done}
+  done: {type: end}

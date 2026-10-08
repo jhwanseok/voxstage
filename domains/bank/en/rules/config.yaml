@@ -13,3 +13,7 @@ ask:
   invalid_reply: "Sorry, that doesn't look right."
   keypad_reply: "For your security, please use the keypad for this one."
   exceed_reply: "I'm sorry, I still can't get that. Let me connect you to an agent."
+
+# A value the flow needs is missing (API result or request meta): apologise, then hand off.
+flow:
+  attribute_missing_reply: "I'm sorry, I can't answer that right now. Let me connect you to an agent."

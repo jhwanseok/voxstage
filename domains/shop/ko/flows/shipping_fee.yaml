@@ -1,0 +1,15 @@
+# 속성 + API: 회원 등급(요청 meta)을 배송비 API에 넘긴다. 영어 쌍둥이와 노드 구조가 같다.
+id: shipping_fee
+triggers: {all_of: [[배송비, 배송], [얼마, 비용, 가격]], none_of: [며칠, 기간, 주소, 걸리, 오래]}
+start: lookup
+nodes:
+  lookup: {type: call, tool: get_shipping_fee, args: {tier: "{customer.tier}"}, on_ok: route, on_error: say_fail}
+  route:
+    type: branch
+    cases:
+      - {when: "result.fee == 0", next: say_free}
+    else: say_fee
+  say_free: {type: say, text: "배송비는 무료입니다.", next: done}
+  say_fee: {type: say, text: "배송비는 {result.fee | money(result.currency)}입니다.", next: done}
+  say_fail: {type: say, text: "지금은 배송비를 조회할 수 없어요. 잠시 후에 다시 시도해 주세요.", next: done}
+  done: {type: end}

@@ -1,0 +1,15 @@
+# Attribute plus API: the membership tier (request meta) goes to the shipping fee API.
+id: shipping_fee
+triggers: {all_of: [[shipping, delivery], [fee, cost, much, price, charge]], none_of: [long, take, time, address]}
+start: lookup
+nodes:
+  lookup: {type: call, tool: get_shipping_fee, args: {tier: "{customer.tier}"}, on_ok: route, on_error: say_fail}
+  route:
+    type: branch
+    cases:
+      - {when: "result.fee == 0", next: say_free}
+    else: say_fee
+  say_free: {type: say, text: "Shipping is free for you.", next: done}
+  say_fee: {type: say, text: "Shipping costs {result.fee | money(result.currency)}.", next: done}
+  say_fail: {type: say, text: "I'm unable to look up the shipping fee right now. Please try again later.", next: done}
+  done: {type: end}

@@ -240,7 +240,7 @@ class LookupFlowsTest(unittest.TestCase):
         a, b = converse(m, Utterance("what's my balance"), Utterance("4821"))
         self.assertIn("last four digits", a.reply)
         self.assertEqual((a.state.flow_id, a.state.node_id), ("balance_inquiry", "ask_account"))
-        self.assertEqual(b.reply, "Your balance is 1250 USD.")
+        self.assertEqual(b.reply, "Your balance is $1,250.")
         self.assertEqual(tools.records, [{"name": "get_balance", "args": {"account_last4": "4821"}, "error": None}])
         self.assertEqual(b.state.slots, {"account_last4": "4821"})
         self.assertEqual(b.state.node_id, "done")
@@ -248,7 +248,7 @@ class LookupFlowsTest(unittest.TestCase):
     def test_keypad_digits_fill_a_digits_slot(self):
         m, _ = manager("bank", "en")
         _, b = converse(m, Utterance("balance please"), Dtmf("7310"))
-        self.assertIn("3000", b.reply)
+        self.assertIn("3,000", b.reply)
 
     def test_wrong_input_asks_again_without_calling_the_api(self):
         m, tools = manager("bank", "en")
@@ -285,7 +285,7 @@ class LookupFlowsTest(unittest.TestCase):
 
     @needs_kiwi
     def test_korean_twins_answer_in_korean(self):
-        cases = (("bank", "내 잔액 알려줘", "4821", ["네 자리"], "1250"),
+        cases = (("bank", "내 잔액 알려줘", "4821", ["네 자리"], "1,250"),
                  ("shop", "제 주문 어디쯤 왔어요", "1001", ["주문번호"], "배송 중"),
                  ("telecom", "데이터 얼마나 남았어요", "5580", ["뒤 네 자리"], "12GB"))
         for domain, text, digits, ask_words, answer in cases:

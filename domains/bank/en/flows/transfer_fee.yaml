@@ -1,0 +1,17 @@
+# Attribute plus API: the customer's grade (request meta) goes to the fee API; a zero fee is said differently.
+id: transfer_fee
+triggers: {all_of: [[fee, fees, charge, cost], [transfer, send]], none_of: [limit, abroad, overseas]}
+captures: {amount: {extractor: number}}
+start: ask_amount
+nodes:
+  ask_amount: {type: ask, slot: amount, prompt: "How much would you like to transfer?", extractor: number, next: lookup}
+  lookup: {type: call, tool: get_transfer_fee, args: {amount: "{amount}", grade: "{customer.grade}"}, on_ok: route, on_error: say_fail}
+  route:
+    type: branch
+    cases:
+      - {when: "result.fee == 0", next: say_free}
+    else: say_fee
+  say_free: {type: say, text: "There is no fee for this transfer.", next: done}
+  say_fee: {type: say, text: "The transfer fee is {result.fee | money(result.currency)}.", next: done}
+  say_fail: {type: say, text: "I'm unable to look up the fee right now. Please try again later.", next: done}
+  done: {type: end}

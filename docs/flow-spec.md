@@ -33,6 +33,28 @@ nodes:
   `ask.max_reprompts` re-prompts (default 2) the manager returns `HandOff("input_failed")` or `EndCall()` as
   `ask.on_exceed` says (`rules/config.yaml`). The counter is `state.meta["ask_misses"]`; a valid answer resets it.
 
+## Attributes, formatters and captures (R4)
+
+Where a value comes from decides what happens when it is missing (decision R4-2):
+
+| Source | Names in templates and expressions | If it is missing |
+|---|---|---|
+| The caller | slot names, `slots` | The flow `ask`s for it. An `ask` whose slot is already filled is skipped. |
+| An API result | `result` | The reply is the apology wording and `HandOff("missing_attribute")`. Nothing is invented. |
+| The request's `meta` | `customer`, `policy` | Same as an API result. |
+
+A default is possible only as an explicit filter in the flow: `{result.balance | default('unknown')}`. It is never silent.
+
+`{value | formatter(args) | default(...)}` writes values for speech. Formatters (`voxstage/rules/formatters.py`):
+`money(currency)` (USD and KRW; other currencies are backlog D1), `count`, `date` (ISO date). They depend on the
+language and, later, on the TTS in use, so the choice is data. An unknown formatter or the wrong number of
+arguments fails at load; a value a formatter cannot write (`money('EUR')`, `date` of a non-date) fails like a
+missing attribute at run time.
+
+`captures: {plan: {extractor: choice, choices: {플러스: plus}}}` at the top of a flow reads slots from the words that
+started the flow ("How much is the plus plan" fills `plan`). `choices` is a list of words or a word -> value
+mapping. Free text and sensitive slots cannot be captured. Spoken numbers ("five hundred") are R11.
+
 ## Node types
 
 | Type | Fields | Behaviour |
@@ -66,5 +88,5 @@ types, `next` links, tools and arguments; only texts and triggers differ (a test
 
 ## Not yet
 
-Number and date formatting (R4), notices (R5), switching and
+Notices (R5), switching and
 resuming (R6, R7), cancel and hand-off words (R8), correction (R9), identity gate (R13).

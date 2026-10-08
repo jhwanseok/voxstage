@@ -28,6 +28,10 @@ class ExprError(ValueError):
     """The expression is not allowed (load time) or could not be evaluated (run time)."""
 
 
+class MissingAttribute(ExprError):
+    """A field a flow reads is not there (`result.fee` absent). The flow fails visibly or uses an explicit default."""
+
+
 class Expr:
     def __init__(self, source: str, tree: ast.Expression, where: str):
         self.source, self.tree, self.where = source, tree, where
@@ -107,7 +111,7 @@ def _eval(node: ast.AST, env: Mapping) -> Any:
         case ast.Attribute(value=value, attr=attr):
             base = _eval(value, env)
             if not isinstance(base, Mapping) or attr not in base:
-                raise ExprError(f"no field `{attr}`")
+                raise MissingAttribute(f"no field `{attr}`")
             return base[attr]
         case ast.Subscript(value=value, slice=ast.Constant(value=index)):
             return _eval(value, env)[index]

@@ -1,0 +1,11 @@
+# 속성 + API: 요금제는 고객의 말에서, 약정 유형은 요청 meta에서 온다. 영어 쌍둥이와 노드 구조가 같다.
+id: plan_price
+triggers: {all_of: [[요금제, 요금], [얼마, 가격, 비용]], none_of: [변경, 바꾸, 올리, 낮추, 업그레이드, 다운그레이드]}
+captures: {plan: {extractor: choice, choices: {베이직: basic, 기본: basic, 플러스: plus}}}
+start: ask_plan
+nodes:
+  ask_plan: {type: ask, slot: plan, prompt: "어느 요금제인가요? 베이직 또는 플러스라고 말씀해 주세요.", extractor: choice, choices: {베이직: basic, 기본: basic, 플러스: plus}, next: lookup}
+  lookup: {type: call, tool: get_plan_price, args: {plan: "{plan}", contract: "{customer.contract}"}, on_ok: say_price, on_error: say_fail}
+  say_price: {type: say, text: "해당 요금제는 월 {result.monthly_price | money(result.currency)}입니다.", next: done}
+  say_fail: {type: say, text: "지금은 요금을 조회할 수 없어요. 잠시 후에 다시 시도해 주세요.", next: done}
+  done: {type: end}
