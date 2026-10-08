@@ -172,13 +172,14 @@ class FileValidationTest(unittest.TestCase):
             load_patterns(self.write("entries:\n  - {id: a, all_of: [false]}\n"), {"a"})  # YAML booleans
 
     def test_fallback_config_is_validated(self):
-        good = "fallback: {reply: r, exceed_reply: e, max_misses: 2, on_exceed: end_call}\n"
-        self.assertEqual(load_fallback(self.write(good)), Fallback("r", "e", 2, "end_call"))
-        for bad in ("fallback: {reply: r}\n", "fallback: {reply: r, exceed_reply: e, max_misses: 0}\n",
-                    "fallback: {reply: r, exceed_reply: e, on_exceed: hangup}\n",
-                    "fallback: {reply: r, exceed_reply: e, extra: 1}\n", "other: 1\n"):
+        words = {"fallback.miss": "r", "fallback.exceed": "e"}
+        good = "fallback: {max_misses: 2, on_exceed: end_call}\n"
+        self.assertEqual(load_fallback(self.write(good), words), Fallback("r", "e", 2, "end_call"))
+        for bad in ("fallback: {max_misses: 0}\n", "fallback: {on_exceed: hangup}\n",
+                    "fallback: {reply: r}\n",   # wording lives in notices.yaml now
+                    "fallback: {extra: 1}\n", "other: 1\n"):
             with self.assertRaises(RuleError, msg=bad):
-                load_fallback(self.write(bad))
+                load_fallback(self.write(bad), words)
 
 
 class HeldOutTest(unittest.TestCase):

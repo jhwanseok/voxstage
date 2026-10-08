@@ -1,0 +1,17 @@
+# Required wording (fixed notices, spoken exactly as written, in priority order) and situation wording.
+# One file per domain and language; every situation key below is required in every language.
+notices:
+  downgrade_effective_date:
+    fixed: true
+    priority: 10
+    text: "Changing to a lower plan takes effect on your next billing cycle and cannot be reversed for 30 days."
+    applies_when: "direction == 'downgrade'"
+
+wording:
+  fallback.miss: "I'm sorry, I didn't catch that. Could you ask it another way?"
+  fallback.exceed: "I'm sorry, I still can't help with that. Let me connect you to an agent."
+  ask.invalid: "Sorry, that doesn't look right."
+  ask.keypad_only: "For your security, please use the keypad for this one."
+  ask.exceed: "I'm sorry, I still can't get that. Let me connect you to an agent."
+  flow.attribute_missing: "I'm sorry, I can't answer that right now. Let me connect you to an agent."
+  flow.no_flow: "I can't help with that."

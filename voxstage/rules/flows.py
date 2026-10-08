@@ -209,6 +209,7 @@ class CompileCtx:
     names: frozenset
     tools: dict   # tool name -> tuple of param names
     sensitive: frozenset = frozenset()   # slots that only the keypad may fill (R3-1)
+    notices: tuple = ()                  # the registry's Notice objects, in priority order (R5)
 
     @property
     def where(self) -> str:
@@ -299,6 +300,34 @@ def _branch(raw, ctx):
     return {"cases": tuple(out), "else": ctx.need(raw, "else")}
 
 
+@register_node_type("notices", edges=lambda d: [d["next"]])
+def _notices(raw, ctx):
+    """Says required wording from the registry: every listed notice (or every notice, without `ids`) whose
+    `applies_when` holds, in the registry's priority order, never cut short (decision R5-2)."""
+    ctx.only(raw, {"ids", "next"})
+    by_id = {n.id: n for n in ctx.notices}
+    ids = raw.get("ids")
+    if ids is not None:
+        if not isinstance(ids, list) or not ids or not all(isinstance(i, str) for i in ids):
+            raise FlowError(f"{ctx.where}: `ids` must be a non-empty list of notice ids")
+        unknown = [i for i in ids if i not in by_id]
+        if unknown:
+            raise FlowError(f"{ctx.where}: unknown notice ids {unknown} (registry has {sorted(by_id)})")
+        chosen = [n for n in ctx.notices if n.id in ids]
+    else:
+        chosen = list(ctx.notices)
+    if not chosen:
+        raise FlowError(f"{ctx.where}: no notices to say (is notices.yaml empty?)")
+    items = []
+    for n in chosen:
+        try:
+            cond = compile_expr(n.applies_when, f"{ctx.where}.{n.id}.applies_when", ctx.names) if n.applies_when else None
+        except ExprError as exc:
+            raise FlowError(str(exc)) from exc
+        items.append((n, cond))
+    return {"items": tuple(items), "next": ctx.need(raw, "next")}
+
+
 @register_node_type("goto", edges=lambda d: [d["next"]])
 def _goto(raw, ctx):
     ctx.only(raw, {"next"})
@@ -322,7 +351,7 @@ def tool_params(tools_path: str) -> dict:
     return {name: tuple(body.get("params") or ()) for name, body in spec["tools"].items()}
 
 
-def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset()) -> Flow:
+def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notices: tuple = ()) -> Flow:
     with open(path, encoding="utf-8") as f:
         try:
             raw = yaml.safe_load(f)
@@ -358,7 +387,7 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset()) -> Flo
     for node_id, body in raw_nodes.items():
         if not isinstance(body, dict) or body.get("type") not in NODE_TYPES:
             raise FlowError(f"{path}: node {node_id}: type must be one of {sorted(NODE_TYPES)}")
-        ctx = CompileCtx(path, flow_id, node_id, names, tools, sensitive)
+        ctx = CompileCtx(path, flow_id, node_id, names, tools, sensitive, notices)
         nodes[node_id] = Node(node_id, body["type"], NODE_TYPES[body["type"]].compile(body, ctx))
     try:
         triggers = parse_pattern(path, {"id": flow_id, **(raw["triggers"] or {})})
@@ -408,11 +437,11 @@ def _validate_graph(flow: Flow) -> None:
     # every slot used in a template must be filled by an ask node of this flow (checked when compiling names)
 
 
-def load_flows(flows_dir: str, tools_path: str, sensitive: frozenset = frozenset()) -> dict:
+def load_flows(flows_dir: str, tools_path: str, sensitive: frozenset = frozenset(), notices: tuple = ()) -> dict:
     tools = tool_params(tools_path)
     flows, owner = {}, {}
     for path in sorted(glob.glob(os.path.join(flows_dir, "*.yaml"))):
-        flow = load_flow(path, tools, sensitive)
+        flow = load_flow(path, tools, sensitive, notices)
         flows[flow.id] = flow
         for b in flow.buttons:
             if b in owner:

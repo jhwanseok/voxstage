@@ -1,0 +1,7 @@
+# The negative case: this product has no notice, so the flow never reaches a notices node.
+id: checking_signup
+triggers: {all_of: [[checking], [open, start, sign, new, want]], none_of: [how]}
+start: intro
+nodes:
+  intro: {type: say, text: "I can help you open a checking account.", next: done}
+  done: {type: end}

@@ -1,0 +1,10 @@
+# 고지문은 요금제를 낮출 때만 나간다. 방향은 고객의 말이나 질문 한 번으로 정해진다. 영어 쌍둥이와 노드 구조가 같다.
+id: change_plan
+triggers: {all_of: [[요금제, 요금], [낮추, 내리, 올리, 다운그레이드, 업그레이드]], none_of: [어떻, 방법, 얼마, 가격]}
+captures: {direction: {extractor: choice, choices: {낮추: downgrade, 내리: downgrade, 다운그레이드: downgrade, 올리: upgrade, 업그레이드: upgrade}}}
+start: ask_direction
+nodes:
+  ask_direction: {type: ask, slot: direction, prompt: "요금제를 올리시나요, 낮추시나요?", extractor: choice, choices: {낮추: downgrade, 내리: downgrade, 다운그레이드: downgrade, 올리: upgrade, 업그레이드: upgrade}, next: intro}
+  intro: {type: say, text: "요금제 변경을 도와드릴게요.", next: notice}
+  notice: {type: notices, next: done}
+  done: {type: end}

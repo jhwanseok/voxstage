@@ -1,0 +1,10 @@
+# The notice depends on the item's category, which comes from the caller's words (a capture) or one question.
+id: return_request
+triggers: {any_of: [return, send back], none_of: [how, policy, deadline, refund]}
+captures: {item: {extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}}}
+start: ask_item
+nodes:
+  ask_item: {type: ask, slot: item, prompt: "What would you like to return?", extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}, next: intro}
+  intro: {type: say, text: "I can help you start that return.", next: notice}
+  notice: {type: notices, next: done}
+  done: {type: end}

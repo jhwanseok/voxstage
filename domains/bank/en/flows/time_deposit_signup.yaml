@@ -1,0 +1,8 @@
+# Required wording: the registry's time deposit notice is said before anything else about the product.
+id: time_deposit_signup
+triggers: {all_of: [[deposit], [open, start, sign, new, want]], none_of: [how, early, repay]}
+start: intro
+nodes:
+  intro: {type: say, text: "I can help you open a time deposit.", next: notice}
+  notice: {type: notices, ids: [time_deposit_early_close], next: done}
+  done: {type: end}

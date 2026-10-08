@@ -369,12 +369,20 @@ class TwinFlowsTest(unittest.TestCase):
     @needs_kiwi
     def test_korean_and_english_flows_share_structure(self):
         for domain in dataset.DOMAINS:
-            en = load_flows(os.path.join(ROOT, domain, "en", "flows"), os.path.join(ROOT, domain, "tools.yaml"))
-            ko = load_flows(os.path.join(ROOT, domain, "ko", "flows"), os.path.join(ROOT, domain, "tools.yaml"))
+            def load(lang):
+                pack = DomainPack.load(ROOT, domain, lang)
+                return load_flows(os.path.join(ROOT, domain, lang, "flows"), pack.tools_path,
+                                  pack.sensitive_slots, pack.notices)
+            en, ko = load("en"), load("ko")
             self.assertEqual(sorted(en), sorted(ko), domain)
             for fid, fe in en.items():
                 fk = ko[fid]
                 self.assertEqual(fe.start, fk.start)
+                self.assertEqual(fe.buttons, fk.buttons, fid)
+                self.assertEqual([(slot, spec["extractor"], sorted({v for _, v in spec["choices"]}))
+                                  for slot, spec in fe.captures],
+                                 [(slot, spec["extractor"], sorted({v for _, v in spec["choices"]}))
+                                  for slot, spec in fk.captures], fid)
                 self.assertEqual(sorted(fe.nodes), sorted(fk.nodes), fid)
                 for nid, ne in fe.nodes.items():
                     nk = fk.nodes[nid]
@@ -387,6 +395,8 @@ class TwinFlowsTest(unittest.TestCase):
                     if ne.type == "ask":
                         self.assertEqual((ne.data["slot"], ne.data["extractor"], ne.data["length"]),
                                          (nk.data["slot"], nk.data["extractor"], nk.data["length"]))
+                    if ne.type == "notices":
+                        self.assertEqual([n.id for n, _ in ne.data["items"]], [n.id for n, _ in nk.data["items"]])
                     if ne.type == "branch":
                         self.assertEqual([c.source for c, _ in ne.data["cases"]], [c.source for c, _ in nk.data["cases"]])
 

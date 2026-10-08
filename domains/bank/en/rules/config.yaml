@@ -1,19 +1,11 @@
+# Counts and actions only; the words are in ../notices.yaml (R5).
 # What happens when no FAQ rule matches. After max_misses consecutive misses the call is handed off
 # (on_exceed: handoff) or ended (on_exceed: end_call). A match resets the counter.
 fallback:
   max_misses: 3
   on_exceed: handoff
-  reply: "I'm sorry, I didn't catch that. Could you ask it another way?"
-  exceed_reply: "I'm sorry, I still can't help with that. Let me connect you to an agent."
 
 # Unusable answer at an ask: re-prompt up to max_reprompts times, then hand off (or end the call).
 ask:
   max_reprompts: 2
   on_exceed: handoff
-  invalid_reply: "Sorry, that doesn't look right."
-  keypad_reply: "For your security, please use the keypad for this one."
-  exceed_reply: "I'm sorry, I still can't get that. Let me connect you to an agent."
-
-# A value the flow needs is missing (API result or request meta): apologise, then hand off.
-flow:
-  attribute_missing_reply: "I'm sorry, I can't answer that right now. Let me connect you to an agent."

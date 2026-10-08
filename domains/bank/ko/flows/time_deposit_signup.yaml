@@ -1,0 +1,8 @@
+# 필수 고지: 레지스트리의 정기예금 고지문을 상품 안내와 함께 말한다. 영어 쌍둥이와 노드 구조가 같다.
+id: time_deposit_signup
+triggers: {all_of: [[정기예금, 예금], [가입, 만들, 개설, 신규]], none_of: [어떻, 중도, 해지]}
+start: intro
+nodes:
+  intro: {type: say, text: "정기예금 가입을 도와드릴게요.", next: notice}
+  notice: {type: notices, ids: [time_deposit_early_close], next: done}
+  done: {type: end}

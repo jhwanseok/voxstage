@@ -55,6 +55,27 @@ missing attribute at run time.
 started the flow ("How much is the plus plan" fills `plan`). `choices` is a list of words or a word -> value
 mapping. Free text and sensitive slots cannot be captured. Spoken numbers ("five hundred") are R11.
 
+## Notices and situation wording (R5)
+
+`domains/<domain>/<lang>/notices.yaml` is the one place for what the bot must say word for word and for the wording
+that depends on the situation. It has two sections:
+
+```yaml
+notices:                               # required wording; every entry says `fixed: true`
+  time_deposit_early_close:
+    fixed: true
+    priority: 10                       # lower number is spoken first; priorities are unique
+    text: "This is a deposit product, ..."   # literal: no {} fields
+    applies_when: "item == 'electronics'"    # optional expression over the flow's slots
+wording:                               # situation wording; exactly these keys, in every language
+  fallback.miss, fallback.exceed, ask.invalid, ask.keypad_only, ask.exceed, flow.attribute_missing, flow.no_flow
+```
+
+A `notices` node (`ids:` optional, `next`) says every listed notice (every notice without `ids`) whose `applies_when`
+holds, in priority order, as part of the reply. Notices are never cut short (interruption is a streaming question,
+S5). Unknown ids and names in conditions fail at load. `rules/config.yaml` keeps only counts and actions; the words
+come from `wording`. Changing a sentence is an edit to the registry, not to code.
+
 ## Node types
 
 | Type | Fields | Behaviour |
@@ -63,6 +84,7 @@ mapping. Free text and sensitive slots cannot be captured. Spoken numbers ("five
 | `ask` | `slot`, `prompt`, `extractor`, `length` (digits only), `choices` (choice only), `next` | Adds the prompt and waits. The next turn's input fills the slot; if it contains no value, the prompt is asked again (see the re-prompt policy above). |
 | `call` | `tool`, `args`, `on_ok`, `on_error` | Calls the tool through the tool port. The result is `result` (`{error: code}` on failure). |
 | `branch` | `cases: [{when, next}]`, `else` | First case whose expression is true; otherwise `else`. |
+| `notices` | optional `ids`, `next` | Says the applicable registry notices in priority order. |
 | `goto` | `next` | Jumps. |
 | `end` | optional `action: handoff` (with `reason`) or `end_call` | Ends the flow; the action is returned in `DMResult.actions`. |
 
@@ -88,5 +110,5 @@ types, `next` links, tools and arguments; only texts and triggers differ (a test
 
 ## Not yet
 
-Notices (R5), switching and
+Switching and
 resuming (R6, R7), cancel and hand-off words (R8), correction (R9), identity gate (R13).

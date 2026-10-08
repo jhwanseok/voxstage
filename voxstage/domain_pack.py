@@ -38,6 +38,20 @@ class Fallback:
     on_exceed: str = "handoff"   # handoff | end_call
 
 
+WORDING_KEYS = ("fallback.miss", "fallback.exceed", "ask.invalid", "ask.keypad_only", "ask.exceed",
+                "flow.attribute_missing", "flow.no_flow")
+
+
+@dataclass(frozen=True)
+class Notice:
+    """Required wording, spoken exactly as written (R5). `applies_when` is an expression source, compiled by the
+    `notices` node of the flow that uses it, because the names it may use are that flow's slots."""
+    id: str
+    text: str
+    priority: int
+    applies_when: Optional[str] = None
+
+
 @dataclass(frozen=True)
 class AskPolicy:
     """What happens when the caller's answer to an `ask` is not usable (R3). Two re-prompts, then the action."""
@@ -61,6 +75,11 @@ class DomainPack:
     ask: Optional[AskPolicy] = None
     sensitive_slots: frozenset = frozenset()   # slots that may only arrive on the keypad (R3-1)
     missing_reply: str = "I'm sorry, I can't answer that right now. Let me connect you to an agent."
+    notices: tuple = ()                        # of Notice, in speaking order (R5-2)
+    wording: dict = field(default_factory=dict)   # situation key -> text (R5-1)
+
+    def notice(self, notice_id: str) -> Notice:
+        return next(n for n in self.notices if n.id == notice_id)
 
     @classmethod
     def load(cls, domains_dir: str, domain: str, lang: str) -> "DomainPack":
@@ -70,15 +89,20 @@ class DomainPack:
         rules_dir = os.path.join(base, "rules")
         pat_path = os.path.join(rules_dir, "faq_patterns.yaml")
         cfg_path = os.path.join(rules_dir, "config.yaml")
+        reg_path = os.path.join(base, "notices.yaml")
         patterns = load_patterns(pat_path, set(answers)) if os.path.exists(pat_path) else ()
-        fallback = load_fallback(cfg_path) if os.path.exists(cfg_path) else None
-        ask = load_ask_policy(cfg_path) if os.path.exists(cfg_path) else None
+        notices, wording = load_registry(reg_path) if os.path.exists(reg_path) else ((), {})
+        has_cfg = os.path.exists(cfg_path)
+        if has_cfg and not wording:
+            raise RuleError(f"{reg_path}: missing; {cfg_path} takes its wording from the notices registry")
+        fallback = load_fallback(cfg_path, wording) if has_cfg else None
+        ask = load_ask_policy(cfg_path, wording) if has_cfg else None
         sens_path = os.path.join(domains_dir, domain, "sensitive_slots.yaml")
         sensitive = load_sensitive_slots(sens_path) if os.path.exists(sens_path) else frozenset()
-        missing = load_missing_reply(cfg_path) if os.path.exists(cfg_path) else None
-        extra = {"missing_reply": missing} if missing else {}
+        extra = {"missing_reply": wording["flow.attribute_missing"]} if wording else {}
         return cls(domain, lang, answers, patterns, fallback,
-                   os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive, **extra)
+                   os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive,
+                   notices=notices, wording=wording, **extra)
 
 
 def _read(path: str):
@@ -135,46 +159,41 @@ def load_patterns(path: str, faq_ids: set) -> tuple:
     return tuple(out)
 
 
-def load_fallback(path: str) -> Fallback:
+def load_fallback(path: str, wording: dict) -> Fallback:
+    """Counts and the action come from the config; the words come from the registry (`fallback.miss`, `.exceed`)."""
     raw = _read(path)
     fb = raw.get("fallback") if isinstance(raw, dict) else None
-    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "flow"}:
+    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask"}:
         raise RuleError(f"{path}: needs a top-level 'fallback' mapping (and optionally 'ask') only")
-    extra = set(fb) - {"reply", "exceed_reply", "max_misses", "on_exceed"}
+    extra = set(fb) - {"max_misses", "on_exceed"}
     if extra:
-        raise RuleError(f"{path}: unknown fallback keys {sorted(extra)}")
-    for key in ("reply", "exceed_reply"):
-        if not isinstance(fb.get(key), str) or not fb[key].strip():
-            raise RuleError(f"{path}: fallback.{key} must be a non-empty string")
+        raise RuleError(f"{path}: unknown fallback keys {sorted(extra)} (wording lives in notices.yaml)")
     n = fb.get("max_misses", 3)
     if not isinstance(n, int) or isinstance(n, bool) or n < 1:
         raise RuleError(f"{path}: fallback.max_misses must be an integer >= 1")
     action = fb.get("on_exceed", "handoff")
     if action not in ("handoff", "end_call"):
         raise RuleError(f"{path}: fallback.on_exceed must be handoff or end_call")
-    return Fallback(fb["reply"], fb["exceed_reply"], n, action)
+    return Fallback(wording["fallback.miss"], wording["fallback.exceed"], n, action)
 
 
-def load_ask_policy(path: str) -> Optional[AskPolicy]:
+def load_ask_policy(path: str, wording: dict) -> Optional[AskPolicy]:
     raw = _read(path)
     ask = raw.get("ask") if isinstance(raw, dict) else None
     if ask is None:
         return None
     if not isinstance(ask, dict):
         raise RuleError(f"{path}: 'ask' must be a mapping")
-    extra = set(ask) - {"invalid_reply", "keypad_reply", "exceed_reply", "max_reprompts", "on_exceed"}
+    extra = set(ask) - {"max_reprompts", "on_exceed"}
     if extra:
-        raise RuleError(f"{path}: unknown ask keys {sorted(extra)}")
-    for key in ("invalid_reply", "keypad_reply", "exceed_reply"):
-        if not isinstance(ask.get(key), str) or not ask[key].strip():
-            raise RuleError(f"{path}: ask.{key} must be a non-empty string")
+        raise RuleError(f"{path}: unknown ask keys {sorted(extra)} (wording lives in notices.yaml)")
     n = ask.get("max_reprompts", 2)
     if not isinstance(n, int) or isinstance(n, bool) or n < 0:
         raise RuleError(f"{path}: ask.max_reprompts must be an integer >= 0")
     action = ask.get("on_exceed", "handoff")
     if action not in ("handoff", "end_call"):
         raise RuleError(f"{path}: ask.on_exceed must be handoff or end_call")
-    return AskPolicy(ask["invalid_reply"], ask["keypad_reply"], ask["exceed_reply"], n, action)
+    return AskPolicy(wording["ask.invalid"], wording["ask.keypad_only"], wording["ask.exceed"], n, action)
 
 
 def load_sensitive_slots(path: str) -> frozenset:
@@ -184,12 +203,39 @@ def load_sensitive_slots(path: str) -> frozenset:
     return frozenset(_words(path, "sensitive_slots", raw["sensitive_slots"]))
 
 
-def load_missing_reply(path: str) -> Optional[str]:
+def load_registry(path: str) -> tuple:
+    """`notices.yaml`: fixed notices (spoken verbatim, in priority order) and situation wording (R5)."""
     raw = _read(path)
-    flow = raw.get("flow") if isinstance(raw, dict) else None
-    if flow is None:
-        return None
-    if not isinstance(flow, dict) or set(flow) != {"attribute_missing_reply"} \
-            or not isinstance(flow["attribute_missing_reply"], str) or not flow["attribute_missing_reply"].strip():
-        raise RuleError(f"{path}: 'flow' needs attribute_missing_reply (a non-empty string) only")
-    return flow["attribute_missing_reply"]
+    if not isinstance(raw, dict) or set(raw) != {"notices", "wording"}:
+        raise RuleError(f"{path}: needs exactly 'notices' and 'wording'")
+    wording = raw["wording"]
+    if not isinstance(wording, dict) or set(wording) != set(WORDING_KEYS):
+        missing = sorted(set(WORDING_KEYS) - set(wording or {}))
+        extra = sorted(set(wording or {}) - set(WORDING_KEYS))
+        raise RuleError(f"{path}: wording must have exactly the situation keys {list(WORDING_KEYS)}"
+                        f" (missing {missing}, unknown {extra})")
+    for key, text in wording.items():
+        if not isinstance(text, str) or not text.strip():
+            raise RuleError(f"{path}: wording.{key} must be a non-empty string")
+    notices_raw = raw["notices"]
+    if not isinstance(notices_raw, dict):
+        raise RuleError(f"{path}: 'notices' must be a mapping of id -> notice")
+    notices, seen = [], {}
+    for nid, body in notices_raw.items():
+        if not isinstance(body, dict) or not {"text", "priority", "fixed"} <= set(body) \
+                or set(body) - {"text", "priority", "fixed", "applies_when"}:
+            raise RuleError(f"{path}: notice {nid}: needs text, priority and fixed (applies_when is optional)")
+        if body["fixed"] is not True:
+            raise RuleError(f"{path}: notice {nid}: `fixed: true` marks required wording; situation wording goes under 'wording'")
+        if not isinstance(body["text"], str) or not body["text"].strip():
+            raise RuleError(f"{path}: notice {nid}: text must be a non-empty string")
+        if not isinstance(body["priority"], int) or isinstance(body["priority"], bool):
+            raise RuleError(f"{path}: notice {nid}: priority must be an integer")
+        if body["priority"] in seen:
+            raise RuleError(f"{path}: notices {seen[body['priority']]} and {nid} share priority {body['priority']}; the order must be fixed")
+        seen[body["priority"]] = nid
+        when = body.get("applies_when")
+        if when is not None and not (isinstance(when, str) and when.strip()):
+            raise RuleError(f"{path}: notice {nid}: applies_when must be an expression")
+        notices.append(Notice(nid, body["text"], body["priority"], when))
+    return tuple(sorted(notices, key=lambda n: n.priority)), dict(wording)

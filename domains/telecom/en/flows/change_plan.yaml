@@ -1,0 +1,10 @@
+# The notice applies to a downgrade only; the direction comes from the caller's words or one question.
+id: change_plan
+triggers: {all_of: [[plan], [downgrade, upgrade, lower, higher]], none_of: [how, much, price, cost]}
+captures: {direction: {extractor: choice, choices: {downgrade: downgrade, lower: downgrade, upgrade: upgrade, higher: upgrade}}}
+start: ask_direction
+nodes:
+  ask_direction: {type: ask, slot: direction, prompt: "Would you like to upgrade or downgrade your plan?", extractor: choice, choices: {downgrade: downgrade, lower: downgrade, upgrade: upgrade, higher: upgrade}, next: intro}
+  intro: {type: say, text: "I can help you change your plan.", next: notice}
+  notice: {type: notices, next: done}
+  done: {type: end}

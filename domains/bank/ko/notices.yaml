@@ -1,0 +1,16 @@
+# Required wording (fixed notices, spoken exactly as written, in priority order) and situation wording.
+# One file per domain and language; every situation key below is required in every language.
+notices:
+  time_deposit_early_close:
+    fixed: true
+    priority: 10
+    text: "이 상품은 예금 상품이며, 만기 전에 해지하시면 약정된 이율보다 낮은 이율이 적용될 수 있습니다."
+
+wording:
+  fallback.miss: "죄송합니다, 잘 알아듣지 못했어요. 다시 한 번 말씀해 주시겠어요?"
+  fallback.exceed: "죄송합니다, 이 문의는 제가 도와드리기 어렵습니다. 상담사에게 연결해 드릴게요."
+  ask.invalid: "죄송합니다, 입력하신 내용을 확인할 수 없어요."
+  ask.keypad_only: "보안을 위해 이 정보는 키패드로 입력해 주세요."
+  ask.exceed: "죄송합니다, 입력을 확인하지 못했어요. 상담사에게 연결해 드릴게요."
+  flow.attribute_missing: "죄송합니다, 지금은 답변드리기 어려워요. 상담사에게 연결해 드릴게요."
+  flow.no_flow: "죄송합니다, 그 부분은 도와드리기 어렵습니다."

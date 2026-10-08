@@ -146,13 +146,13 @@ class ConfigFilesTest(unittest.TestCase):
         return path
 
     def test_ask_policy_is_validated(self):
-        good = "ask: {invalid_reply: a, keypad_reply: b, exceed_reply: c, max_reprompts: 1, on_exceed: end_call}\n"
-        self.assertEqual(load_ask_policy(self.write(good)), AskPolicy("a", "b", "c", 1, "end_call"))
-        for bad in ("ask: {invalid_reply: a}\n", "ask: {invalid_reply: a, keypad_reply: b, exceed_reply: c, max_reprompts: -1}\n",
-                    "ask: {invalid_reply: a, keypad_reply: b, exceed_reply: c, on_exceed: hangup}\n",
-                    "ask: {invalid_reply: a, keypad_reply: b, exceed_reply: c, extra: 1}\n"):
+        words = {"ask.invalid": "a", "ask.keypad_only": "b", "ask.exceed": "c"}
+        good = "ask: {max_reprompts: 1, on_exceed: end_call}\n"
+        self.assertEqual(load_ask_policy(self.write(good), words), AskPolicy("a", "b", "c", 1, "end_call"))
+        for bad in ("ask: {max_reprompts: -1}\n", "ask: {on_exceed: hangup}\n", "ask: {extra: 1}\n",
+                    "ask: {invalid_reply: a}\n"):
             with self.assertRaises(RuleError, msg=bad):
-                load_ask_policy(self.write(bad))
+                load_ask_policy(self.write(bad), words)
 
     def test_sensitive_slots_file(self):
         self.assertEqual(load_sensitive_slots(self.write("sensitive_slots: [birth_date]\n")), frozenset({"birth_date"}))

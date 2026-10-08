@@ -101,6 +101,17 @@ def run_branch(run: Run, node: Node):
     return node.data["else"]
 
 
+@handler("notices")
+def run_notices(run: Run, node: Node):
+    env, spoken = run.env(), []
+    for notice, cond in node.data["items"]:
+        if cond is None or cond.evaluate(env):
+            run.out.append(notice.text)
+            spoken.append(notice.id)
+    run.trace["notices"] = spoken
+    return node.data["next"]
+
+
 @handler("goto")
 def run_goto(run: Run, node: Node):
     return node.data["next"]
@@ -177,8 +188,8 @@ class FlowManager(DialogueManager):
                 return self._run(run, state, flow.start)
         if self.faq is not None:
             return self.faq.respond(state, turn_input)
-        reply = "I can't help with that."
-        return DMResult(reply, state, trace={"rule": "no_flow"})
+        return DMResult(self.pack.wording.get("flow.no_flow", "I can't help with that."), state,
+                        trace={"rule": "no_flow"})
 
     def _capture(self, flow: Flow, turn_input) -> dict:
         """Slots the first utterance already contains ("How much is the plus plan" fills `plan`)."""
@@ -237,7 +248,7 @@ class FlowManager(DialogueManager):
 
 def build_manager(domains_dir: str, domain: str, lang: str, tools: ToolExecutor) -> FlowManager:
     pack = DomainPack.load(domains_dir, domain, lang)
-    flows = load_flows(f"{pack.base_dir}/flows", pack.tools_path, pack.sensitive_slots)
+    flows = load_flows(f"{pack.base_dir}/flows", pack.tools_path, pack.sensitive_slots, pack.notices)
     return FlowManager(pack, tools, flows)
 
 

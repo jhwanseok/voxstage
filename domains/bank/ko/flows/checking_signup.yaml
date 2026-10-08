@@ -1,0 +1,7 @@
+# 부정 사례: 이 상품에는 고지문이 없으므로 notices 노드에 도달하지 않는다. 영어 쌍둥이와 노드 구조가 같다.
+id: checking_signup
+triggers: {all_of: [[입출금, 통장], [가입, 만들, 개설, 신규]], none_of: [어떻]}
+start: intro
+nodes:
+  intro: {type: say, text: "입출금 통장 개설을 도와드릴게요.", next: done}
+  done: {type: end}
