@@ -120,3 +120,13 @@ are answerable by that domain's `tools.yaml` (including expected failures); the 
 negative case forbids is part of the notice its positive case requires; no Hangul in English
 files and Hangul in Korean utterances; Korean and English twins share ids, setup, flow, slots,
 tool calls and actions; ASR variants differ from the question and its paraphrases.
+
+## Rule-author view and out-of-scope drafts (R1)
+
+`python -m voxstage.dataset authoring-view <domain> <lang>` prints each FAQ entry's id, canonical question and
+answer and nothing else. People or sessions who write rules use only this view; `paraphrases` and `asr_variants`
+are held out (ADR 0009).
+
+`domains/<domain>/<lang>/faq_unanswerable.yaml` holds five out-of-scope questions that must hit the fallback
+(three clear, two near-misses). Keys: `status` (`draft` until the owner approves), `lang`, `questions`. The
+evaluation reports false accepts on it apart from the pass rate.

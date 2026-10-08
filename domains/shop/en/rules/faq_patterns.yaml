@@ -1,0 +1,36 @@
+entries:
+  - id: shop.faq.shipping_time
+    all_of: [[shipping, delivery, deliver, delivered, arrive, arrives, ship, ships]]
+    any_of: [long, take, takes, days, fast, quick, quickly, soon, when, time, express, standard, business]
+    none_of: [track, tracking, address, return, returns, cancel, change, coupon, wrap, wrapping]
+    priority: 0
+  - id: shop.faq.return_how
+    all_of: [[return, returns, returning, returned, refund, refunds]]
+    none_of: [cancel, cancelling, canceling, address]
+    priority: 0
+  - id: shop.faq.track_order
+    all_of:
+      - [track, tracking, tracked, status, where, locate, location]
+      - [order, package, parcel, shipment, delivery]
+    none_of: [cancel, return, address, change, coupon, promo, code]
+    priority: 0
+  - id: shop.faq.change_address
+    all_of:
+      - [address, addresses]
+      - [change, changing, update, edit, modify, wrong, different, another, new]
+    priority: 0
+  - id: shop.faq.payment_methods
+    all_of: [[pay, payment, payments, card, cards, credit, debit, wallet, wallets, paypal]]
+    any_of: [accept, method, methods, options, option, can, use, take, support, allowed]
+    none_of: [coupon, promo, discount, wrap, wrapping, refund, return, cancel]
+    priority: 0
+  - id: shop.faq.gift_wrap
+    all_of: [[wrap, wrapping, wrapped, handwritten, note, ribbon]]
+    none_of: [return, cancel, refund]
+    priority: 0
+  - id: shop.faq.cancel_order
+    all_of: [[cancel, cancelling, canceling, cancellation, cancelled, canceled]]
+    priority: 0
+  - id: shop.faq.use_coupon
+    all_of: [[coupon, coupons, promo, promotion, voucher, discount, discounts]]
+    priority: 0

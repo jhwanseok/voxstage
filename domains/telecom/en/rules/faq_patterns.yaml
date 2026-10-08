@@ -1,0 +1,42 @@
+entries:
+  - id: telecom.faq.check_usage
+    all_of: [[data, usage, gb, gigabytes, minutes]]
+    any_of: [check, see, view, much, left, remaining, used, track, monitor, find, know, many, using]
+    none_of: [abroad, overseas, roaming, plan, plans, bill, pay, paying, sim, outage]
+    priority: 0
+  - id: telecom.faq.change_plan
+    all_of:
+      - [plan, plans, subscription, package, tariff]
+      - [change, changing, switch, switching, upgrade, upgrading, downgrade, downgrading, swap, modify, update, different, cheaper]
+    none_of: [carrier, number, pin, port, transfer, bill, pay]
+    priority: 0
+  - id: telecom.faq.bill_due
+    all_of:
+      - [bill, bills, billing, payment, statement, invoice]
+      - [due, when, date, deadline, overdue, day]
+    priority: 0
+  - id: telecom.faq.report_outage
+    all_of:
+      - [service, signal, network, coverage, reception, phone, internet, data, calls, call, connection, outage, outages]
+      - [not, "no", "isn't", "doesn't", "won't", "can't", cant, down, dead, broken, nothing, outage, outages, dropping]
+    none_of: [abroad, overseas, roaming, bill, usage]
+    priority: 0
+  - id: telecom.faq.roaming
+    all_of: [[abroad, overseas, roaming, international, travel, traveling, travelling, trip, country, countries]]
+    none_of: [sim, bill]
+    priority: 0
+  - id: telecom.faq.replace_sim
+    all_of:
+      - [sim]
+      - [replace, replacement, replacing, new, lost, damaged, broken, stolen, swap, order, another, change, changing]
+    priority: 0
+  - id: telecom.faq.keep_number
+    all_of:
+      - [number, numbers]
+      - [keep, keeping, port, porting, transfer, transferring, bring, move, moving, retain, same, existing, switch, switching]
+    none_of: [bill, sim]
+    priority: 0
+  - id: telecom.faq.pay_bill
+    all_of: [[pay, pays, paying, paid, payment, payments, autopay]]
+    none_of: [due, when, date, deadline, overdue, day, days, plan, plans, sim, roaming, data, keep, port]
+    priority: 0

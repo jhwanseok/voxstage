@@ -1,0 +1,45 @@
+entries:
+  - id: telecom.faq.check_usage
+    all_of:
+      - [데이터, 사용량, 기가, 용량]
+      - [확인, 보, 조회, 얼마, 남, 쓰, 사용]
+    none_of: [해외, 로밍, 유심, 변경, 바꾸, 바꿔]
+    priority: 0
+  - id: telecom.faq.change_plan
+    all_of:
+      - [요금제, 요금, 플랜]
+      - [변경, 바꾸, 바꿔, 변환, 갈아타, 교체, 올리, 내리, 낮추]
+    none_of: [번호, 유심, 납부, 언제, 청구]
+    priority: 0
+  - id: telecom.faq.bill_due
+    all_of:
+      - [요금, 청구, 고지서, 납부일, 통신비]
+      - [언제, 며칠, 날짜, 납부일, 기한, 마감, 기일]
+    priority: 0
+  - id: telecom.faq.report_outage
+    all_of:
+      - [서비스, 통화, 인터넷, 데이터, 전화, 신호, 통신, 휴대폰, 폰, 먹통, 장애, 불통]
+      - [안, 못, 먹통, 장애, 불통, 끊기, 끊어, 터지, 불가]
+    none_of: [해외, 로밍, 사용량, 요금, 번호]
+    priority: 0
+  - id: telecom.faq.roaming
+    all_of: [[해외, 외국, 로밍, 출국, 여행, 출장]]
+    none_of: [유심, 요금제, 번호]
+    priority: 0
+  - id: telecom.faq.replace_sim
+    all_of:
+      - [유심, 심카드]
+      - [교체, 바꾸, 바꿔, 재발급, 분실, 교환, 주문, 잃어버리, 고장, 새로]
+    priority: 0
+  - id: telecom.faq.keep_number
+    all_of:
+      - [번호, 전화번호]
+      - [유지, 그대로, 옮기, 이동, 이전, 가져오, 가져가, 번호이동]
+    none_of: [유심, 요금제]
+    priority: 0
+  - id: telecom.faq.pay_bill
+    all_of:
+      - [요금, 청구, 고지서, 통신비, 휴대폰비]
+      - [내, 납부, 결제, 지불, 납입, 자동이체, 자동납부, 계산]
+    none_of: [언제, 며칠, 날짜, 납부일, 기한, 마감, 기일, 요금제, 변경, 해외, 로밍]
+    priority: 0

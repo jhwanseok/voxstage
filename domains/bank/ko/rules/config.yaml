@@ -1,0 +1,7 @@
+# 일치하는 FAQ 룰이 없을 때의 동작. 연속 max_misses번 실패하면 상담사 연결(on_exceed: handoff)
+# 또는 통화 종료(on_exceed: end_call)를 한다. 일치하면 횟수는 0으로 돌아간다.
+fallback:
+  max_misses: 3
+  on_exceed: handoff
+  reply: "죄송합니다, 잘 알아듣지 못했어요. 다시 한 번 말씀해 주시겠어요?"
+  exceed_reply: "죄송합니다, 이 문의는 제가 도와드리기 어렵습니다. 상담사에게 연결해 드릴게요."

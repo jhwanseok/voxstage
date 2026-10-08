@@ -1,0 +1,7 @@
+# What happens when no FAQ rule matches. After max_misses consecutive misses the call is handed off
+# (on_exceed: handoff) or ended (on_exceed: end_call). A match resets the counter.
+fallback:
+  max_misses: 3
+  on_exceed: handoff
+  reply: "I'm sorry, I didn't catch that. Could you ask it another way?"
+  exceed_reply: "I'm sorry, I still can't help with that. Let me connect you to an agent."

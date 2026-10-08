@@ -6,6 +6,7 @@ Validation is strict on purpose: a typo in a scenario should fail at load time, 
 a silently wrong experiment. Format reference: docs/dataset-spec.md.
 
 CLI: python -m voxstage.dataset coverage [domains_dir] [lang]   # capability x domain matrix
+     python -m voxstage.dataset authoring-view <domain> <lang> [domains_dir]   # id, question, answer only
 """
 
 from __future__ import annotations
@@ -218,6 +219,28 @@ def load_domain(domain_dir: str, lang: str = "en") -> tuple[list[FaqEntry], list
     return faq, scenarios
 
 
+def authoring_view(domain_dir: str, lang: str = "en") -> list[tuple[str, str, str]]:
+    """What a rule author may read of the FAQ: id, canonical question, answer. Nothing else.
+    Paraphrases and recognition-error variants are held out (ADR 0009)."""
+    faq, _ = load_domain(domain_dir, lang)
+    return [(e.id, e.question, e.answer) for e in faq]
+
+
+def load_unanswerable(path: str) -> list[str]:
+    """Out-of-scope questions that must hit the fallback. The file is a draft until the owner approves it."""
+    raw = _load_yaml(path)
+    if not isinstance(raw, dict) or set(raw) - {"status", "lang", "questions"} or raw.get("lang") not in LANGS:
+        _fail(path, "needs 'status', 'lang' and 'questions' only")
+    if raw.get("status") not in ("draft", "approved"):
+        _fail(path, "status must be draft or approved")
+    qs = raw.get("questions")
+    if not isinstance(qs, list) or len(qs) < 5 or not all(isinstance(q, str) and q for q in qs):
+        _fail(path, "questions must be a list of at least five non-empty strings")
+    if os.path.basename(os.path.dirname(os.path.abspath(path))) != raw["lang"]:
+        _fail(path, "faq_unanswerable.yaml must sit in the directory named after its lang")
+    return qs
+
+
 def coverage(domains_dir: str, lang: str = "en") -> dict:
     """{(domain, capability): count}. C00 counts FAQ entries, the others count scenarios."""
     counts = {(d, c): 0 for d in DOMAINS for c in CAPABILITIES}
@@ -241,6 +264,11 @@ def format_coverage(counts: dict) -> str:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 4 and sys.argv[1] == "authoring-view":
+        root = sys.argv[4] if len(sys.argv) > 4 else os.path.join(os.path.dirname(__file__), "..", "domains")
+        for fid, question, answer in authoring_view(os.path.join(root, sys.argv[2]), sys.argv[3]):
+            print(f"{fid}\n  question: {question}\n  answer: {answer}")
+        sys.exit(0)
     if len(sys.argv) >= 2 and sys.argv[1] == "coverage":
         root = sys.argv[2] if len(sys.argv) > 2 else "domains"
         lang = sys.argv[3] if len(sys.argv) > 3 else "en"

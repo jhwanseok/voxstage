@@ -1,0 +1,20 @@
+entries:
+  - id: bank.faq.hours
+    all_of: [[영업시간, 운영, 시간, 몇시, 열, 닫, 문]]
+    none_of: [이체, 송금, 카드, 대출, 비밀번호, 거래, 도착, 수수료, 계좌]
+  - id: bank.faq.card_loss
+    all_of: [[카드, 체크, 신용], [잃어버리, 잃, 분실, 도난, 정지, 훔치]]
+  - id: bank.faq.transfer_limit
+    all_of: [[한도, 상한]]
+    none_of: [해외, 카드, 대출, 자동]
+  - id: bank.faq.password_locked
+    all_of: [[비밀번호, 비번, 패스워드, 암호, 계정, 로그인], [잠기, 잠금, 틀리, 오류, 재설정, 초기화, 잊어버리, 잊, 막히, 실패]]
+  - id: bank.faq.statement_copy
+    all_of: [[거래내역, 내역서, 명세서, 출력본, 입출금내역]]
+  - id: bank.faq.recurring_payment
+    all_of: [[자동이체, 자동납부, 자동결제, 정기결제, 정기이체]]
+  - id: bank.faq.international_transfer
+    all_of: [[해외, 외국, 국제, 외화], [송금, 이체, 보내]]
+    priority: 1
+  - id: bank.faq.loan_payoff
+    all_of: [[대출, 융자], [갚, 상환, 미리, 조기, 완납]]

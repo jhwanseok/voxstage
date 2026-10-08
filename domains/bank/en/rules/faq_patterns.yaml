@@ -1,0 +1,25 @@
+entries:
+  - id: bank.faq.hours
+    all_of: [[hours, time, times, open, opens, opening, close, closes, closing, closed]]
+    none_of: [account, accounts, card, statement, loan, password, transfer, send, abroad, international, payment, arrive, arrival]
+  - id: bank.faq.card_loss
+    all_of: [[card, debit, credit], [lose, lost, losing, stolen, steal, missing, block, stop, freeze, frozen]]
+    none_of: [statement, limit]
+  - id: bank.faq.transfer_limit
+    all_of: [[transfer, transfers, send, sending], [limit, limits, maximum, max, cap, much, daily]]
+    none_of: [abroad, international, overseas, foreign, recurring, automatic, loan]
+  - id: bank.faq.password_locked
+    all_of: [[password, passcode, pin, login, account], [locked, lock, locks, locking, blocked, suspended, reset, forgot, forgotten, attempts]]
+    none_of: [statement, loan, limit, card]
+  - id: bank.faq.statement_copy
+    all_of: [[statement, statements, history, transactions]]
+    none_of: [recurring, loan]
+  - id: bank.faq.recurring_payment
+    all_of: [[recurring, automatic, auto, autopay, standing, scheduled, repeating, subscription]]
+    none_of: [loan, abroad, international]
+  - id: bank.faq.international_transfer
+    all_of: [[abroad, overseas, international, internationally, foreign], [send, sending, transfer, transfers, wire, money, remit, payment]]
+    priority: 1
+  - id: bank.faq.loan_payoff
+    all_of: [[loan, loans, mortgage], [early, "off", payoff, repay, repayment, prepay, prepayment, settle, pay, paying]]
+    none_of: [recurring, abroad]

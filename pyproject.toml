@@ -10,6 +10,7 @@ dependencies = ["numpy", "matplotlib", "pyyaml"]
 whisper = ["faster-whisper"]
 gemini = ["google-genai"]
 audio = ["scipy"]
+ko = ["kiwipiepy"]
 
 [build-system]
 requires = ["setuptools>=68"]

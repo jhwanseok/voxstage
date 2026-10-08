@@ -107,7 +107,7 @@ def _variant_cases(s: dataset.Scenario) -> list[Case]:
 
 
 def build_cases(domains_dir: str = DEFAULT_DOMAINS_DIR, lang: str = "en",
-                domains: Optional[list] = None) -> list[Case]:
+                domains: Optional[list] = None, include_unanswerable: bool = False) -> list[Case]:
     cases: list[Case] = []
     for d in domains or dataset.DOMAINS:
         path = os.path.join(domains_dir, d)
@@ -124,6 +124,15 @@ def build_cases(domains_dir: str = DEFAULT_DOMAINS_DIR, lang: str = "en",
         for s in scenarios:
             cases.append(Case(s.id, "scenario", s.domain, s.lang, s.capability, s.turns, s.setup, "base"))
             cases.extend(_variant_cases(s))
+        un_path = os.path.join(path, lang, "faq_unanswerable.yaml")
+        if include_unanswerable and os.path.exists(un_path):
+            # Out-of-scope questions: the reply must not be any FAQ answer (a false accept otherwise).
+            answers = [e.answer for e in faq]
+            for n, text in enumerate(dataset.load_unanswerable(un_path)):
+                turn = dataset.Turn(user={"kind": "utterance", "text": text},
+                                    expect={"reply_not_contains": answers})
+                cases.append(Case(f"{d}.unanswerable.{n}", "unanswerable", d, lang, "C00", (turn,), {},
+                                  "unanswerable_draft"))
     return cases
 
 
@@ -193,9 +202,10 @@ def run_case(factory: ManagerFactory, case: Case, domains_dir: str, mode: str = 
 
 
 def evaluate(factory: ManagerFactory, *, domains_dir: str = DEFAULT_DOMAINS_DIR, lang: str = "en",
-             mode: str = "clean", domains: Optional[list] = None, manager_name: str = "") -> dict:
+             mode: str = "clean", domains: Optional[list] = None, manager_name: str = "",
+             include_unanswerable: bool = False) -> dict:
     results = [run_case(factory, c, domains_dir, mode)
-               for c in build_cases(domains_dir, lang, domains)]
+               for c in build_cases(domains_dir, lang, domains, include_unanswerable)]
     return {"manager": manager_name, "lang": lang, "mode": mode, "summary": summarize(results),
             "results": results}
 
@@ -211,9 +221,17 @@ def summarize(results: list) -> dict:
         keys = sorted({r[key] for r in rows})
         return {k: _rate([r for r in rows if r[key] == k]) for k in keys}
 
+    unanswerable = [r for r in results if r["kind"] == "unanswerable"]
+    results = [r for r in results if r["kind"] != "unanswerable"]
     faq = [r for r in results if r["kind"] == "faq"]
-    return {"overall": _rate(results), "by_capability": group("capability"), "by_domain": group("domain"),
-            "by_lang": group("lang"), "faq_by_source": group("source", faq) if faq else {}}
+    out = {"overall": _rate(results), "by_capability": group("capability", results),
+           "by_domain": group("domain", results), "by_lang": group("lang", results),
+           "faq_by_source": group("source", faq) if faq else {}}
+    if unanswerable:  # the file is a draft until the owner approves it; reported apart from the pass rate
+        wrong = sum(not r["passed"] for r in unanswerable)
+        out["false_accept"] = {"false_accepts": wrong, "total": len(unanswerable),
+                               "rate": round(100 * wrong / len(unanswerable), 1), "status": "draft, not reviewed"}
+    return out
 
 
 # --- reports -----------------------------------------------------------------------------------------
@@ -225,6 +243,10 @@ def to_markdown(report: dict) -> str:
     lines += [f"| {k} | {v['passed']} | {v['total']} | {v['rate']} |" for k, v in s["by_capability"].items()]
     lines += ["", "| Domain | Passed | Total | Rate % |", "|---|---|---|---|"]
     lines += [f"| {k} | {v['passed']} | {v['total']} | {v['rate']} |" for k, v in s["by_domain"].items()]
+    if "false_accept" in s:
+        fa = s["false_accept"]
+        lines += ["", f"False accepts on the unanswerable list ({fa['status']}): "
+                      f"{fa['false_accepts']}/{fa['total']} ({fa['rate']}%)"]
     if s["faq_by_source"]:
         lines += ["", "| FAQ query source | Passed | Total | Rate % |", "|---|---|---|---|"]
         lines += [f"| {k} | {v['passed']} | {v['total']} | {v['rate']} |" for k, v in s["faq_by_source"].items()]
@@ -281,13 +303,15 @@ def main(argv: Optional[list] = None) -> int:
     r.add_argument("--mode", default="clean", choices=("clean", "noisy"))
     r.add_argument("--domains-dir", default=DEFAULT_DOMAINS_DIR)
     r.add_argument("--out", default=None)
+    r.add_argument("--unanswerable", action="store_true", help="also run the draft out-of-scope questions")
     c = sub.add_parser("compare")
     c.add_argument("a")
     c.add_argument("b")
     args = ap.parse_args(argv)
     if args.cmd == "run":
         report = evaluate(load_factory(args.manager), domains_dir=args.domains_dir, lang=args.lang,
-                          mode=args.mode, manager_name=args.manager.split(":")[-1])
+                          mode=args.mode, manager_name=args.manager.split(":")[-1],
+                          include_unanswerable=args.unanswerable)
         if args.out:
             print(*write_report(report, args.out), sep="\n")
         else:

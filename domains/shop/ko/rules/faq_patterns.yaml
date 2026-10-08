@@ -1,0 +1,35 @@
+entries:
+  - id: shop.faq.shipping_time
+    all_of: [[배송, 도착, 발송]]
+    any_of: [걸리, 얼마나, 며칠, 언제, 기간, 오래, 빠르, 빨리]
+    none_of: [배송지, 조회, 추적, 주소, 반품, 취소, 바꾸, 변경, 쿠폰, 포장]
+    priority: 0
+  - id: shop.faq.return_how
+    all_of: [[반품, 반송, 돌려보내]]
+    none_of: [취소]
+    priority: 0
+  - id: shop.faq.track_order
+    all_of: [[조회, 추적, 어디쯤, 현황]]
+    none_of: [배송지, 주소, 취소, 반품]
+    priority: 0
+  - id: shop.faq.change_address
+    all_of:
+      - [배송지, 주소]
+      - [바꾸, 변경, 수정, 고치, 바뀌, 다르]
+    priority: 0
+  - id: shop.faq.payment_methods
+    all_of: [[결제, 지불, 카드, 페이, 계산]]
+    any_of: [수단, 방법, 방식, 가능, 지원, 종류, 뭐, 되, 있]
+    none_of: [쿠폰, 포장, 취소, 반품, 환불, 할인]
+    priority: 0
+  - id: shop.faq.gift_wrap
+    all_of: [[포장, 손글씨, 메시지, 리본]]
+    none_of: [반품, 환불, 취소, 교환]
+    priority: 0
+  - id: shop.faq.cancel_order
+    all_of: [[취소]]
+    none_of: [배송지, 쿠폰]
+    priority: 0
+  - id: shop.faq.use_coupon
+    all_of: [[쿠폰, 프로모션, 할인, 바우처]]
+    priority: 0

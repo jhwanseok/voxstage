@@ -10,3 +10,9 @@ One row per domain and language each time a step is measured. Every rule counts 
 | R0 | fb351cd | shop | ko | 0 | 0 | 0 | 0 | 0 | 0 |
 | R0 | fb351cd | telecom | en | 0 | 0 | 0 | 0 | 0 | 0 |
 | R0 | fb351cd | telecom | ko | 0 | 0 | 0 | 0 | 0 | 0 |
+| R1 | 0abd454 | bank | en | 0 | 0 | 8 | 0 | 0 | 148 |
+| R1 | 0abd454 | bank | ko | 0 | 0 | 8 | 0 | 0 | 148 |
+| R1 | 0abd454 | shop | en | 0 | 0 | 8 | 0 | 0 | 148 |
+| R1 | 0abd454 | shop | ko | 0 | 0 | 8 | 0 | 0 | 148 |
+| R1 | 0abd454 | telecom | en | 0 | 0 | 8 | 0 | 0 | 148 |
+| R1 | 0abd454 | telecom | ko | 0 | 0 | 8 | 0 | 0 | 148 |
