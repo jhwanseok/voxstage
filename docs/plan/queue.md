@@ -6,7 +6,7 @@ owner, one queue item per run, from the spec file of that item. Nothing here is 
 
 | # | Item | Spec | Depends on | Status | Handoff note |
 |---|---|---|---|---|---|
-| 1 | R0 evaluation harness and ledger | [R0](specs/R0-evaluation-harness.md) | none | ready | |
+| 1 | R0 evaluation harness and ledger | [R0](specs/R0-evaluation-harness.md) | none | done | Built `voxstage/evaluate.py`, `reference_managers.py`, `ledger.py`; `initial_state(session_id, setup)` now copies setup into `meta`. NullDM scores 0 and OracleDM 100 percent in both languages and both modes (en 234 cases, ko 240 cases including variant copies and every FAQ query; 72 base cases per language). Tests: 56 pass. Open: the plan counted 144 cases in total; the harness counts 72 base per language plus expansions, as the spec said. |
 | 2 | R1 FAQ rule manager (English and Korean) | [R1](specs/R1-faq-rule-manager.md) | R0 | ready | |
 | 3 | R2 flow interpreter | [R2](specs/R2-flow-interpreter.md) | R1 | ready | |
 | 4 | R3 button and DTMF | not written | R2 | needs decisions (decision sheet R3-1, R3-2) | |

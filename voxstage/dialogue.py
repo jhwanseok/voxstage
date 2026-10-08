@@ -67,8 +67,10 @@ class DialogueManager:
 
     name = "dm"
 
-    def initial_state(self, session_id: str) -> DialogueState:
-        return DialogueState(session_id=session_id)
+    def initial_state(self, session_id: str, setup: Optional[dict] = None) -> DialogueState:
+        """`setup` (customer, clock, policy) is copied into `state.meta` once; it does not change
+        during a session (ADR 0008)."""
+        return DialogueState(session_id=session_id, meta=dict(setup or {}))
 
     def respond(self, state: DialogueState, turn_input: TurnInput) -> DMResult:
         raise NotImplementedError
