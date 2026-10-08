@@ -8,12 +8,12 @@ priority, then the most specific (more matched words), then file order. No match
 
 from __future__ import annotations
 
-import re
 from typing import Optional
 
 from ..dialogue import DialogueManager, DMResult, EndCall, HandOff
-from ..domain_pack import DomainPack, Pattern
+from ..domain_pack import DomainPack
 from ..turn import Utterance
+from .matching import Matcher
 from .tokenize import Tokenizer, for_lang
 
 MISSES = "faq_misses"
@@ -27,45 +27,10 @@ class FaqRuleManager(DialogueManager):
             raise ValueError(f"{pack.domain}/{pack.lang}: no rules/config.yaml (fallback policy) in the pack")
         self.pack = pack
         self.tok = tokenizer or for_lang(pack.lang)
-        self._regex = {p.id: tuple(re.compile(r, re.IGNORECASE) for r in p.regex) for p in pack.patterns}
-
-    def _score(self, p: Pattern, text: str, analysis) -> Optional[int]:
-        """Number of matched words if the pattern matches, else None."""
-        if any(self.tok.has(analysis, w) for w in p.none_of):
-            return None
-        hits, ok = 0, True
-        for group in p.all_of:
-            if any(self.tok.has(analysis, w) for w in group):
-                hits += 1
-            else:
-                ok = False
-                break
-        if ok and p.any_of:
-            n = sum(self.tok.has(analysis, w) for w in p.any_of)
-            if n == 0:
-                ok = False
-            hits += n
-        if ok and (p.all_of or p.any_of):
-            return hits
-        if any(r.search(text) for r in self._regex[p.id]):
-            return max(hits, 1)
-        return None
+        self.matcher = Matcher(pack.patterns, self.tok)
 
     def match(self, text: str) -> tuple:
-        """(pattern or None, trace)"""
-        analysis = self.tok.analyze(text)
-        scored = []
-        for order, p in enumerate(self.pack.patterns):
-            s = self._score(p, text, analysis)
-            if s is not None:
-                scored.append((p.priority, s, -order, p))
-        if not scored:
-            return None, {"tokens": list(analysis.tokens), "matched": None}
-        scored.sort(key=lambda t: t[:3], reverse=True)
-        best = scored[0]
-        ties = [t[3].id for t in scored[1:] if t[:2] == best[:2]]
-        return best[3], {"tokens": list(analysis.tokens), "matched": best[3].id, "priority": best[0],
-                         "specificity": best[1], "ties": ties}
+        return self.matcher.match(text)
 
     def respond(self, state, turn_input):
         if isinstance(turn_input, Utterance):

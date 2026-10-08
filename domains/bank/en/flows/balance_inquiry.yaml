@@ -1,0 +1,10 @@
+# Lookup flow: ask which account, call the balance API, say the result or an honest failure.
+id: balance_inquiry
+triggers: {any_of: [balance], none_of: [fee, fees]}
+start: ask_account
+nodes:
+  ask_account: {type: ask, slot: account_last4, prompt: "Which account? Please enter the last four digits of the account number.", extractor: digits, length: 4, next: lookup}
+  lookup: {type: call, tool: get_balance, args: {account_last4: "{account_last4}"}, on_ok: say_balance, on_error: say_fail}
+  say_balance: {type: say, text: "Your balance is {result.balance} {result.currency}.", next: done}
+  say_fail: {type: say, text: "I'm unable to look that up right now. Please try again later.", next: done}
+  done: {type: end}

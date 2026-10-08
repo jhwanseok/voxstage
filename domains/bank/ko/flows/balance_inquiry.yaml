@@ -1,0 +1,10 @@
+# 조회 플로우: 계좌를 묻고, 잔액 API를 호출한 뒤, 결과나 정직한 실패 안내를 말한다. 영어 쌍둥이와 노드 구조가 같다.
+id: balance_inquiry
+triggers: {any_of: [잔액, 잔고], none_of: [수수료]}
+start: ask_account
+nodes:
+  ask_account: {type: ask, slot: account_last4, prompt: "어느 계좌인가요? 계좌번호 뒤 네 자리를 입력해 주세요.", extractor: digits, length: 4, next: lookup}
+  lookup: {type: call, tool: get_balance, args: {account_last4: "{account_last4}"}, on_ok: say_balance, on_error: say_fail}
+  say_balance: {type: say, text: "현재 잔액은 {result.balance} {result.currency}입니다.", next: done}
+  say_fail: {type: say, text: "지금은 조회할 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

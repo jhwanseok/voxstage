@@ -77,6 +77,26 @@ def _words(path: str, where: str, value) -> tuple:
     return tuple(value)
 
 
+def parse_pattern(path: str, e: dict) -> Pattern:
+    """One word-group rule (an FAQ entry's pattern or a flow's triggers). `e` carries the id."""
+    extra = set(e) - {"id", "all_of", "any_of", "none_of", "priority", "regex", "note"}
+    if extra:
+        raise RuleError(f"{path}: {e['id']}: unknown keys {sorted(extra)}")
+    groups = []
+    for g in e.get("all_of") or []:
+        groups.append(tuple(_words(path, f"{e['id']}.all_of group", g)) if isinstance(g, list)
+                      else (_words(path, f"{e['id']}.all_of", [g])[0],))
+    any_of = _words(path, f"{e['id']}.any_of", e.get("any_of") or [])
+    regex = _words(path, f"{e['id']}.regex", e.get("regex") or [])
+    if not groups and not any_of and not regex:
+        raise RuleError(f"{path}: {e['id']} needs all_of, any_of or regex")
+    prio = e.get("priority", 0)
+    if not isinstance(prio, int) or isinstance(prio, bool):
+        raise RuleError(f"{path}: {e['id']}: priority must be an integer")
+    return Pattern(e["id"], tuple(groups), any_of, _words(path, f"{e['id']}.none_of", e.get("none_of") or []),
+                   prio, regex)
+
+
 def load_patterns(path: str, faq_ids: set) -> tuple:
     raw = _read(path)
     if not isinstance(raw, dict) or set(raw) != {"entries"} or not isinstance(raw["entries"], list):
@@ -85,27 +105,12 @@ def load_patterns(path: str, faq_ids: set) -> tuple:
     for e in raw["entries"]:
         if not isinstance(e, dict) or "id" not in e:
             raise RuleError(f"{path}: every entry needs an id")
-        extra = set(e) - {"id", "all_of", "any_of", "none_of", "priority", "regex", "note"}
-        if extra:
-            raise RuleError(f"{path}: {e['id']}: unknown keys {sorted(extra)}")
         if e["id"] not in faq_ids:
             raise RuleError(f"{path}: {e['id']} is not a FAQ id")
         if e["id"] in seen:
             raise RuleError(f"{path}: duplicate {e['id']}")
         seen.add(e["id"])
-        groups = []
-        for g in e.get("all_of") or []:
-            groups.append(tuple(_words(path, f"{e['id']}.all_of group", g)) if isinstance(g, list)
-                          else (_words(path, f"{e['id']}.all_of", [g])[0],))
-        any_of = _words(path, f"{e['id']}.any_of", e.get("any_of") or [])
-        regex = _words(path, f"{e['id']}.regex", e.get("regex") or [])
-        if not groups and not any_of and not regex:
-            raise RuleError(f"{path}: {e['id']} needs all_of, any_of or regex")
-        prio = e.get("priority", 0)
-        if not isinstance(prio, int) or isinstance(prio, bool):
-            raise RuleError(f"{path}: {e['id']}: priority must be an integer")
-        out.append(Pattern(e["id"], tuple(groups), any_of, _words(path, f"{e['id']}.none_of", e.get("none_of") or []),
-                           prio, regex))
+        out.append(parse_pattern(path, e))
     missing = faq_ids - seen
     if missing:
         raise RuleError(f"{path}: no pattern for FAQ entries {sorted(missing)}")

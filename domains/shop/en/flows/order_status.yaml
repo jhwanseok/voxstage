@@ -1,0 +1,19 @@
+# Lookup flow with a branch on the status the API returns.
+id: order_status
+triggers: {all_of: [[order, package, parcel], [my]], any_of: [where, status, arrive, track, tracking], none_of: [how, cancel, return, change]}
+start: ask_order
+nodes:
+  ask_order: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: lookup}
+  lookup: {type: call, tool: get_order_status, args: {order_id: "{order_id}"}, on_ok: route, on_error: say_fail}
+  route:
+    type: branch
+    cases:
+      - {when: "result.status == 'shipped'", next: say_shipped}
+      - {when: "result.status == 'processing'", next: say_processing}
+      - {when: "result.status == 'delivered'", next: say_delivered}
+    else: say_fail
+  say_shipped: {type: say, text: "Your order has shipped and should arrive on {result.eta}.", next: done}
+  say_processing: {type: say, text: "Your order is still being prepared. The estimated arrival is {result.eta}.", next: done}
+  say_delivered: {type: say, text: "Your order was delivered on {result.eta}.", next: done}
+  say_fail: {type: say, text: "I'm unable to check that order right now. Please try again later.", next: done}
+  done: {type: end}

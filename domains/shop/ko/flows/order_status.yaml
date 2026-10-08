@@ -1,0 +1,19 @@
+# 조회 플로우: API가 돌려준 상태에 따라 갈라진다. 영어 쌍둥이와 노드 구조가 같다.
+id: order_status
+triggers: {all_of: [주문], any_of: [어디, 상태, 도착, 왔, 조회], none_of: [어떻, 방법, 취소, 반품, 변경]}
+start: ask_order
+nodes:
+  ask_order: {type: ask, slot: order_id, prompt: "주문번호를 입력해 주세요.", extractor: digits, length: 4, next: lookup}
+  lookup: {type: call, tool: get_order_status, args: {order_id: "{order_id}"}, on_ok: route, on_error: say_fail}
+  route:
+    type: branch
+    cases:
+      - {when: "result.status == 'shipped'", next: say_shipped}
+      - {when: "result.status == 'processing'", next: say_processing}
+      - {when: "result.status == 'delivered'", next: say_delivered}
+    else: say_fail
+  say_shipped: {type: say, text: "주문하신 상품은 배송 중이며 {result.eta}에 도착할 예정입니다.", next: done}
+  say_processing: {type: say, text: "주문하신 상품을 준비하고 있어요. 도착 예정일은 {result.eta}입니다.", next: done}
+  say_delivered: {type: say, text: "주문하신 상품은 {result.eta}에 전달되었습니다.", next: done}
+  say_fail: {type: say, text: "지금은 주문 상태를 확인할 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

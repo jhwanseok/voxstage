@@ -92,6 +92,7 @@ voxstage/vendors/         mock, faster-whisper, MeloTTS, Gemini
 - [Project principles](docs/project-principles.md)
 - [Design patterns used, and why](docs/design-patterns.md)
 - [Dataset spec](docs/dataset-spec.md)
+- [Flow files](docs/flow-spec.md)
 - [Decision records](docs/decisions/README.md): every design decision, who made it, options, public basis
 - [Workflow: dev and main branches](docs/workflow.md)
 - [Rule-engine step plan (R0–R15)](docs/plan/rule-engine-steps.md)
