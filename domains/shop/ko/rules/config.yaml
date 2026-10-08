@@ -5,3 +5,11 @@ fallback:
   on_exceed: handoff
   reply: "죄송합니다, 잘 알아듣지 못했어요. 다시 한 번 말씀해 주시겠어요?"
   exceed_reply: "죄송합니다, 이 문의는 제가 도와드리기 어렵습니다. 상담사에게 연결해 드릴게요."
+
+# Unusable answer at an ask: re-prompt up to max_reprompts times, then hand off (or end the call).
+ask:
+  max_reprompts: 2
+  on_exceed: handoff
+  invalid_reply: "죄송합니다, 입력하신 내용을 확인할 수 없어요."
+  keypad_reply: "보안을 위해 이 정보는 키패드로 입력해 주세요."
+  exceed_reply: "죄송합니다, 입력을 확인하지 못했어요. 상담사에게 연결해 드릴게요."

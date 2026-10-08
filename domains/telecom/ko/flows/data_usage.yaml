@@ -1,5 +1,6 @@
 # 조회 플로우: 회선을 묻고, 사용량 API를 호출해 사용량과 총량을 말한다. 영어 쌍둥이와 노드 구조가 같다.
 id: data_usage
+buttons: [menu_usage]
 triggers: {all_of: [데이터], any_of: [사용, 남, 얼마, 썼], none_of: [어떻, 방법, 요금제, 로밍, 추가]}
 start: ask_line
 nodes:

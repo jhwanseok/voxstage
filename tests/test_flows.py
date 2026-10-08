@@ -253,8 +253,8 @@ class LookupFlowsTest(unittest.TestCase):
     def test_wrong_input_asks_again_without_calling_the_api(self):
         m, tools = manager("bank", "en")
         a, b, c = converse(m, Utterance("my balance"), Utterance("I don't know"), Utterance("12"))
-        self.assertEqual(b.reply, a.reply)
-        self.assertEqual(c.reply, a.reply)
+        self.assertTrue(b.reply.endswith(a.reply) and b.reply != a.reply)   # re-prompt wording + the question
+        self.assertTrue(c.reply.endswith(a.reply))
         self.assertEqual(tools.records, [])
         self.assertEqual(c.state.node_id, "ask_account")
 
@@ -336,8 +336,8 @@ class LookupFlowsTest(unittest.TestCase):
 
     def test_other_inputs_outside_a_flow_do_not_crash(self):
         m, _ = manager("bank", "en")
-        (r,) = converse(m, ButtonPress("menu_balance"))
-        self.assertEqual(r.trace["rule"], "fallback")  # buttons start flows in R3
+        (r,) = converse(m, ButtonPress("menu_unknown"))
+        self.assertEqual(r.trace["rule"], "fallback")  # a button no flow declares is a miss
 
     def test_end_node_actions(self):
         with tempfile.TemporaryDirectory() as tmp:

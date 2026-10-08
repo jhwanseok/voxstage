@@ -39,6 +39,16 @@ class Fallback:
 
 
 @dataclass(frozen=True)
+class AskPolicy:
+    """What happens when the caller's answer to an `ask` is not usable (R3). Two re-prompts, then the action."""
+    invalid_reply: str
+    keypad_reply: str
+    exceed_reply: str
+    max_reprompts: int = 2
+    on_exceed: str = "handoff"   # handoff | end_call
+
+
+@dataclass(frozen=True)
 class DomainPack:
     domain: str
     lang: str
@@ -48,6 +58,8 @@ class DomainPack:
     tools_path: str = ""
     base_dir: str = ""
     flows: Optional[dict] = field(default=None)
+    ask: Optional[AskPolicy] = None
+    sensitive_slots: frozenset = frozenset()   # slots that may only arrive on the keypad (R3-1)
 
     @classmethod
     def load(cls, domains_dir: str, domain: str, lang: str) -> "DomainPack":
@@ -59,8 +71,11 @@ class DomainPack:
         cfg_path = os.path.join(rules_dir, "config.yaml")
         patterns = load_patterns(pat_path, set(answers)) if os.path.exists(pat_path) else ()
         fallback = load_fallback(cfg_path) if os.path.exists(cfg_path) else None
+        ask = load_ask_policy(cfg_path) if os.path.exists(cfg_path) else None
+        sens_path = os.path.join(domains_dir, domain, "sensitive_slots.yaml")
+        sensitive = load_sensitive_slots(sens_path) if os.path.exists(sens_path) else frozenset()
         return cls(domain, lang, answers, patterns, fallback,
-                   os.path.join(domains_dir, domain, "tools.yaml"), base)
+                   os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive)
 
 
 def _read(path: str):
@@ -120,8 +135,8 @@ def load_patterns(path: str, faq_ids: set) -> tuple:
 def load_fallback(path: str) -> Fallback:
     raw = _read(path)
     fb = raw.get("fallback") if isinstance(raw, dict) else None
-    if not isinstance(fb, dict) or set(raw) != {"fallback"}:
-        raise RuleError(f"{path}: needs a top-level 'fallback' mapping only")
+    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask"}:
+        raise RuleError(f"{path}: needs a top-level 'fallback' mapping (and optionally 'ask') only")
     extra = set(fb) - {"reply", "exceed_reply", "max_misses", "on_exceed"}
     if extra:
         raise RuleError(f"{path}: unknown fallback keys {sorted(extra)}")
@@ -135,3 +150,32 @@ def load_fallback(path: str) -> Fallback:
     if action not in ("handoff", "end_call"):
         raise RuleError(f"{path}: fallback.on_exceed must be handoff or end_call")
     return Fallback(fb["reply"], fb["exceed_reply"], n, action)
+
+
+def load_ask_policy(path: str) -> Optional[AskPolicy]:
+    raw = _read(path)
+    ask = raw.get("ask") if isinstance(raw, dict) else None
+    if ask is None:
+        return None
+    if not isinstance(ask, dict):
+        raise RuleError(f"{path}: 'ask' must be a mapping")
+    extra = set(ask) - {"invalid_reply", "keypad_reply", "exceed_reply", "max_reprompts", "on_exceed"}
+    if extra:
+        raise RuleError(f"{path}: unknown ask keys {sorted(extra)}")
+    for key in ("invalid_reply", "keypad_reply", "exceed_reply"):
+        if not isinstance(ask.get(key), str) or not ask[key].strip():
+            raise RuleError(f"{path}: ask.{key} must be a non-empty string")
+    n = ask.get("max_reprompts", 2)
+    if not isinstance(n, int) or isinstance(n, bool) or n < 0:
+        raise RuleError(f"{path}: ask.max_reprompts must be an integer >= 0")
+    action = ask.get("on_exceed", "handoff")
+    if action not in ("handoff", "end_call"):
+        raise RuleError(f"{path}: ask.on_exceed must be handoff or end_call")
+    return AskPolicy(ask["invalid_reply"], ask["keypad_reply"], ask["exceed_reply"], n, action)
+
+
+def load_sensitive_slots(path: str) -> frozenset:
+    raw = _read(path)
+    if not isinstance(raw, dict) or set(raw) != {"sensitive_slots"}:
+        raise RuleError(f"{path}: needs a top-level 'sensitive_slots' list only")
+    return frozenset(_words(path, "sensitive_slots", raw["sensitive_slots"]))

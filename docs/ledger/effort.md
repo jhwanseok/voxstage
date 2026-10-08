@@ -22,3 +22,9 @@ One row per domain and language each time a step is measured. Every rule counts 
 | R2 | 44dc1ee | shop | ko | 18 | 8 | 8 | 0 | 521 | 164 |
 | R2 | 44dc1ee | telecom | en | 9 | 5 | 8 | 0 | 521 | 164 |
 | R2 | 44dc1ee | telecom | ko | 9 | 5 | 8 | 0 | 521 | 164 |
+| R3 | 3dfa5fa | bank | en | 10 | 5 | 8 | 0 | 555 | 164 |
+| R3 | 3dfa5fa | bank | ko | 10 | 5 | 8 | 0 | 555 | 164 |
+| R3 | 3dfa5fa | shop | en | 19 | 8 | 8 | 0 | 555 | 164 |
+| R3 | 3dfa5fa | shop | ko | 19 | 8 | 8 | 0 | 555 | 164 |
+| R3 | 3dfa5fa | telecom | en | 10 | 5 | 8 | 0 | 555 | 164 |
+| R3 | 3dfa5fa | telecom | ko | 10 | 5 | 8 | 0 | 555 | 164 |

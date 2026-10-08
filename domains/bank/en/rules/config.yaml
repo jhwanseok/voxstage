@@ -5,3 +5,11 @@ fallback:
   on_exceed: handoff
   reply: "I'm sorry, I didn't catch that. Could you ask it another way?"
   exceed_reply: "I'm sorry, I still can't help with that. Let me connect you to an agent."
+
+# Unusable answer at an ask: re-prompt up to max_reprompts times, then hand off (or end the call).
+ask:
+  max_reprompts: 2
+  on_exceed: handoff
+  invalid_reply: "Sorry, that doesn't look right."
+  keypad_reply: "For your security, please use the keypad for this one."
+  exceed_reply: "I'm sorry, I still can't get that. Let me connect you to an agent."

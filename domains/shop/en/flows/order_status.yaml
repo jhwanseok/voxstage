@@ -1,5 +1,6 @@
 # Lookup flow with a branch on the status the API returns.
 id: order_status
+buttons: [menu_track]
 triggers: {all_of: [[order, package, parcel], [my]], any_of: [where, status, arrive, track, tracking], none_of: [how, cancel, return, change]}
 start: ask_order
 nodes:

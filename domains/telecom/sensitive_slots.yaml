@@ -1,0 +1,2 @@
+# Slots the caller may give on the keypad only, never by voice (R3, decision R3-1). Language-free.
+sensitive_slots: [birth_date, phone_number]

@@ -1,5 +1,6 @@
 # Lookup flow: ask which account, call the balance API, say the result or an honest failure.
 id: balance_inquiry
+buttons: [menu_balance]
 triggers: {any_of: [balance], none_of: [fee, fees]}
 start: ask_account
 nodes:

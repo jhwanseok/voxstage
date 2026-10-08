@@ -1,5 +1,6 @@
 # 조회 플로우: 계좌를 묻고, 잔액 API를 호출한 뒤, 결과나 정직한 실패 안내를 말한다. 영어 쌍둥이와 노드 구조가 같다.
 id: balance_inquiry
+buttons: [menu_balance]
 triggers: {any_of: [잔액, 잔고], none_of: [수수료]}
 start: ask_account
 nodes:

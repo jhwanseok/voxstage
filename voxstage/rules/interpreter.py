@@ -22,6 +22,7 @@ from .flows import Flow, FlowError, Node, load_flows
 from .matching import Matcher
 from .tokenize import Tokenizer, for_lang
 
+ASK_MISSES = "ask_misses"   # consecutive unusable answers at the current ask (R3)
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
 
@@ -148,6 +149,7 @@ class FlowManager(DialogueManager):
                 if node.type not in HANDLERS:
                     raise FlowError(f"{flow.path}: node {node.id}: no handler registered for `{node.type}`")
         self.matcher = Matcher([f.triggers for f in self.flows.values()], self.tok)
+        self.buttons = {b: f.id for f in self.flows.values() for b in f.buttons}
         self.faq = faq if faq is not None else (
             FaqRuleManager(pack, self.tok) if pack.patterns and pack.fallback else None)
 
@@ -156,6 +158,10 @@ class FlowManager(DialogueManager):
         flow = self.flows.get(state.flow_id) if state.flow_id else None
         if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "ask":
             return self._answer_ask(flow, state, turn_input)
+        if isinstance(turn_input, ButtonPress) and turn_input.button_id in self.buttons:
+            flow = self.flows[self.buttons[turn_input.button_id]]
+            run = Run(self, flow, {}, {**state.meta}, trace={"flow": flow.id, "button": turn_input.button_id})
+            return self._run(run, state, flow.start)
         if isinstance(turn_input, Utterance) and self.flows:
             trigger, trace = self.matcher.match(turn_input.text)
             if trigger is not None:
@@ -169,15 +175,30 @@ class FlowManager(DialogueManager):
 
     def _answer_ask(self, flow: Flow, state, turn_input):
         node = flow.nodes[state.node_id]
-        value = extract(node, turn_input, self.tok)
+        slot = node.data["slot"]
+        keypad_only = slot in self.pack.sensitive_slots
+        spoken_at_keypad = keypad_only and isinstance(turn_input, Utterance)
+        value = None if spoken_at_keypad else extract(node, turn_input, self.tok)
         run = Run(self, flow, dict(state.slots), {**state.meta}, trace={"flow": flow.id, "ask": node.id})
         if value is None:
-            run.out.append(node.data["prompt"].render(run.env()))   # ask again; counting retries is R3
-            run.trace["extracted"] = None
-            return DMResult(" ".join(run.out), state, trace=run.trace)
-        run.slots[node.data["slot"]] = value
-        run.trace["extracted"] = {node.data["slot"]: value}
+            return self._unusable(flow, node, state, run, spoken_at_keypad)
+        run.slots[slot] = value
+        run.trace["extracted"] = {slot: value}
         return self._run(run, state, node.data["next"])
+
+    def _unusable(self, flow: Flow, node: Node, state, run: Run, spoken_at_keypad: bool):
+        """No usable answer: re-ask, and after the configured number of re-prompts hand off or end the call."""
+        policy = self.pack.ask
+        misses = int(state.meta.get(ASK_MISSES, 0)) + 1
+        new = state.evolve(meta={**state.meta, ASK_MISSES: misses})
+        run.trace.update(extracted=None, misses=misses, keypad_only=spoken_at_keypad)
+        if policy is None:   # no policy in the pack: just ask again
+            return DMResult(node.data["prompt"].render(run.env()), new, trace=run.trace)
+        if misses > policy.max_reprompts:
+            action = HandOff("input_failed") if policy.on_exceed == "handoff" else EndCall()
+            return DMResult(policy.exceed_reply, new, (action,), {**run.trace, "escalated": policy.on_exceed})
+        lead = policy.keypad_reply if spoken_at_keypad else policy.invalid_reply
+        return DMResult(f"{lead} {node.data['prompt'].render(run.env())}", new, trace=run.trace)
 
     def _run(self, run: Run, state, node_id: str):
         for _ in range(MAX_NODES_PER_TURN):
@@ -187,6 +208,7 @@ class FlowManager(DialogueManager):
             except ExprError as exc:
                 raise FlowRuntimeError(f"{run.flow.path}: node {node_id}: {exc}") from exc
             if isinstance(outcome, (Wait, Done)):
+                run.meta[ASK_MISSES] = 0
                 new = state.evolve(flow_id=run.flow.id, node_id=outcome.node_id, slots=run.slots, meta=run.meta)
                 return DMResult(" ".join(run.out), new, tuple(run.actions), run.trace)
             node_id = outcome
@@ -195,7 +217,7 @@ class FlowManager(DialogueManager):
 
 def build_manager(domains_dir: str, domain: str, lang: str, tools: ToolExecutor) -> FlowManager:
     pack = DomainPack.load(domains_dir, domain, lang)
-    flows = load_flows(f"{pack.base_dir}/flows", pack.tools_path)
+    flows = load_flows(f"{pack.base_dir}/flows", pack.tools_path, pack.sensitive_slots)
     return FlowManager(pack, tools, flows)
 
 

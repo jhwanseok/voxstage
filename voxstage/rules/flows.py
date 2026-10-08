@@ -91,6 +91,7 @@ class Flow:
     nodes: dict
     path: str
     slots: frozenset
+    buttons: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -117,6 +118,7 @@ class CompileCtx:
     node_id: str
     names: frozenset
     tools: dict   # tool name -> tuple of param names
+    sensitive: frozenset = frozenset()   # slots that only the keypad may fill (R3-1)
 
     @property
     def where(self) -> str:
@@ -154,7 +156,10 @@ def _ask(raw, ctx):
     length = raw.get("length")
     if length is not None and (extractor != "digits" or not isinstance(length, int) or length < 1):
         raise FlowError(f"{ctx.where}: `length` is a positive integer for the digits extractor")
-    return {"slot": ctx.need(raw, "slot"), "prompt": ctx.template(ctx.need(raw, "prompt"), "prompt"),
+    slot = ctx.need(raw, "slot")
+    if slot in ctx.sensitive and extractor != "digits":
+        raise FlowError(f"{ctx.where}: `{slot}` is a sensitive slot (keypad only), so its extractor must be digits")
+    return {"slot": slot, "prompt": ctx.template(ctx.need(raw, "prompt"), "prompt"),
             "extractor": extractor, "length": length, "choices": tuple(choices or ()),
             "next": ctx.need(raw, "next")}
 
@@ -212,14 +217,18 @@ def tool_params(tools_path: str) -> dict:
     return {name: tuple(body.get("params") or ()) for name, body in spec["tools"].items()}
 
 
-def load_flow(path: str, tools: dict) -> Flow:
+def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset()) -> Flow:
     with open(path, encoding="utf-8") as f:
         try:
             raw = yaml.safe_load(f)
         except yaml.YAMLError as exc:
             raise FlowError(f"{path}: invalid YAML ({exc})") from exc
-    if not isinstance(raw, dict) or set(raw) != {"id", "triggers", "start", "nodes"}:
-        raise FlowError(f"{path}: needs exactly id, triggers, start and nodes")
+    if not isinstance(raw, dict) or not {"id", "triggers", "start", "nodes"} <= set(raw) \
+            or set(raw) - {"id", "triggers", "start", "nodes", "buttons"}:
+        raise FlowError(f"{path}: needs id, triggers, start and nodes (and optionally buttons)")
+    buttons = raw.get("buttons") or []
+    if not isinstance(buttons, list) or not all(isinstance(b, str) and b.strip() for b in buttons):
+        raise FlowError(f"{path}: `buttons` must be a list of button ids")
     flow_id = raw["id"]
     raw_nodes = raw["nodes"]
     if not isinstance(raw_nodes, dict) or not raw_nodes:
@@ -232,13 +241,13 @@ def load_flow(path: str, tools: dict) -> Flow:
     for node_id, body in raw_nodes.items():
         if not isinstance(body, dict) or body.get("type") not in NODE_TYPES:
             raise FlowError(f"{path}: node {node_id}: type must be one of {sorted(NODE_TYPES)}")
-        ctx = CompileCtx(path, flow_id, node_id, names, tools)
+        ctx = CompileCtx(path, flow_id, node_id, names, tools, sensitive)
         nodes[node_id] = Node(node_id, body["type"], NODE_TYPES[body["type"]].compile(body, ctx))
     try:
         triggers = parse_pattern(path, {"id": flow_id, **(raw["triggers"] or {})})
     except ValueError as exc:
         raise FlowError(str(exc)) from exc
-    flow = Flow(flow_id, triggers, raw["start"], nodes, path, names)
+    flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons))
     _validate_graph(flow)
     return flow
 
@@ -282,10 +291,14 @@ def _validate_graph(flow: Flow) -> None:
     # every slot used in a template must be filled by an ask node of this flow (checked when compiling names)
 
 
-def load_flows(flows_dir: str, tools_path: str) -> dict:
+def load_flows(flows_dir: str, tools_path: str, sensitive: frozenset = frozenset()) -> dict:
     tools = tool_params(tools_path)
-    flows = {}
+    flows, owner = {}, {}
     for path in sorted(glob.glob(os.path.join(flows_dir, "*.yaml"))):
-        flow = load_flow(path, tools)
+        flow = load_flow(path, tools, sensitive)
         flows[flow.id] = flow
+        for b in flow.buttons:
+            if b in owner:
+                raise FlowError(f"{path}: button `{b}` already starts flow `{owner[b]}`")
+            owner[b] = flow.id
     return flows

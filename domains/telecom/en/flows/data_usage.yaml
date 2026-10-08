@@ -1,5 +1,6 @@
 # Lookup flow: ask which line, call the usage API, say used and total data.
 id: data_usage
+buttons: [menu_usage]
 triggers: {all_of: [data], any_of: [usage, used, left, remaining, much], none_of: [check, see, find, view, plan, roaming, abroad, buy, extra, add]}
 start: ask_line
 nodes:

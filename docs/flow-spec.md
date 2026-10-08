@@ -22,12 +22,23 @@ nodes:
   done: {type: end}
 ```
 
+## Buttons, keypad and the re-prompt policy (R3)
+
+- `buttons: [menu_balance]` at the top of a flow lists the button ids that start it (language-free, so twins share
+  it; one flow per id). A button received while no `ask` waits starts the flow at `start`.
+- An `ask` accepts keypad digits and, unless the slot is sensitive, a spoken value through the same extractor.
+- `domains/<domain>/sensitive_slots.yaml` lists the slots that may only arrive on the keypad (birth date, phone
+  number). Speech is not accepted for them; an `ask` for one must use `extractor: digits` (load-time check).
+- An unusable answer (no value, wrong length, speech at a keypad-only prompt, any other input) re-asks. After
+  `ask.max_reprompts` re-prompts (default 2) the manager returns `HandOff("input_failed")` or `EndCall()` as
+  `ask.on_exceed` says (`rules/config.yaml`). The counter is `state.meta["ask_misses"]`; a valid answer resets it.
+
 ## Node types
 
 | Type | Fields | Behaviour |
 |---|---|---|
 | `say` | `text`, `next` | Adds the rendered text to the reply. |
-| `ask` | `slot`, `prompt`, `extractor`, `length` (digits only), `choices` (choice only), `next` | Adds the prompt and waits. The next turn's input fills the slot; if it contains no value, the prompt is asked again. |
+| `ask` | `slot`, `prompt`, `extractor`, `length` (digits only), `choices` (choice only), `next` | Adds the prompt and waits. The next turn's input fills the slot; if it contains no value, the prompt is asked again (see the re-prompt policy above). |
 | `call` | `tool`, `args`, `on_ok`, `on_error` | Calls the tool through the tool port. The result is `result` (`{error: code}` on failure). |
 | `branch` | `cases: [{when, next}]`, `else` | First case whose expression is true; otherwise `else`. |
 | `goto` | `next` | Jumps. |
@@ -55,5 +66,5 @@ types, `next` links, tools and arguments; only texts and triggers differ (a test
 
 ## Not yet
 
-Buttons and keypad menus starting a flow (R3), number and date formatting (R4), notices (R5), switching and
+Number and date formatting (R4), notices (R5), switching and
 resuming (R6, R7), cancel and hand-off words (R8), correction (R9), identity gate (R13).

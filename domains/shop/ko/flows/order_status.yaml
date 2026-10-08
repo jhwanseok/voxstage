@@ -1,5 +1,6 @@
 # 조회 플로우: API가 돌려준 상태에 따라 갈라진다. 영어 쌍둥이와 노드 구조가 같다.
 id: order_status
+buttons: [menu_track]
 triggers: {all_of: [주문], any_of: [어디, 상태, 도착, 왔, 조회], none_of: [어떻, 방법, 취소, 반품, 변경]}
 start: ask_order
 nodes:
