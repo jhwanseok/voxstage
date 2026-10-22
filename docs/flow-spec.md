@@ -101,6 +101,27 @@ carry: [order_id]                                                    # slots tak
 - Load checks: `interrupts` must be a valid pattern; every `carry` name must be a slot of the flow; `interruptible`
   is true or false.
 
+## Side questions and resuming (R7)
+
+Order of checks while a flow waits at an `ask` (decisions R6-4 to R6-6, R7-1 to R7-5):
+
+1. a button of another flow switches (not at `interruptible: false`);
+2. the other flows' `interrupts:` (not at `interruptible: false`);
+3. the extractor and the FAQ rules are both evaluated, and `decide(extracted, faq)` picks:
+   `answer` (a usable value wins), `side_question` (no value, an FAQ match: the FAQ answer, then the pending
+   question again; the flow, slots and miss counters do not move), or `reprompt` (as before, counts as a miss).
+   `trace` has `extracted`, `faq` and `decided`, so turns where both matched can be counted. The two are evaluated
+   one after the other; running them concurrently waits for a new ADR (ADR 0002 keeps `respond` synchronous).
+
+When a flow that was switched in ends:
+- without an action: the newest parked flow resumes in the same turn and asks its pending question again, with the
+  slots it had (`trace["resumed"]`);
+- with `handoff` or `end_call` (also the missing-attribute hand-off): every parked flow is dropped
+  (`trace["parked_dropped"]`).
+
+`rules/config.yaml` sets how many flows may be parked: `switch: {max_parked: 2}` (default 2, at least 1). Parking
+beyond it drops the oldest, silently, and lists it in `trace["parked_dropped"]`.
+
 ## Node types
 
 | Type | Fields | Behaviour |
@@ -135,4 +156,4 @@ types, `next` links, tools and arguments; only texts and triggers differ (a test
 
 ## Not yet
 
-Resuming a parked flow (R7), cancel and hand-off words (R8), correction (R9), identity gate (R13).
+Cancel and hand-off words (R8), correction (R9), identity gate (R13).
