@@ -9,8 +9,14 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from voxstage.domain_pack import COMMANDS, WORDING_KEYS, DomainPack, RuleError, load_commands
+from voxstage.dialogue import HandOff, step
+from voxstage.domain_pack import (COMMANDS, WORDING_KEYS, AskPolicy, DomainPack, Fallback, RuleError, load_commands,
+                                  parse_pattern)
+from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, load_flows
+from voxstage.rules.interpreter import ASK_MISSES, ASKED, MAIN_MENU, PARKED, FlowManager
+from voxstage.tools import FakeApiExecutor
+from voxstage.turn import Dtmf, Utterance
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "domains")
 BANK_TOOLS = os.path.join(ROOT, "bank", "tools.yaml")
@@ -58,6 +64,178 @@ class CommandsFileTest(unittest.TestCase):
             with self.assertRaises(FlowError) as cm:
                 load_flows(tmp, BANK_TOOLS)
         self.assertIn("reserved", str(cm.exception))
+
+
+TOOLS = """
+tools:
+  pay:
+    params: [amount, to]
+    risky: true
+    default: {return: {reference: R1}}
+"""
+
+FLOWS = {
+    "pay": """
+        id: pay
+        triggers: {any_of: [pay]}
+        start: ask_amount
+        nodes:
+          ask_amount: {type: ask, slot: amount, prompt: "How much?", extractor: number, next: intro}
+          intro: {type: say, text: "Noted.", next: ask_to}
+          ask_to: {type: ask, slot: to, prompt: "To whom?", extractor: text, next: check}
+          check: {type: confirm, prompt: "Pay {amount} to {to}?", on_yes: call, on_no: done}
+          call: {type: call, tool: pay, args: {amount: "{amount}", to: "{to}"}, on_ok: done, on_error: done}
+          done: {type: end}
+    """,
+    "lost": """
+        id: lost
+        triggers: {any_of: [lost]}
+        interrupts: {priority: 9, any_of: [lost, cancel]}
+        start: ask_card
+        nodes:
+          ask_card: {type: ask, slot: card, prompt: "Which card?", extractor: digits, length: 4, next: done}
+          done: {type: end}
+    """,
+}
+
+COMMAND_PATTERNS = tuple(parse_pattern("t", {"id": n, "any_of": w}) for n, w in
+                         (("cancel", ["cancel", "never mind"]), ("back", ["go back"]), ("agent", ["agent"])))
+WORDING = {"command.cancelled": "Cancelled.", "command.agent": "Connecting.", "flow.no_flow": "Nothing to do.",
+           "confirm.declined": "Not done."}
+
+
+def build(tmp, commands=COMMAND_PATTERNS):
+    with open(os.path.join(tmp, "tools.yaml"), "w", encoding="utf-8") as f:
+        f.write(TOOLS)
+    flows_dir = os.path.join(tmp, "flows")
+    os.makedirs(flows_dir)
+    for name, text in FLOWS.items():
+        with open(os.path.join(flows_dir, f"{name}.yaml"), "w", encoding="utf-8") as f:
+            f.write(textwrap.dedent(text))
+    pack = DomainPack("bank", "en", {}, (), Fallback("sorry", "bye"), "", "", None,
+                      AskPolicy("not valid.", "keypad.", "giving up.", 2, "handoff"), frozenset(),
+                      wording=WORDING, confirm_words=(("yes",), ("no",)), commands=commands)
+    tools = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(tmp, "tools.yaml")))
+    return FlowManager(pack, tools, load_flows(flows_dir, os.path.join(tmp, "tools.yaml"))), tools
+
+
+def talk(m, *inputs, setup=None):
+    state, out = m.initial_state("s", setup), []
+    for i in inputs:
+        r = step(m, state, i)
+        state = r.state
+        out.append(r)
+    return out
+
+
+class CancelTest(unittest.TestCase):
+    def test_cancel_clears_the_talk_and_keeps_the_request(self):
+        setup = {"customer": {"grade": "gold"}, "now": "2026-10-22"}
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            *_, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("hmm"), Utterance("never mind"), setup=setup)
+        self.assertEqual((r.reply, r.state.flow_id, r.state.node_id, r.state.slots), ("Cancelled.", MAIN_MENU, None, {}))
+        self.assertEqual(r.state.meta, setup)
+        self.assertEqual(r.actions, ())
+
+    def test_cancel_drops_parked_flows_without_resuming(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            *_, a, r = talk(m, Utterance("pay"), Utterance("I lost it"), Utterance("cancel"))
+        self.assertEqual(a.state.flow_id, "lost")
+        self.assertEqual((r.state.flow_id, r.trace["parked_dropped"], r.state.meta.get(PARKED)), (MAIN_MENU, ["pay"], None))
+
+    def test_cancel_at_a_confirm_calls_no_tool(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, tools = build(tmp)
+            *_, c, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("Ann"), Utterance("cancel"))
+        self.assertEqual(c.state.node_id, "check")
+        self.assertEqual((r.state.flow_id, tools.records), (MAIN_MENU, []))
+
+    def test_after_cancel_the_next_words_start_as_at_the_beginning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            *_, r = talk(m, Utterance("pay"), Utterance("cancel"), Utterance("pay"))
+        self.assertEqual((r.state.flow_id, r.state.node_id), ("pay", "ask_amount"))
+
+    def test_cancel_outside_a_flow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            r, = talk(m, Utterance("cancel"))
+        self.assertEqual((r.reply, r.state.flow_id), ("Cancelled.", MAIN_MENU))
+
+    def test_commands_come_before_interrupts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            _, r = talk(m, Utterance("pay"), Utterance("cancel"))   # `lost` interrupts on cancel too
+        self.assertEqual((r.state.flow_id, r.trace["command"]), (MAIN_MENU, "cancel"))
+        self.assertNotIn("switch", r.trace)
+
+    def test_keypad_input_is_never_a_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            _, r = talk(m, Utterance("pay"), Dtmf("50"))
+        self.assertEqual(r.state.slots, {"amount": "50"})
+
+
+class AgentTest(unittest.TestCase):
+    def test_agent_hands_off_and_drops_parked_flows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, tools = build(tmp)
+            *_, r = talk(m, Utterance("pay"), Utterance("I lost it"), Utterance("get me an agent"))
+        self.assertEqual((r.reply, r.actions), ("Connecting.", (HandOff("caller_request"),)))
+        self.assertEqual((r.trace["parked_dropped"], r.state.meta[PARKED]), (["pay"], []))
+        self.assertEqual(tools.records, [])
+
+
+class BackTest(unittest.TestCase):
+    def test_back_asks_the_previous_question_with_the_slot_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            *_, a, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("go back"))
+        self.assertEqual(a.reply, "Noted. To whom?")
+        self.assertEqual((r.reply, r.state.node_id, r.state.slots), ("How much?", "ask_amount", {"amount": "50"}))
+        self.assertEqual((r.trace["back_to"], r.state.meta[ASKED]), ("ask_amount", []))
+
+    def test_the_new_answer_replaces_the_old_and_the_flow_goes_on(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            *_, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("go back"), Utterance("70"))
+        self.assertEqual((r.state.slots, r.state.node_id, r.reply), ({"amount": "70"}, "ask_to", "Noted. To whom?"))
+
+    def test_back_at_a_confirm_goes_to_the_last_question(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, tools = build(tmp)
+            *_, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("Ann"), Utterance("go back"))
+        self.assertEqual((r.state.node_id, r.reply, tools.records), ("ask_to", "To whom?", []))
+
+    def test_back_twice_walks_back_two_questions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            *_, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("Ann"), Utterance("go back"), Utterance("go back"))
+        self.assertEqual(r.state.node_id, "ask_amount")
+
+    def test_back_at_the_first_question_asks_it_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            _, r = talk(m, Utterance("pay"), Utterance("go back"))
+        self.assertEqual((r.state.node_id, r.reply, r.state.meta[ASK_MISSES]), ("ask_amount", "How much?", 0))
+
+    def test_back_outside_a_flow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            r, = talk(m, Utterance("go back"))
+        self.assertEqual((r.reply, r.state.flow_id), ("Nothing to do.", None))
+
+    def test_history_belongs_to_its_flow_across_a_switch_and_a_resume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, _ = build(tmp)
+            *_, s, back_in_lost = talk(m, Utterance("pay"), Utterance("50"), Utterance("lost"), Utterance("go back"))
+            self.assertEqual((s.state.meta[ASKED], s.state.meta[PARKED][0]["asked"]), ([], ["ask_amount"]))
+            self.assertEqual(back_in_lost.state.node_id, "ask_card")   # nothing answered in `lost` yet
+            *_, resumed, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("lost"), Dtmf("1234"), Utterance("go back"))
+        self.assertEqual((resumed.state.node_id, resumed.state.meta[ASKED]), ("ask_to", ["ask_amount"]))
+        self.assertEqual(r.state.node_id, "ask_amount")
 
 
 if __name__ == "__main__":

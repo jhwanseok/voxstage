@@ -293,7 +293,7 @@ class DomainContentTest(unittest.TestCase):
         self.assertIn("저축 계좌로 보낼까요", c.reply)
         self.assertIn("저축 계좌로 보냈습니다", r.reply)
         *_, r = talk(domain("bank", "ko", tools), Utterance("이체하려고 하는데요"), Utterance("50"),
-                     Utterance("입출금 계좌요"), Utterance("아니요 취소할게요"))
+                     Utterance("입출금 계좌요"), Utterance("아니요"))
         self.assertEqual((r.reply, len(tools.records)), ("알겠습니다. 진행하지 않았어요.", 1))
 
 

@@ -24,7 +24,10 @@ from .matching import Matcher
 from .tokenize import Tokenizer, for_lang
 
 ASK_MISSES = "ask_misses"   # consecutive unusable answers at the current ask (R3)
-PARKED = "parked"           # flows set aside by a switch, newest last: {flow, node, slots} (R6-1)
+PARKED = "parked"           # flows set aside by a switch, newest last: {flow, node, slots, asked} (R6-1)
+ASKED = "asked"             # answered asks of the running flow, oldest first, for `back` (R8-1)
+MAIN_MENU = "main_menu"     # reserved flow_id after `cancel`: no flow runs (R8-3)
+RUNTIME = (ASK_MISSES, PARKED, ASKED, "result", "faq_misses")   # meta written while talking; `cancel` clears it
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
 
@@ -185,11 +188,16 @@ class FlowManager(DialogueManager):
                     raise FlowError(f"{flow.path}: node {node.id}: a confirm node needs rules/confirm.yaml in the pack")
         self.matcher = Matcher([f.triggers for f in self.flows.values()], self.tok)
         self.buttons = {b: f.id for f in self.flows.values() for b in f.buttons}
+        self.commands = Matcher(pack.commands, self.tok) if pack.commands else None
         self.faq = faq if faq is not None else (
             FaqRuleManager(pack, self.tok) if pack.patterns and pack.fallback else None)
 
     # -- entry point --------------------------------------------------------------------------------
     def respond(self, state, turn_input):
+        if isinstance(turn_input, Utterance) and self.commands is not None:   # first, in every state (R8-5)
+            command, match = self.commands.match(turn_input.text)
+            if command is not None:
+                return self._command(command.id, state, {"command": command.id, "command_match": match})
         flow = self.flows.get(state.flow_id) if state.flow_id else None
         if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "confirm":
             return self._answer_confirm(flow, state, turn_input)   # nothing breaks in here (R7-12)
@@ -201,20 +209,47 @@ class FlowManager(DialogueManager):
             return self._answer_ask(flow, state, turn_input)
         if isinstance(turn_input, ButtonPress) and turn_input.button_id in self.buttons:
             flow = self.flows[self.buttons[turn_input.button_id]]
-            run = Run(self, flow, {}, {**state.meta}, trace={"flow": flow.id, "button": turn_input.button_id})
+            run = Run(self, flow, {}, {**state.meta, ASKED: []}, trace={"flow": flow.id, "button": turn_input.button_id})
             return self._run(run, state, flow.start)
         if isinstance(turn_input, Utterance) and self.flows:
             trigger, trace = self.matcher.match(turn_input.text)
             if trigger is not None:
                 flow = self.flows[trigger.id]
                 captured = self._capture(flow, turn_input)
-                run = Run(self, flow, captured, {**state.meta},
+                run = Run(self, flow, captured, {**state.meta, ASKED: []},
                           trace={"flow": flow.id, "trigger": trace, "captured": dict(captured)})
                 return self._run(run, state, flow.start)
         if self.faq is not None:
             return self.faq.respond(state, turn_input)
         return DMResult(self.pack.wording.get("flow.no_flow", "I can't help with that."), state,
                         trace={"rule": "no_flow"})
+
+    def _command(self, name: str, state, trace: dict) -> DMResult:
+        """cancel, back and agent (R8-3, R8-1, R8-4). None of them calls a tool."""
+        wording = self.pack.wording
+        if name == "cancel":   # keep what came with the request, clear what the talk produced
+            if state.meta.get(PARKED):
+                trace["parked_dropped"] = [p["flow"] for p in state.meta[PARKED]]
+            meta = {k: v for k, v in state.meta.items() if k not in RUNTIME}
+            new = state.evolve(flow_id=MAIN_MENU, node_id=None, slots={}, meta=meta)
+            return DMResult(wording.get("command.cancelled", "All right, I have cancelled that."), new, trace=trace)
+        if name == "agent":
+            meta = dict(state.meta)
+            if meta.get(PARKED):
+                trace["parked_dropped"] = [p["flow"] for p in meta[PARKED]]
+                meta[PARKED] = []
+            return DMResult(wording.get("command.agent", "I'll connect you to an agent."), state.evolve(meta=meta),
+                            (HandOff("caller_request"),), trace)
+        flow = self.flows.get(state.flow_id) if state.flow_id else None
+        node = flow.nodes.get(state.node_id) if flow is not None else None
+        if node is None or node.type not in ("ask", "confirm"):   # back with nothing to go back in
+            return DMResult(wording.get("flow.no_flow", "I can't help with that."), state, trace=trace)
+        asked = list(state.meta.get(ASKED, ()))
+        target = flow.nodes[asked.pop()] if asked else node   # at the first question: the same question
+        run = Run(self, flow, dict(state.slots), {**state.meta, ASKED: asked, ASK_MISSES: 0},
+                  trace={**trace, "flow": flow.id, "back_to": target.id})
+        new = state.evolve(node_id=target.id, meta=run.meta)   # the slot stays until a new answer (R8-1)
+        return DMResult(target.data["prompt"].render(run.env()), new, trace=run.trace)
 
     def _switch(self, flow: Flow, state, turn_input) -> Optional[DMResult]:
         """Another flow breaks in: a button of another flow (R6-6), or the `interrupts:` of another flow (R6-4).
@@ -234,13 +269,14 @@ class FlowManager(DialogueManager):
             trace["interrupt"] = match
         else:
             return None
-        parked = [*state.meta.get(PARKED, ()), {"flow": flow.id, "node": state.node_id, "slots": dict(state.slots)}]
+        parked = [*state.meta.get(PARKED, ()), {"flow": flow.id, "node": state.node_id, "slots": dict(state.slots),
+                                                "asked": list(state.meta.get(ASKED, ()))}]
         if len(parked) > self.pack.max_parked:   # the oldest goes; nothing is said (R7-3)
             trace["parked_dropped"] = [p["flow"] for p in parked[:-self.pack.max_parked]]
             parked = parked[-self.pack.max_parked:]
         carried = {slot: state.slots[slot] for slot in target.carry if slot in state.slots}
         captured = self._capture(target, turn_input)
-        run = Run(self, target, {**carried, **captured}, {**state.meta, PARKED: parked, ASK_MISSES: 0},
+        run = Run(self, target, {**carried, **captured}, {**state.meta, PARKED: parked, ASK_MISSES: 0, ASKED: []},
                   trace={"flow": target.id, "switch": {"from": flow.id, "to": target.id, "by": by}, **trace,
                          "carried": carried, "captured": captured})
         return self._run(run, state, target.start)
@@ -279,6 +315,7 @@ class FlowManager(DialogueManager):
             return self._unusable(flow, node, state, run, spoken_at_keypad)
         run.slots[slot] = value
         run.trace["extracted"] = {slot: value}
+        run.meta[ASKED] = [*state.meta.get(ASKED, ()), node.id]   # for `back` (R8-1)
         return self._run(run, state, node.data["next"])
 
     def confirm_answer(self, turn_input) -> str:
@@ -354,7 +391,7 @@ class FlowManager(DialogueManager):
         *rest, top = run.meta[PARKED]
         flow = self.flows[top["flow"]]
         node = flow.nodes[top["node"]]
-        meta = {**run.meta, PARKED: rest, ASK_MISSES: 0}
+        meta = {**run.meta, PARKED: rest, ASK_MISSES: 0, ASKED: list(top.get("asked", ()))}
         back = Run(self, flow, dict(top["slots"]), meta)
         run.out.append(node.data["prompt"].render(back.env()))
         run.trace["resumed"] = {"flow": flow.id, "node": node.id}
