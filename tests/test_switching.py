@@ -8,15 +8,18 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from voxstage.dialogue import step
+from voxstage.dialogue import HandOff, step
 from voxstage.domain_pack import AskPolicy, DomainPack, Fallback
 from voxstage.rules.flows import FlowError, load_flows
-from voxstage.rules.interpreter import ASK_MISSES, PARKED, FlowManager
+from voxstage.rules.interpreter import ASK_MISSES, PARKED, FlowManager, build_manager
+from voxstage.rules.tokenize import kiwi_available
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import ButtonPress, Utterance
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "domains")
 BANK_TOOLS = os.path.join(ROOT, "bank", "tools.yaml")
+
+needs_kiwi = unittest.skipUnless(kiwi_available(), "kiwipiepy missing: pip install 'voxstage[ko]'")
 
 POLICY = AskPolicy("not valid.", "use the keypad.", "giving up.", 2, "handoff")
 
@@ -263,6 +266,30 @@ class ButtonSwitchTest(unittest.TestCase):
             m = build(tmp)
             _, r = talk(m, Utterance("I want to pay"), ButtonPress("menu_cancel"))
         self.assertEqual((r.state.flow_id, r.state.meta[ASK_MISSES]), ("pay", 1))
+
+
+def domain(name, lang):
+    return build_manager(ROOT, name, lang, FakeApiExecutor.from_yaml(os.path.join(ROOT, name, "tools.yaml")))
+
+
+class DomainSwitchTest(unittest.TestCase):
+    def test_order_number_carries_into_cancel_order(self):
+        m = domain("shop", "en")
+        state = step(m, m.initial_state("s"), Utterance("Where is my order")).state
+        # order_status asks one question, so a known number is set by hand while it still waits
+        r = step(m, state.evolve(slots={"order_id": "1234"}), Utterance("Actually I want to cancel it"))
+        self.assertEqual((r.state.flow_id, r.trace["carried"]), ("cancel_order", {"order_id": "1234"}))
+        self.assertIn("1234", r.reply)
+        self.assertEqual(r.actions, (HandOff("cancel_order"),))
+
+    def test_balance_check_switches_to_card_loss(self):
+        _, r = talk(domain("bank", "en"), Utterance("I'd like to check my balance"), Utterance("Oh wait I just lost my card"))
+        self.assertEqual((r.state.flow_id, r.state.meta[PARKED][0]["flow"]), ("card_loss", "balance_inquiry"))
+
+    @needs_kiwi
+    def test_korean_plan_change_switches_to_outage_report(self):
+        _, r = talk(domain("telecom", "ko"), Utterance("요금제 변경하려고요"), Utterance("잠깐만요 지금 인터넷이 안 돼요"))
+        self.assertEqual((r.state.flow_id, r.trace["switch"]["from"]), ("outage_report", "change_plan"))
 
 
 if __name__ == "__main__":

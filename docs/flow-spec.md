@@ -76,12 +76,35 @@ holds, in priority order, as part of the reply. Notices are never cut short (int
 S5). Unknown ids and names in conditions fail at load. `rules/config.yaml` keeps only counts and actions; the words
 come from `wording`. Changing a sentence is an edit to the registry, not to code.
 
+## Switching (R6)
+
+A flow can break into another flow that is waiting for an answer (decisions R6-1 to R6-6):
+
+```yaml
+id: cancel_order
+triggers:   {all_of: [[cancel]], any_of: [order], none_of: [how]}   # outside a flow, as before
+interrupts: {priority: 5, any_of: [cancel]}                          # while another flow waits at an ask
+carry: [order_id]                                                    # slots taken over from the parked flow
+```
+
+- `interrupts:` uses the trigger language plus `priority`. While a flow waits at an `ask`, only the `interrupts:` of
+  the other flows are checked; plain `triggers` apply only when no flow waits. Highest priority wins, then the most
+  matched words; the match, its priority, specificity and ties are in `trace["interrupt"]`.
+- Order at a waiting `ask`: a button of another flow switches; then the interrupts are checked; only when nothing
+  matches is the input the answer (re-asked if unusable, as before).
+- `interruptible: false` on an `ask` lets nothing in: speech is the answer, and a button counts as an invalid answer.
+- A switch parks the running flow as `{flow, node, slots}` on `state.meta["parked"]` (newest last), copies the new
+  flow's `carry` slots that the parked flow has, runs its captures, and starts it at `start`. Nothing else carries
+  over. The trace has `switch: {from, to, by: interrupt|button}` and `carried`. Resuming a parked flow is R7.
+- Load checks: `interrupts` must be a valid pattern; every `carry` name must be a slot of the flow; `interruptible`
+  is true or false.
+
 ## Node types
 
 | Type | Fields | Behaviour |
 |---|---|---|
 | `say` | `text`, `next` | Adds the rendered text to the reply. |
-| `ask` | `slot`, `prompt`, `extractor`, `length` (digits only), `choices` (choice only), `next` | Adds the prompt and waits. The next turn's input fills the slot; if it contains no value, the prompt is asked again (see the re-prompt policy above). |
+| `ask` | `slot`, `prompt`, `extractor`, `length` (digits only), `choices` (choice only), optional `interruptible` (default true), `next` | Adds the prompt and waits. The next turn's input fills the slot; if it contains no value, the prompt is asked again (see the re-prompt policy above). |
 | `call` | `tool`, `args`, `on_ok`, `on_error` | Calls the tool through the tool port. The result is `result` (`{error: code}` on failure). |
 | `branch` | `cases: [{when, next}]`, `else` | First case whose expression is true; otherwise `else`. |
 | `notices` | optional `ids`, `next` | Says the applicable registry notices in priority order. |
@@ -110,5 +133,4 @@ types, `next` links, tools and arguments; only texts and triggers differ (a test
 
 ## Not yet
 
-Switching and
-resuming (R6, R7), cancel and hand-off words (R8), correction (R9), identity gate (R13).
+Resuming a parked flow (R7), cancel and hand-off words (R8), correction (R9), identity gate (R13).
