@@ -58,3 +58,9 @@ One row per domain and language each time a step is measured. Every rule counts 
 | R7b | ee60146 | shop | ko | 60 | 26 | 8 | 0 | 870 | 229 |
 | R7b | ee60146 | telecom | en | 37 | 17 | 8 | 0 | 870 | 229 |
 | R7b | ee60146 | telecom | ko | 37 | 17 | 8 | 0 | 870 | 229 |
+| R8 | b92f407 | bank | en | 58 | 26 | 8 | 0 | 908 | 229 |
+| R8 | b92f407 | bank | ko | 58 | 26 | 8 | 0 | 908 | 229 |
+| R8 | b92f407 | shop | en | 71 | 33 | 8 | 0 | 908 | 229 |
+| R8 | b92f407 | shop | ko | 71 | 33 | 8 | 0 | 908 | 229 |
+| R8 | b92f407 | telecom | en | 37 | 17 | 8 | 0 | 908 | 229 |
+| R8 | b92f407 | telecom | ko | 37 | 17 | 8 | 0 | 908 | 229 |
