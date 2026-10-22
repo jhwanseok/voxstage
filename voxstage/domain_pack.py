@@ -78,6 +78,7 @@ class DomainPack:
     notices: tuple = ()                        # of Notice, in speaking order (R5-2)
     wording: dict = field(default_factory=dict)   # situation key -> text (R5-1)
     max_parked: int = 2                        # flows a switch may set aside (R7-3)
+    confirm_words: Optional[tuple] = None      # (yes words, no words) for confirm nodes (R7-12)
 
     def notice(self, notice_id: str) -> Notice:
         return next(n for n in self.notices if n.id == notice_id)

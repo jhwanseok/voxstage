@@ -275,6 +275,15 @@ def _ask(raw, ctx):
             "interruptible": interruptible, "next": ctx.need(raw, "next")}
 
 
+@register_node_type("confirm", edges=lambda d: [d["on_yes"], d["on_no"]], waits=True)
+def _confirm(raw, ctx):
+    """Asks yes or no before a risky action (R7-12). Never interruptible, no FAQ side question. The keys are
+    `on_yes` and `on_no` because YAML reads a bare `yes:` or `no:` key as a boolean."""
+    ctx.only(raw, {"prompt", "on_yes", "on_no"})
+    return {"prompt": ctx.template(ctx.need(raw, "prompt"), "prompt"), "on_yes": ctx.need(raw, "on_yes"),
+            "on_no": ctx.need(raw, "on_no")}
+
+
 @register_node_type("call", edges=lambda d: [d["on_ok"], d["on_error"]])
 def _call(raw, ctx):
     ctx.only(raw, {"tool", "args", "on_ok", "on_error"})
@@ -429,7 +438,7 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
 
 
 def _check_risky_calls(flow: Flow, risky: frozenset) -> None:
-    """A call to a risky tool is reached only from the `yes` of a `confirm` node (R7-12)."""
+    """A call to a risky tool is reached only from the `on_yes` of a `confirm` node (R7-12)."""
     for node in flow.nodes.values():
         if node.type != "call" or node.data["tool"] not in risky:
             continue
@@ -438,9 +447,9 @@ def _check_risky_calls(flow: Flow, risky: frozenset) -> None:
                             f"a confirm node must come first")
         for other in flow.nodes.values():
             if node.id in NODE_TYPES[other.type].edges(other.data) and \
-                    not (other.type == "confirm" and other.data["yes"] == node.id and other.data["no"] != node.id):
+                    not (other.type == "confirm" and other.data["on_yes"] == node.id and other.data["on_no"] != node.id):
                 raise FlowError(f"{flow.path}: node {node.id}: `{node.data['tool']}` is risky, so it may only follow "
-                                f"the yes of a confirm node, not node {other.id}")
+                                f"the on_yes of a confirm node, not node {other.id}")
 
 
 def _validate_graph(flow: Flow) -> None:

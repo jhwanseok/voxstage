@@ -18,20 +18,22 @@ Read first: this file, [queue.md](../queue.md), decision sheet rows R7-10 to R7-
 ## Build
 1. `voxstage/tools.py`: tool key `risky` (boolean, default false) accepted and validated. `flows.py` reads the risky
    tool names with the params. Load check: for a `call` node whose tool is risky, every node that leads to it must be
-   a `confirm` node whose `yes` is that `call`, and the `call` is not the flow's `start`.
-2. Node type `confirm` in `flows.py` (`prompt` template, `yes`, `no`; no other keys; waits for the caller) and its
+   a `confirm` node whose `on_yes` is that `call`, and the `call` is not the flow's `start`.
+2. Node type `confirm` in `flows.py` (`prompt` template, `on_yes`, `on_no`; no other keys; waits for the caller;
+   the keys are not `yes` / `no` because YAML reads those bare keys as booleans) and its
    handler in the interpreter (says the prompt and waits). A turn at a waiting `confirm`:
    - no switch, no interrupts, no FAQ (R6 and R7 checks are skipped);
    - `Dtmf` "1" is yes, "2" is no; an `Utterance` is yes when it has a yes word and no no word, no when it has a no
      word and no yes word (words matched with the pack's tokenizer); anything else is unclear;
-   - yes: run from `yes`; no: say `confirm.declined`, then run from `no`; unclear: the `ask` re-prompt policy with
+   - yes: run from `on_yes`; no: say `confirm.declined`, then run from `on_no`; unclear: the `ask` re-prompt policy with
      the confirm prompt (same counter, same hand-off). `trace` gets `confirm: yes|no|unclear`.
-3. `domains/<d>/<lang>/rules/confirm.yaml`: `{yes: [...], no: [...]}`, non-empty word lists, no shared word; required
+3. `domains/<d>/<lang>/rules/confirm.yaml`: `{yes_words: [...], no_words: [...]}` (quoted words; English `"yes"`
+   and `"no"` must be quoted for the same YAML reason), non-empty word lists, no shared word; required
    for every domain and language that has a `rules/config.yaml`; read into the pack. A flow with a `confirm` node in
    a pack without confirm words is a load error.
 4. Registry: `confirm.declined` becomes a required situation key; text in all six `notices.yaml` files.
 5. Content: `make_transfer` gets `risky: true`; the `transfer` flow (twins) gets a `confirm` node between the account
-   question and the call, prompt naming the amount and the account; `no` goes to `done`. Korean account words per
+   question and the call, prompt naming the amount and the account; `on_no` goes to `done`. Korean account words per
    R7-10.
 6. R7-11 in the interpreter's side-question branch.
 7. `docs/flow-spec.md`: the `confirm` node, `risky`, `confirm.yaml`, and the R7-11 rule.

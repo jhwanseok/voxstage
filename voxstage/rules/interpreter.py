@@ -84,6 +84,12 @@ def run_ask(run: Run, node: Node):
     return Wait(node.id)
 
 
+@handler("confirm")
+def run_confirm(run: Run, node: Node):
+    run.out.append(node.data["prompt"].render(run.env()))
+    return Wait(node.id)
+
+
 @handler("call")
 def run_call(run: Run, node: Node):
     args = {k: t.render(run.env()) for k, t in node.data["args"].items()}
@@ -183,6 +189,8 @@ class FlowManager(DialogueManager):
     # -- entry point --------------------------------------------------------------------------------
     def respond(self, state, turn_input):
         flow = self.flows.get(state.flow_id) if state.flow_id else None
+        if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "confirm":
+            return self._answer_confirm(flow, state, turn_input)   # nothing breaks in here (R7-12)
         if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "ask":
             if flow.nodes[state.node_id].data["interruptible"]:   # interrupts first, then the answer (R6-5)
                 switched = self._switch(flow, state, turn_input)
@@ -267,6 +275,29 @@ class FlowManager(DialogueManager):
         run.slots[slot] = value
         run.trace["extracted"] = {slot: value}
         return self._run(run, state, node.data["next"])
+
+    def confirm_answer(self, turn_input) -> str:
+        """yes, no or unclear: keypad 1 and 2, or exactly one kind of word from `rules/confirm.yaml`."""
+        if isinstance(turn_input, Dtmf):
+            return {"1": "yes", "2": "no"}.get(turn_input.digits, "unclear")
+        if not isinstance(turn_input, Utterance) or self.pack.confirm_words is None:
+            return "unclear"
+        analysis = self.tok.analyze(turn_input.text)
+        yes_words, no_words = self.pack.confirm_words
+        yes = any(self.tok.has(analysis, w) for w in yes_words)
+        no = any(self.tok.has(analysis, w) for w in no_words)
+        return "yes" if yes and not no else "no" if no and not yes else "unclear"
+
+    def _answer_confirm(self, flow: Flow, state, turn_input):
+        node = flow.nodes[state.node_id]
+        answer = self.confirm_answer(turn_input)
+        run = Run(self, flow, dict(state.slots), {**state.meta}, trace={"flow": flow.id, "confirm": answer})
+        if answer == "yes":
+            return self._run(run, state, node.data["on_yes"])
+        if answer == "no":   # the risky tool is not called
+            run.out.append(self.pack.wording.get("confirm.declined", "All right, I have not done that."))
+            return self._run(run, state, node.data["on_no"])
+        return self._unusable(flow, node, state, run, False)
 
     def _unusable(self, flow: Flow, node: Node, state, run: Run, spoken_at_keypad: bool):
         """No usable answer: re-ask, and after the configured number of re-prompts hand off or end the call."""
