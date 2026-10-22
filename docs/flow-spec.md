@@ -150,6 +150,32 @@ confirm: {type: confirm, prompt: "Shall I send {amount | money('USD')} to your {
 - At a keypad-only `ask`, a side question whose spoken words contain digits gets `ask.keypad_only` before the FAQ
   answer (R7-11).
 
+## Global commands (R8)
+
+`domains/<domain>/<lang>/rules/commands.yaml` holds exactly three word-group patterns (decisions R8-1 to R8-5):
+
+```yaml
+cancel: {any_of: [cancel, forget it, never mind], none_of: [how, what, why]}
+back:   {any_of: [go back, previous]}
+agent:  {any_of: [agent, person, human]}
+```
+
+They are checked first, for every utterance, in every state (also at a `confirm`); keypad input and buttons are
+never commands. Then come the button switch, `interrupts:` and the answer / FAQ of R6 and R7.
+
+- `cancel`: keeps what came with the request (`customer`, `policy` and the other setup values in `meta`) and clears
+  the slots, the flow, every parked flow, the question history, `result` and the counters. `flow_id` becomes the
+  reserved `main_menu` (no flow file may use that id); the next words are handled as at the start. Reply:
+  `command.cancelled`.
+- `agent`: `command.agent` and `HandOff("caller_request")`; parked flows are dropped.
+- `back`: at a waiting `ask` or `confirm`, the previous answered question is asked again (say, branch and call nodes
+  in between are skipped); its old answer stays until a new one replaces it; at the first question that question is
+  asked again; outside a flow, `flow.no_flow`. Tool calls already made are not undone. The answered questions are
+  in `state.meta["asked"]`, per flow: a parked flow keeps its history and gets it back when it resumes.
+- One word can mean two things: "cancel" stops the task in bank and telecom, but in shop "cancel it" or "cancel
+  the order" means the `cancel_order` flow. The shop `cancel` command therefore has `none_of` words for an order
+  reference; the clash is settled in domain data, not in the core.
+
 ## Node types
 
 | Type | Fields | Behaviour |
@@ -185,4 +211,4 @@ types, `next` links, tools and arguments; only texts and triggers differ (a test
 
 ## Not yet
 
-Cancel and hand-off words (R8), correction (R9), identity gate (R13).
+Correction (R9), identity gate (R13).
