@@ -1,0 +1,8 @@
+# 전환 대상 (C01): 서비스 불통은 다른 흐름 도중에도 끼어든다. 장애 접수 도구가 없으므로 상담원이 접수한다.
+id: outage_report
+triggers: {all_of: [[장애]], any_of: [신고, 접수]}
+interrupts: {priority: 10, any_of: [장애, 먹통, 신호, 안 되, 안 돼]}
+start: say
+nodes:
+  say: {type: say, text: "불편을 드려 죄송합니다. 먼저 휴대폰을 한 번 껐다 켜 보세요. 그래도 서비스가 안 되면 장애 접수를 도와드릴 상담원에게 연결해 드릴게요.", next: done}
+  done: {type: end, action: handoff, reason: outage_report}

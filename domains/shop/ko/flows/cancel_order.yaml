@@ -1,0 +1,10 @@
+# 전환 대상 (C01): 주문번호는 order_status에서 넘어온다. 취소 도구가 없으므로 상담원이 마무리한다.
+id: cancel_order
+triggers: {all_of: [[주문]], any_of: [취소], none_of: [어떻, 방법]}
+interrupts: {priority: 5, any_of: [취소]}
+carry: [order_id]
+start: ask_order
+nodes:
+  ask_order: {type: ask, slot: order_id, prompt: "취소를 도와드릴게요. 주문번호를 입력해 주세요.", extractor: digits, length: 4, next: say}
+  say: {type: say, text: "감사합니다. 주문 {order_id} 취소를 처리할 상담원에게 연결해 드릴게요.", next: done}
+  done: {type: end, action: handoff, reason: cancel_order}

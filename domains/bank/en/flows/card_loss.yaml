@@ -1,0 +1,8 @@
+# Switch target (C01): a lost card breaks into any other flow. No blocking tool exists, so a person finishes it.
+id: card_loss
+triggers: {all_of: [[card], [block, freeze, report]], none_of: [how, what]}
+interrupts: {priority: 10, all_of: [[card]], any_of: [lost, lose, missing, stolen, block, freeze]}
+start: say
+nodes:
+  say: {type: say, text: "I'm sorry to hear that. I'll connect you to an agent who can report the lost card and block it right away.", next: done}
+  done: {type: end, action: handoff, reason: card_loss}

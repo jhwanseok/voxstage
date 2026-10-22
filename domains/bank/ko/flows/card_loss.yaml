@@ -1,0 +1,8 @@
+# 전환 대상 (C01): 카드 분실은 다른 흐름 도중에도 끼어든다. 정지 도구가 없으므로 상담원이 마무리한다.
+id: card_loss
+triggers: {all_of: [[카드], [정지, 막, 신고]], none_of: [어떻, 방법]}
+interrupts: {priority: 10, all_of: [[카드]], any_of: [잃어버, 분실, 없어지, 도난, 막, 정지]}
+start: say
+nodes:
+  say: {type: say, text: "불편을 드려 죄송합니다. 카드 분실 신고와 정지를 바로 도와드릴 상담원에게 연결해 드릴게요.", next: done}
+  done: {type: end, action: handoff, reason: card_loss}

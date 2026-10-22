@@ -1,0 +1,10 @@
+# Switch target (C01): the order number carries over from order_status. No cancelling tool exists, so a person finishes it.
+id: cancel_order
+triggers: {all_of: [[cancel]], any_of: [order], none_of: [how, can, recurring]}
+interrupts: {priority: 5, any_of: [cancel]}
+carry: [order_id]
+start: ask_order
+nodes:
+  ask_order: {type: ask, slot: order_id, prompt: "I can help you cancel it. What is your order number?", extractor: digits, length: 4, next: say}
+  say: {type: say, text: "Thank you. I'll connect you to an agent who will cancel order {order_id}.", next: done}
+  done: {type: end, action: handoff, reason: cancel_order}

@@ -1,0 +1,8 @@
+# Switch target (C01): no service breaks into any other flow. No outage tool exists, so a person takes the report.
+id: outage_report
+triggers: {all_of: [[outage]], any_of: [report]}
+interrupts: {priority: 10, any_of: [outage, down, signal, no service, not working]}
+start: say
+nodes:
+  say: {type: say, text: "I'm sorry about that. Please restart your phone once. If there is still no service, I'll connect you to an agent who will take an outage report.", next: done}
+  done: {type: end, action: handoff, reason: outage_report}
