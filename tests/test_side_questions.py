@@ -152,6 +152,13 @@ class SideQuestionTest(unittest.TestCase):
         self.assertEqual(r.reply, "We open at 9. Enter your phone number.")
         self.assertEqual(d.state.slots, {"phone_number": "1234"})
 
+    def test_spoken_digits_at_a_keypad_only_prompt_get_the_reminder_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, r = talk(m, Utterance("pin"), Utterance("it is 1234, and when do you open"))
+        self.assertEqual(r.reply, "use the keypad. We open at 9. Enter your phone number.")
+        self.assertEqual((r.trace["decided"], r.state.slots, r.state.meta.get(ASK_MISSES, 0)), ("side_question", {}, 0))
+
     def test_keypad_input_is_not_an_faq_question(self):
         with tempfile.TemporaryDirectory() as tmp:
             m = build(tmp)

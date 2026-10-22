@@ -270,8 +270,11 @@ class FlowManager(DialogueManager):
                   trace={"flow": flow.id, "ask": node.id, "faq": faq.id if faq else None, "decided": decided})
         if decided == "side_question":   # answer it, ask the pending question again; nothing else moves (R7-2)
             run.trace["extracted"] = None
-            reply = f"{self.faq.pack.answers[faq.id]} {node.data['prompt'].render(run.env())}"
-            return DMResult(reply, state, trace=run.trace)
+            parts = [self.faq.pack.answers[faq.id], node.data["prompt"].render(run.env())]
+            if spoken_at_keypad and re.search(r"\d", turn_input.text) and self.pack.ask is not None:
+                parts.insert(0, self.pack.ask.keypad_reply)   # digits were spoken: remind first (R7-11, R3-1)
+                run.trace["keypad_only"] = True
+            return DMResult(" ".join(parts), state, trace=run.trace)
         if decided == "reprompt":
             return self._unusable(flow, node, state, run, spoken_at_keypad)
         run.slots[slot] = value
