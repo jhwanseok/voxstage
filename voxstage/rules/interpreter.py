@@ -128,6 +128,16 @@ def run_end(run: Run, node: Node):
     return Done(node.id)
 
 
+def decide(extracted: Optional[str], faq) -> str:
+    """What a turn at a waiting `ask` is (decision R7-4). Both results are known before this is called, so the
+    outcome never depends on which one was ready first: a usable answer wins, then an FAQ side question (R7-1)."""
+    if extracted is not None:
+        return "answer"
+    if faq is not None:
+        return "side_question"
+    return "reprompt"
+
+
 # --- slot extraction ----------------------------------------------------------------------------------
 def extract(node: Node, turn_input, tok: Tokenizer) -> Optional[str]:
     """The slot value for an `ask` node, or None when the input does not contain one."""
@@ -239,8 +249,17 @@ class FlowManager(DialogueManager):
         keypad_only = slot in self.pack.sensitive_slots
         spoken_at_keypad = keypad_only and isinstance(turn_input, Utterance)
         value = None if spoken_at_keypad else extract(node, turn_input, self.tok)
-        run = Run(self, flow, dict(state.slots), {**state.meta}, trace={"flow": flow.id, "ask": node.id})
-        if value is None:
+        faq = None   # evaluated every turn, so turns where both match show in the trace (R7-4)
+        if self.faq is not None and isinstance(turn_input, Utterance):
+            faq, _ = self.faq.match(turn_input.text)
+        decided = decide(value, faq)
+        run = Run(self, flow, dict(state.slots), {**state.meta},
+                  trace={"flow": flow.id, "ask": node.id, "faq": faq.id if faq else None, "decided": decided})
+        if decided == "side_question":   # answer it, ask the pending question again; nothing else moves (R7-2)
+            run.trace["extracted"] = None
+            reply = f"{self.faq.pack.answers[faq.id]} {node.data['prompt'].render(run.env())}"
+            return DMResult(reply, state, trace=run.trace)
+        if decided == "reprompt":
             return self._unusable(flow, node, state, run, spoken_at_keypad)
         run.slots[slot] = value
         run.trace["extracted"] = {slot: value}

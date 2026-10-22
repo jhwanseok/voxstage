@@ -77,6 +77,7 @@ class DomainPack:
     missing_reply: str = "I'm sorry, I can't answer that right now. Let me connect you to an agent."
     notices: tuple = ()                        # of Notice, in speaking order (R5-2)
     wording: dict = field(default_factory=dict)   # situation key -> text (R5-1)
+    max_parked: int = 2                        # flows a switch may set aside (R7-3)
 
     def notice(self, notice_id: str) -> Notice:
         return next(n for n in self.notices if n.id == notice_id)
