@@ -37,7 +37,10 @@ class EnglishTokenizer(Tokenizer):
         return Analysis(tokens, "".join(tokens))
 
     def has(self, analysis: Analysis, word: str) -> bool:
-        return word.lower() in analysis.tokens
+        """A word, or a phrase whose words occur next to each other in that order (`no service`, decision R6-7)."""
+        words = tuple(self._WORD.findall(word.lower()))
+        n, tokens = len(words), analysis.tokens
+        return n > 0 and any(tokens[i:i + n] == words for i in range(len(tokens) - n + 1))
 
 
 class KiwiTokenizer(Tokenizer):

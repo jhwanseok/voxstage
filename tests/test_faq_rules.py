@@ -46,6 +46,15 @@ class EnglishTokenizerTest(unittest.TestCase):
         self.assertTrue(t.has(a, "Closing"))
         self.assertFalse(t.has(a, "clos"))
 
+    def test_a_phrase_matches_adjacent_words_in_order(self):
+        t = EnglishTokenizer()
+        a = t.analyze("Wait, my phone has no service!")
+        self.assertTrue(t.has(a, "no service"))
+        self.assertTrue(t.has(a, "No  Service"))
+        self.assertFalse(t.has(a, "service no"))
+        self.assertFalse(t.has(t.analyze("no phone service"), "no service"))
+        self.assertFalse(t.has(t.analyze("no"), "no service"))
+
 
 @needs_kiwi
 class KiwiTokenizerTest(unittest.TestCase):

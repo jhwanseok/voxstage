@@ -87,6 +87,8 @@ interrupts: {priority: 5, any_of: [cancel]}                          # while ano
 carry: [order_id]                                                    # slots taken over from the parked flow
 ```
 
+- A pattern word may be a phrase (`no service`): in English its words must occur next to each other in that order
+  (decision R6-7); in Korean spacing is ignored, as before.
 - `interrupts:` uses the trigger language plus `priority`. While a flow waits at an `ask`, only the `interrupts:` of
   the other flows are checked; plain `triggers` apply only when no flow waits. Highest priority wins, then the most
   matched words; the match, its priority, specificity and ties are in `trace["interrupt"]`.
