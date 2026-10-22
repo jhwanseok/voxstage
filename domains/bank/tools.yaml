@@ -23,6 +23,7 @@ tools:
       error: not_found
   make_transfer:
     params: [amount, to_account]
+    risky: true           # moves money: a flow must confirm before calling it (R7-12)
     rules: []
     default:              # every transfer is accepted (R7-6); no failure rule yet
       return: {reference: TR1001}

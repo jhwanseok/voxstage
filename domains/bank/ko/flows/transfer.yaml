@@ -1,11 +1,13 @@
-# 이체 (R7-6): 금액, 받는 계좌를 묻고 가짜 API로 이체한다. R9 전까지 호출 전 확인은 없다. 영어 쌍둥이와 노드 구조가 같다.
+# 이체 (R7-6): 금액, 받는 계좌를 묻고, 호출 전에 확인을 받은 뒤(make_transfer는 위험 도구, R7-12) 가짜 API로 이체한다.
+# 영어 쌍둥이와 노드 구조가 같다.
 id: transfer
 triggers: {any_of: [이체, 송금, 보내], none_of: [수수료, 한도, 해외, 어떻, 방법, 자동, 예약]}
-captures: {amount: {extractor: number}, to_account: {extractor: choice, choices: {저축: savings, 적금: savings, 입출금: checking, 체크: checking}}}
+captures: {amount: {extractor: number}, to_account: {extractor: choice, choices: {저축: savings, 입출금: checking}}}
 start: ask_amount
 nodes:
   ask_amount: {type: ask, slot: amount, prompt: "얼마를 이체하실 건가요? 금액을 말씀해 주세요.", extractor: number, next: ask_to}
-  ask_to: {type: ask, slot: to_account, prompt: "어느 계좌로 보내시나요? 저축 계좌 또는 입출금 계좌라고 말씀해 주세요.", extractor: choice, choices: {저축: savings, 적금: savings, 입출금: checking, 체크: checking}, next: make}
+  ask_to: {type: ask, slot: to_account, prompt: "어느 계좌로 보내시나요? 저축 계좌 또는 입출금 계좌라고 말씀해 주세요.", extractor: choice, choices: {저축: savings, 입출금: checking}, next: confirm}
+  confirm: {type: confirm, prompt: "{amount | money('USD')}를 {'저축' if to_account == 'savings' else '입출금'} 계좌로 보낼까요?", on_yes: make, on_no: done}
   make: {type: call, tool: make_transfer, args: {amount: "{amount}", to_account: "{to_account}"}, on_ok: say_done, on_error: say_fail}
   say_done: {type: say, text: "{amount | money('USD')}를 {'저축' if to_account == 'savings' else '입출금'} 계좌로 보냈습니다. 접수번호는 {result.reference}입니다.", next: done}
   say_fail: {type: say, text: "지금은 이체를 처리할 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}

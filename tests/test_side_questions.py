@@ -241,8 +241,9 @@ def domain(name, lang, tools=None):
 class DomainContentTest(unittest.TestCase):
     def test_transfer_calls_make_transfer_with_both_slots(self):
         tools = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, "bank", "tools.yaml")))
-        *_, r = talk(domain("bank", "en", tools), Utterance("I want to make a transfer"), Utterance("50"),
-                     Utterance("savings"))
+        *_, c, r = talk(domain("bank", "en", tools), Utterance("I want to make a transfer"), Utterance("50"),
+                        Utterance("savings"), Utterance("yes"))
+        self.assertEqual(c.reply, "Shall I send $50 to your savings account?")   # risky: confirmed first (R7-12)
         self.assertEqual([(c["name"], c["args"]) for c in tools.records],
                          [("make_transfer", {"amount": "50", "to_account": "savings"})])
         self.assertIn("TR1001", r.reply)
@@ -279,8 +280,14 @@ class DomainContentTest(unittest.TestCase):
         self.assertIn("주문번호", a.reply)
         self.assertEqual(b.trace["decided"], "side_question")
         self.assertEqual(c.state.slots, {"order_id": "1001"})
-        *_, r = talk(domain("bank", "ko"), Utterance("이체하려고 하는데요"), Utterance("50"), Utterance("저축 계좌로요"))
+        tools = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, "bank", "tools.yaml")))
+        *_, c, r = talk(domain("bank", "ko", tools), Utterance("이체하려고 하는데요"), Utterance("50"),
+                        Utterance("저축 계좌로요"), Utterance("네"))
+        self.assertIn("저축 계좌로 보낼까요", c.reply)
         self.assertIn("저축 계좌로 보냈습니다", r.reply)
+        *_, r = talk(domain("bank", "ko", tools), Utterance("이체하려고 하는데요"), Utterance("50"),
+                     Utterance("입출금 계좌요"), Utterance("아니요 취소할게요"))
+        self.assertEqual((r.reply, len(tools.records)), ("알겠습니다. 진행하지 않았어요.", 1))
 
 
 if __name__ == "__main__":
