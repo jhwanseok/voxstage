@@ -149,5 +149,121 @@ class LoadTest(unittest.TestCase):
             self.assertIn("interrupts", load_error(tmp, BASE + "interrupts: [y]\n"))
 
 
+class SwitchTest(unittest.TestCase):
+    def test_interrupt_switches_at_an_ask_and_parks_the_flow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, r = talk(m, Utterance("where is it"), Utterance("I lost my card"))
+        self.assertEqual((r.state.flow_id, r.reply), ("lost", "Reporting the lost card."))
+        self.assertEqual(r.trace["switch"], {"from": "lookup", "to": "lost", "by": "interrupt"})
+        self.assertEqual(r.state.meta[PARKED], [{"flow": "lookup", "node": "ask_order", "slots": {}}])
+        self.assertEqual(r.actions[0].reason, "card_loss")
+
+    def test_plain_triggers_do_not_fire_inside_a_flow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, r = talk(m, Utterance("where is it"), Utterance("I want to pay"))
+        self.assertEqual((r.state.flow_id, r.state.node_id), ("lookup", "ask_order"))
+        self.assertNotIn("switch", r.trace)
+        self.assertEqual(r.state.meta[ASK_MISSES], 1)
+
+    def test_a_valid_answer_is_still_an_answer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, r = talk(m, Utterance("where is it"), Utterance("1234"))
+        self.assertEqual((r.state.node_id, r.state.slots), ("ask_note", {"order_id": "1234"}))
+
+    def test_interrupts_come_before_the_answer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)   # the text ask would take any words as the note
+            _, _, r = talk(m, Utterance("where is it"), Utterance("1234"), Utterance("please cancel"))
+        self.assertEqual(r.state.flow_id, "cancel")
+
+    def test_no_switch_at_a_guarded_node(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, r = talk(m, Utterance("I want to pay"), Utterance("I lost my card"))
+        self.assertEqual((r.state.flow_id, r.state.node_id), ("pay", "confirm"))
+        self.assertNotIn(PARKED, r.state.meta)
+        self.assertEqual(r.reply, "not valid. Confirm the payment?")
+
+    def test_priority_then_specificity_with_ties_in_trace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, r = talk(m, Utterance("where is it"), Utterance("cancel it I lost my card"))
+            self.assertEqual(r.state.flow_id, "lost")   # priority 5 beats 1
+            self.assertEqual(r.trace["interrupt"]["priority"], 5)
+        flows = dict(FLOWS, other="""
+            id: other
+            triggers: {any_of: [stop]}
+            interrupts: {priority: 1, any_of: [cancel, stop]}
+            start: say
+            nodes:
+              say: {type: say, text: "Other.", next: done}
+              done: {type: end}
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp, flows)
+            _, r = talk(m, Utterance("where is it"), Utterance("cancel and stop"))
+            self.assertEqual(r.state.flow_id, "other")   # same priority, two words beat one
+            self.assertEqual(r.trace["interrupt"]["specificity"], 2)
+            _, r = talk(m, Utterance("where is it"), Utterance("cancel"))
+            self.assertEqual(r.trace["interrupt"]["ties"], ["other"])
+
+    def test_declared_carry_copies_and_a_same_name_slot_does_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, _, r = talk(m, Utterance("where is it"), Utterance("1234"), Utterance("cancel it"))
+        self.assertEqual(r.trace["carried"], {"order_id": "1234"})
+        self.assertEqual(r.reply, "Cancelling 1234.")   # the ask for order_id is skipped
+        flows = dict(FLOWS, cancel=FLOWS["cancel"].replace("carry: [order_id]", ""))
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp, flows)
+            _, _, r = talk(m, Utterance("where is it"), Utterance("1234"), Utterance("cancel it"))
+        self.assertEqual((r.trace["carried"], r.state.slots, r.reply), ({}, {}, "Which order to cancel?"))
+        self.assertEqual(r.state.meta[PARKED][0]["slots"], {"order_id": "1234"})
+
+    def test_parked_flows_stack_up(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            *_, r = talk(m, Utterance("where is it"), Utterance("cancel it"), Utterance("I lost my card"))
+        self.assertEqual([p["flow"] for p in r.state.meta[PARKED]], ["lookup", "cancel"])
+
+    def test_after_a_switched_flow_ends_plain_triggers_apply(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            *_, r = talk(m, Utterance("where is it"), Utterance("I lost my card"), Utterance("I want to pay"))
+        self.assertEqual(r.state.flow_id, "pay")
+
+    def test_a_switch_resets_the_reprompt_counter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            *_, r = talk(m, Utterance("where is it"), Utterance("hmm"), Utterance("cancel it"))
+        self.assertEqual(r.state.meta[ASK_MISSES], 0)
+
+
+class ButtonSwitchTest(unittest.TestCase):
+    def test_a_button_of_another_flow_switches_at_an_ask(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, r = talk(m, Utterance("where is it"), ButtonPress("menu_cancel"))
+        self.assertEqual(r.state.flow_id, "cancel")
+        self.assertEqual(r.trace["switch"]["by"], "button")
+        self.assertEqual(r.state.meta[PARKED][0]["flow"], "lookup")
+
+    def test_the_own_button_and_unknown_buttons_are_invalid_answers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            for button in ("menu_lookup", "nothing"):
+                _, r = talk(m, Utterance("where is it"), ButtonPress(button))
+                self.assertEqual((r.state.flow_id, r.state.meta[ASK_MISSES]), ("lookup", 1))
+
+    def test_no_button_switch_at_a_guarded_node(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            _, r = talk(m, Utterance("I want to pay"), ButtonPress("menu_cancel"))
+        self.assertEqual((r.state.flow_id, r.state.meta[ASK_MISSES]), ("pay", 1))
+
+
 if __name__ == "__main__":
     unittest.main()

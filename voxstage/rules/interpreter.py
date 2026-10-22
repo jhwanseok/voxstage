@@ -174,6 +174,10 @@ class FlowManager(DialogueManager):
     def respond(self, state, turn_input):
         flow = self.flows.get(state.flow_id) if state.flow_id else None
         if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "ask":
+            if flow.nodes[state.node_id].data["interruptible"]:   # interrupts first, then the answer (R6-5)
+                switched = self._switch(flow, state, turn_input)
+                if switched is not None:
+                    return switched
             return self._answer_ask(flow, state, turn_input)
         if isinstance(turn_input, ButtonPress) and turn_input.button_id in self.buttons:
             flow = self.flows[self.buttons[turn_input.button_id]]
@@ -192,9 +196,37 @@ class FlowManager(DialogueManager):
         return DMResult(self.pack.wording.get("flow.no_flow", "I can't help with that."), state,
                         trace={"rule": "no_flow"})
 
+    def _switch(self, flow: Flow, state, turn_input) -> Optional[DMResult]:
+        """Another flow breaks in: a button of another flow (R6-6), or the `interrupts:` of another flow (R6-4).
+        The running flow is parked (R6-1); only the new flow's `carry` slots are copied from it (R6-2)."""
+        trace: dict = {}
+        if isinstance(turn_input, ButtonPress) and self.buttons.get(turn_input.button_id, flow.id) != flow.id:
+            target, by = self.flows[self.buttons[turn_input.button_id]], "button"
+            trace["button"] = turn_input.button_id
+        elif isinstance(turn_input, Utterance):
+            others = [f.interrupts for f in self.flows.values() if f.interrupts is not None and f.id != flow.id]
+            if not others:
+                return None
+            hit, match = Matcher(others, self.tok).match(turn_input.text)   # priority, then specificity (R6-3)
+            if hit is None:
+                return None
+            target, by = self.flows[hit.id], "interrupt"
+            trace["interrupt"] = match
+        else:
+            return None
+        parked = [*state.meta.get(PARKED, ()), {"flow": flow.id, "node": state.node_id, "slots": dict(state.slots)}]
+        carried = {slot: state.slots[slot] for slot in target.carry if slot in state.slots}
+        captured = self._capture(target, turn_input)
+        run = Run(self, target, {**carried, **captured}, {**state.meta, PARKED: parked, ASK_MISSES: 0},
+                  trace={"flow": target.id, "switch": {"from": flow.id, "to": target.id, "by": by}, **trace,
+                         "carried": carried, "captured": captured})
+        return self._run(run, state, target.start)
+
     def _capture(self, flow: Flow, turn_input) -> dict:
         """Slots the first utterance already contains ("How much is the plus plan" fills `plan`)."""
         out = {}
+        if not isinstance(turn_input, Utterance):
+            return out
         for slot, spec in flow.captures:
             value = extract(Node(f"capture:{slot}", "capture", spec), turn_input, self.tok)
             if value is not None:
