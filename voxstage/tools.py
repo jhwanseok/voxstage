@@ -86,7 +86,7 @@ def _validate_spec(spec) -> dict:
     out = {}
     for name, body in spec["tools"].items():
         body = body or {}
-        extra = set(body) - {"params", "rules", "default"}
+        extra = set(body) - {"params", "rules", "default", "risky"}
         if extra:
             raise ValueError(f"tool {name}: unknown keys {sorted(extra)}")
         rules = body.get("rules", [])
@@ -95,7 +95,10 @@ def _validate_spec(spec) -> dict:
         default = body.get("default")
         if default is not None:
             _check_outcome(f"tool {name} default", default, allow_when=False)
-        out[name] = {"params": list(body.get("params", [])), "rules": rules, "default": default}
+        risky = body.get("risky", False)
+        if not isinstance(risky, bool):
+            raise ValueError(f"tool {name}: 'risky' must be true or false")
+        out[name] = {"params": list(body.get("params", [])), "rules": rules, "default": default, "risky": risky}
     return out
 
 

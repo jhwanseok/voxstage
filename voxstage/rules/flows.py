@@ -356,7 +356,15 @@ def tool_params(tools_path: str) -> dict:
     return {name: tuple(body.get("params") or ()) for name, body in spec["tools"].items()}
 
 
-def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notices: tuple = ()) -> Flow:
+def risky_tools(tools_path: str) -> frozenset:
+    """Tools whose call changes something for the caller (`risky: true`): a `confirm` must come first (R7-12)."""
+    with open(tools_path, encoding="utf-8") as f:
+        spec = yaml.safe_load(f)
+    return frozenset(name for name, body in spec["tools"].items() if (body or {}).get("risky") is True)
+
+
+def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notices: tuple = (),
+              risky: frozenset = frozenset()) -> Flow:
     with open(path, encoding="utf-8") as f:
         try:
             raw = yaml.safe_load(f)
@@ -416,7 +424,23 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
     flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons), tuple(captures),
                 interrupts, tuple(carry))
     _validate_graph(flow)
+    _check_risky_calls(flow, risky)
     return flow
+
+
+def _check_risky_calls(flow: Flow, risky: frozenset) -> None:
+    """A call to a risky tool is reached only from the `yes` of a `confirm` node (R7-12)."""
+    for node in flow.nodes.values():
+        if node.type != "call" or node.data["tool"] not in risky:
+            continue
+        if flow.start == node.id:
+            raise FlowError(f"{flow.path}: node {node.id}: `{node.data['tool']}` is risky and cannot be the start; "
+                            f"a confirm node must come first")
+        for other in flow.nodes.values():
+            if node.id in NODE_TYPES[other.type].edges(other.data) and \
+                    not (other.type == "confirm" and other.data["yes"] == node.id and other.data["no"] != node.id):
+                raise FlowError(f"{flow.path}: node {node.id}: `{node.data['tool']}` is risky, so it may only follow "
+                                f"the yes of a confirm node, not node {other.id}")
 
 
 def _validate_graph(flow: Flow) -> None:
@@ -459,10 +483,10 @@ def _validate_graph(flow: Flow) -> None:
 
 
 def load_flows(flows_dir: str, tools_path: str, sensitive: frozenset = frozenset(), notices: tuple = ()) -> dict:
-    tools = tool_params(tools_path)
+    tools, risky = tool_params(tools_path), risky_tools(tools_path)
     flows, owner = {}, {}
     for path in sorted(glob.glob(os.path.join(flows_dir, "*.yaml"))):
-        flow = load_flow(path, tools, sensitive, notices)
+        flow = load_flow(path, tools, sensitive, notices, risky)
         flows[flow.id] = flow
         for b in flow.buttons:
             if b in owner:
