@@ -225,6 +225,9 @@ class FlowManager(DialogueManager):
         else:
             return None
         parked = [*state.meta.get(PARKED, ()), {"flow": flow.id, "node": state.node_id, "slots": dict(state.slots)}]
+        if len(parked) > self.pack.max_parked:   # the oldest goes; nothing is said (R7-3)
+            trace["parked_dropped"] = [p["flow"] for p in parked[:-self.pack.max_parked]]
+            parked = parked[-self.pack.max_parked:]
         carried = {slot: state.slots[slot] for slot in target.carry if slot in state.slots}
         captured = self._capture(target, turn_input)
         run = Run(self, target, {**carried, **captured}, {**state.meta, PARKED: parked, ASK_MISSES: 0},
@@ -306,7 +309,7 @@ class FlowManager(DialogueManager):
 
     def _drop_parked(self, run: Run) -> None:
         if run.meta.get(PARKED):
-            run.trace["parked_dropped"] = [p["flow"] for p in run.meta[PARKED]]
+            run.trace["parked_dropped"] = run.trace.get("parked_dropped", []) + [p["flow"] for p in run.meta[PARKED]]
             run.meta[PARKED] = []
 
     def _resume(self, run: Run, state) -> DMResult:

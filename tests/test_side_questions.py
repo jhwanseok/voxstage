@@ -9,7 +9,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from voxstage.dialogue import step
-from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, parse_pattern
+from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, RuleError, load_max_parked, parse_pattern
 from voxstage.rules.faq import MISSES
 from voxstage.rules.flows import load_flows
 from voxstage.rules.interpreter import ASK_MISSES, PARKED, FlowManager, decide
@@ -186,6 +186,47 @@ class ResumeTest(unittest.TestCase):
             *_, r = talk(m, Utterance("transfer"), Utterance("I need help"), Utterance("get me an agent"))
         self.assertEqual(r.trace["parked_dropped"], ["transfer", "help"])
         self.assertEqual((r.state.meta[PARKED], r.state.flow_id, r.reply), ([], "agent", "Connecting you."))
+
+
+class ParkedLimitTest(unittest.TestCase):
+    def test_beyond_the_limit_the_oldest_is_dropped_silently(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp, max_parked=1)
+            *_, r = talk(m, Utterance("transfer"), Utterance("I need help"), Utterance("what is the rate"))
+        self.assertEqual(r.trace["parked_dropped"], ["transfer"])
+        self.assertEqual(r.reply, "The rate is 2 percent. Help with what?")   # help resumes, transfer is gone
+        self.assertEqual((r.state.flow_id, r.state.meta[PARKED]), ("help", []))
+
+    def test_within_the_limit_nothing_is_dropped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp, max_parked=2)
+            *_, r = talk(m, Utterance("transfer"), Utterance("I need help"), Utterance("what is the rate"))
+        self.assertNotIn("parked_dropped", r.trace)
+        self.assertEqual([p["flow"] for p in r.state.meta[PARKED]], ["transfer"])
+
+    def test_switch_config(self):
+        cases = {"fallback: {max_misses: 3}\n": 2,
+                 "fallback: {max_misses: 3}\nswitch: {max_parked: 3}\n": 3}
+        bad = ["fallback: {max_misses: 3}\nswitch: {max_parked: 0}\n",
+               "fallback: {max_misses: 3}\nswitch: {max_parked: two}\n",
+               "fallback: {max_misses: 3}\nswitch: {depth: 2}\n",
+               "fallback: {max_misses: 3}\nswitch: [2]\n"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "config.yaml")
+            for text, n in cases.items():
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                self.assertEqual(load_max_parked(path), n)
+            for text in bad:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                with self.assertRaises(RuleError):
+                    load_max_parked(path)
+
+    def test_every_domain_sets_the_limit(self):
+        for d in ("bank", "shop", "telecom"):
+            for lang in ("en", "ko"):
+                self.assertEqual(load_max_parked(os.path.join(ROOT, d, lang, "rules", "config.yaml")), 2)
 
 
 if __name__ == "__main__":

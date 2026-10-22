@@ -8,3 +8,7 @@ fallback:
 ask:
   max_reprompts: 2
   on_exceed: handoff
+
+# A switch to another flow sets the running one aside (R6); at most max_parked are kept, the oldest is dropped (R7-3).
+switch:
+  max_parked: 2

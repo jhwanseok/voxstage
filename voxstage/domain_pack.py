@@ -101,6 +101,8 @@ class DomainPack:
         sens_path = os.path.join(domains_dir, domain, "sensitive_slots.yaml")
         sensitive = load_sensitive_slots(sens_path) if os.path.exists(sens_path) else frozenset()
         extra = {"missing_reply": wording["flow.attribute_missing"]} if wording else {}
+        if has_cfg:
+            extra["max_parked"] = load_max_parked(cfg_path)
         return cls(domain, lang, answers, patterns, fallback,
                    os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive,
                    notices=notices, wording=wording, **extra)
@@ -164,8 +166,8 @@ def load_fallback(path: str, wording: dict) -> Fallback:
     """Counts and the action come from the config; the words come from the registry (`fallback.miss`, `.exceed`)."""
     raw = _read(path)
     fb = raw.get("fallback") if isinstance(raw, dict) else None
-    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask"}:
-        raise RuleError(f"{path}: needs a top-level 'fallback' mapping (and optionally 'ask') only")
+    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "switch"}:
+        raise RuleError(f"{path}: needs a top-level 'fallback' mapping (and optionally 'ask', 'switch') only")
     extra = set(fb) - {"max_misses", "on_exceed"}
     if extra:
         raise RuleError(f"{path}: unknown fallback keys {sorted(extra)} (wording lives in notices.yaml)")
@@ -195,6 +197,20 @@ def load_ask_policy(path: str, wording: dict) -> Optional[AskPolicy]:
     if action not in ("handoff", "end_call"):
         raise RuleError(f"{path}: ask.on_exceed must be handoff or end_call")
     return AskPolicy(wording["ask.invalid"], wording["ask.keypad_only"], wording["ask.exceed"], n, action)
+
+
+def load_max_parked(path: str) -> int:
+    """`switch: {max_parked: 2}`: how many flows a switch may set aside; beyond it the oldest is dropped (R7-3)."""
+    raw = _read(path)
+    sw = raw.get("switch") if isinstance(raw, dict) else None
+    if sw is None:
+        return 2
+    if not isinstance(sw, dict) or set(sw) - {"max_parked"}:
+        raise RuleError(f"{path}: 'switch' takes max_parked only")
+    n = sw.get("max_parked", 2)
+    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+        raise RuleError(f"{path}: switch.max_parked must be an integer >= 1")
+    return n
 
 
 def load_sensitive_slots(path: str) -> frozenset:
