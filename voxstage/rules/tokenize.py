@@ -27,6 +27,10 @@ class Tokenizer:
         """Does the pattern word occur in the analysed text?"""
         raise NotImplementedError
 
+    def analyze_answer(self, text: str) -> Analysis:
+        """For yes and no answers at a confirm node (R7-12). Same as `analyze` unless a language drops answer words."""
+        return self.analyze(text)
+
 
 class EnglishTokenizer(Tokenizer):
     lang = "en"
@@ -56,9 +60,14 @@ class KiwiTokenizer(Tokenizer):
             raise ImportError("Korean rules need kiwipiepy: pip install 'voxstage[ko]'") from exc
         self._kiwi = Kiwi()
 
-    def analyze(self, text: str) -> Analysis:
-        tokens = tuple(t.form for t in self._kiwi.tokenize(text) if t.tag.split("-")[0] in self.CONTENT_TAGS)
+    def analyze(self, text: str, tags: frozenset = frozenset()) -> Analysis:
+        keep = self.CONTENT_TAGS | tags
+        tokens = tuple(t.form for t in self._kiwi.tokenize(text) if t.tag.split("-")[0] in keep)
         return Analysis(tokens, "".join(tokens))
+
+    def analyze_answer(self, text: str) -> Analysis:
+        """네, 예, 아니요 are interjections (IC), which rule matching drops; a yes or no answer keeps them."""
+        return self.analyze(text, frozenset({"IC"}))
 
     def has(self, analysis: Analysis, word: str) -> bool:
         word = word.replace(" ", "")

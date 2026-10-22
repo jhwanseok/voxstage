@@ -9,12 +9,15 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from voxstage.dialogue import HandOff, step
-from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, parse_pattern
+from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, RuleError, load_confirm_words, parse_pattern
+from voxstage.rules.tokenize import kiwi_available
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, load_flows, risky_tools
 from voxstage.rules.interpreter import FlowManager
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import ButtonPress, Dtmf, Utterance
+
+needs_kiwi = unittest.skipUnless(kiwi_available(), "kiwipiepy missing: pip install 'voxstage[ko]'")
 
 TOOLS = """
 tools:
@@ -182,11 +185,46 @@ class ConfirmTest(unittest.TestCase):
                 self.assertNotIn("switch", r.trace)
                 self.assertNotIn("We open", r.reply)
 
-    def test_without_confirm_words_speech_is_unclear(self):
+    def test_a_confirm_node_needs_confirm_words(self):
         with tempfile.TemporaryDirectory() as tmp:
-            m, _ = build(tmp, words=None)
-            *_, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("yes"))
-        self.assertEqual(r.trace["confirm"], "unclear")
+            with self.assertRaises(FlowError) as cm:
+                build(tmp, words=None)
+        self.assertIn("confirm.yaml", str(cm.exception))
+
+
+class ConfirmWordsTest(unittest.TestCase):
+    def test_confirm_yaml_is_checked(self):
+        bad = ["yes_words: [ok]\n", "yes_words: [ok]\nno_words: []\n", "yes_words: [ok]\nno_words: [ok]\n",
+               "yes_words: [yes]\nno_words: [nope]\n", "yes_words: [ok]\nno_words: [nope]\nmaybe: [x]\n"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "confirm.yaml")
+            for text in bad:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                with self.assertRaises(RuleError, msg=text):
+                    load_confirm_words(path)
+
+    def test_every_domain_has_confirm_words(self):
+        root = os.path.join(os.path.dirname(__file__), "..", "domains")
+        for d in ("bank", "shop", "telecom"):
+            for lang in ("en", "ko"):
+                yes, no = load_confirm_words(os.path.join(root, d, lang, "rules", "confirm.yaml"))
+                self.assertTrue(yes and no)
+
+    def test_a_pack_without_confirm_yaml_does_not_load(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            import shutil
+            shutil.copytree(os.path.join(os.path.dirname(__file__), "..", "domains", "bank"), os.path.join(tmp, "bank"))
+            os.remove(os.path.join(tmp, "bank", "en", "rules", "confirm.yaml"))
+            with self.assertRaises(RuleError):
+                DomainPack.load(tmp, "bank", "en")
+
+    @needs_kiwi
+    def test_korean_yes_and_no_are_interjections_kept_for_answers(self):
+        from voxstage.rules.tokenize import for_lang
+        tok = for_lang("ko")
+        self.assertEqual(tok.analyze("네 맞아요").tokens, ("맞",))          # rule matching drops 네
+        self.assertEqual(tok.analyze_answer("네 맞아요").tokens, ("네", "맞"))   # an answer keeps it
 
     def test_a_risky_call_reached_from_elsewhere_too_is_rejected(self):
         msg = load_error(CONFIRMED.replace("on_error: done}\n      say", "on_error: call}\n      say")

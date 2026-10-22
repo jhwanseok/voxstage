@@ -181,6 +181,8 @@ class FlowManager(DialogueManager):
             for node in flow.nodes.values():
                 if node.type not in HANDLERS:
                     raise FlowError(f"{flow.path}: node {node.id}: no handler registered for `{node.type}`")
+                if node.type == "confirm" and pack.confirm_words is None:
+                    raise FlowError(f"{flow.path}: node {node.id}: a confirm node needs rules/confirm.yaml in the pack")
         self.matcher = Matcher([f.triggers for f in self.flows.values()], self.tok)
         self.buttons = {b: f.id for f in self.flows.values() for b in f.buttons}
         self.faq = faq if faq is not None else (
@@ -282,7 +284,7 @@ class FlowManager(DialogueManager):
             return {"1": "yes", "2": "no"}.get(turn_input.digits, "unclear")
         if not isinstance(turn_input, Utterance) or self.pack.confirm_words is None:
             return "unclear"
-        analysis = self.tok.analyze(turn_input.text)
+        analysis = self.tok.analyze_answer(turn_input.text)
         yes_words, no_words = self.pack.confirm_words
         yes = any(self.tok.has(analysis, w) for w in yes_words)
         no = any(self.tok.has(analysis, w) for w in no_words)

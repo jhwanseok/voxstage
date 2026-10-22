@@ -104,6 +104,10 @@ class DomainPack:
         extra = {"missing_reply": wording["flow.attribute_missing"]} if wording else {}
         if has_cfg:
             extra["max_parked"] = load_max_parked(cfg_path)
+            confirm_path = os.path.join(rules_dir, "confirm.yaml")
+            if not os.path.exists(confirm_path):
+                raise RuleError(f"{confirm_path}: missing (yes and no words for confirm nodes)")
+            extra["confirm_words"] = load_confirm_words(confirm_path)
         return cls(domain, lang, answers, patterns, fallback,
                    os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive,
                    notices=notices, wording=wording, **extra)
@@ -212,6 +216,21 @@ def load_max_parked(path: str) -> int:
     if not isinstance(n, int) or isinstance(n, bool) or n < 1:
         raise RuleError(f"{path}: switch.max_parked must be an integer >= 1")
     return n
+
+
+def load_confirm_words(path: str) -> tuple:
+    """`rules/confirm.yaml`: `yes_words` and `no_words` for confirm nodes (R7-12). Quote "yes" and "no": YAML reads
+    them bare as booleans."""
+    raw = _read(path)
+    if not isinstance(raw, dict) or set(raw) != {"yes_words", "no_words"}:
+        raise RuleError(f"{path}: needs exactly 'yes_words' and 'no_words'")
+    yes, no = _words(path, "yes_words", raw["yes_words"]), _words(path, "no_words", raw["no_words"])
+    if not yes or not no:
+        raise RuleError(f"{path}: yes_words and no_words must not be empty")
+    shared = sorted(set(yes) & set(no))
+    if shared:
+        raise RuleError(f"{path}: words in both lists: {shared}")
+    return yes, no
 
 
 def load_sensitive_slots(path: str) -> frozenset:

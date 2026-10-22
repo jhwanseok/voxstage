@@ -1,0 +1,4 @@
+# Words that answer a confirm node before a risky action (R7-12); keypad 1 is yes, 2 is no.
+# "yes" and "no" are quoted: YAML reads them bare as booleans.
+yes_words: ["yes", yeah, yep, sure, correct, go ahead]
+no_words: ["no", nope, cancel, stop, wrong, "don't"]

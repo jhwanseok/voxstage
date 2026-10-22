@@ -146,6 +146,7 @@ class WordingTest(unittest.TestCase):
             shutil.copy(os.path.join(ROOT, "bank", "en", "faq.yaml"), os.path.join(tmp, "bank", "en", "faq.yaml"))
             shutil.copy(os.path.join(ROOT, "bank", "en", "rules", "config.yaml"), base)
             shutil.copy(os.path.join(ROOT, "bank", "en", "rules", "faq_patterns.yaml"), base)
+            shutil.copy(os.path.join(ROOT, "bank", "en", "rules", "confirm.yaml"), base)
             shutil.copy(BANK_TOOLS, os.path.join(tmp, "bank", "tools.yaml"))
             registry(os.path.join(tmp, "bank", "en"), 'a: {fixed: true, priority: 1, text: "A."}\n',
                      WORDING.replace('"w:fallback.miss"', '"Pardon?"'))
