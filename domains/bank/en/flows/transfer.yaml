@@ -4,7 +4,7 @@ triggers: {any_of: [transfer, send], none_of: [fee, fees, charge, cost, limit, a
 captures: {amount: {extractor: number}, to_account: {extractor: choice, choices: [savings, checking]}}
 start: ask_amount
 nodes:
-  ask_amount: {type: ask, slot: amount, prompt: "How much would you like to transfer?", extractor: number, next: ask_to}
+  ask_amount: {type: ask, slot: amount, prompt: "What amount would you like to transfer?", extractor: number, next: ask_to}
   ask_to: {type: ask, slot: to_account, prompt: "To which account, savings or checking?", extractor: choice, choices: [savings, checking], next: make}
   make: {type: call, tool: make_transfer, args: {amount: "{amount}", to_account: "{to_account}"}, on_ok: say_done, on_error: say_fail}
   say_done: {type: say, text: "I've sent {amount | money('USD')} to your {to_account} account. Your reference is {result.reference}.", next: done}

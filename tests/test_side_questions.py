@@ -250,7 +250,7 @@ class DomainContentTest(unittest.TestCase):
     def test_bank_c02_first_two_turns(self):
         a, b = talk(domain("bank", "en"), Utterance("I want to make a transfer"), Utterance("Wait what time do you close"))
         self.assertEqual(a.state.flow_id, "transfer")
-        self.assertIn("How much", a.reply)
+        self.assertIn("amount", a.reply)
         self.assertIn("9 a.m. to 4 p.m.", b.reply)
         self.assertEqual((b.state.flow_id, b.state.node_id, b.trace["decided"]), ("transfer", "ask_amount", "side_question"))
 
