@@ -34,6 +34,33 @@ FLOWS = {
           ask_to: {type: ask, slot: to_account, prompt: "To which account?", extractor: choice, choices: [savings, checking], next: done}
           done: {type: end}
     """,
+    "quick": """
+        id: quick
+        triggers: {any_of: [quickly]}
+        interrupts: {priority: 1, any_of: [rate]}
+        start: say
+        nodes:
+          say: {type: say, text: "The rate is 2 percent.", next: done}
+          done: {type: end}
+    """,
+    "agent": """
+        id: agent
+        triggers: {any_of: [human]}
+        interrupts: {priority: 1, any_of: [agent]}
+        start: say
+        nodes:
+          say: {type: say, text: "Connecting you.", next: done}
+          done: {type: end, action: handoff, reason: asked}
+    """,
+    "help": """
+        id: help
+        triggers: {any_of: [helpdesk]}
+        interrupts: {priority: 1, any_of: [help]}
+        start: ask_topic
+        nodes:
+          ask_topic: {type: ask, slot: topic, prompt: "Help with what?", extractor: choice, choices: [cards, loans], next: done}
+          done: {type: end}
+    """,
     "pin": """
         id: pin
         triggers: {any_of: [pin]}
@@ -126,6 +153,39 @@ class SideQuestionTest(unittest.TestCase):
             m = build(tmp)
             _, r = talk(m, Utterance("transfer"), Dtmf("12"))
         self.assertEqual((r.trace["faq"], r.state.slots), (None, {"amount": "12"}))
+
+
+class ResumeTest(unittest.TestCase):
+    def test_after_an_action_less_end_the_parked_flow_asks_again_with_its_slots(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            *_, r = talk(m, Utterance("transfer"), Utterance("50"), Utterance("what is the rate"))
+        self.assertEqual(r.reply, "The rate is 2 percent. To which account?")
+        self.assertEqual((r.state.flow_id, r.state.node_id, r.state.slots), ("transfer", "ask_to", {"amount": "50"}))
+        self.assertEqual((r.trace["resumed"], r.state.meta[PARKED]), ({"flow": "transfer", "node": "ask_to"}, []))
+        self.assertEqual(r.actions, ())
+
+    def test_the_resumed_flow_takes_its_answer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            *_, r = talk(m, Utterance("transfer"), Utterance("50"), Utterance("what is the rate"), Utterance("savings"))
+        self.assertEqual(r.state.slots, {"amount": "50", "to_account": "savings"})
+
+    def test_newest_parked_flow_resumes_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            *_, a, b = talk(m, Utterance("transfer"), Utterance("I need help"), Utterance("what is the rate"),
+                            Utterance("loans"))
+        self.assertEqual((a.state.flow_id, a.reply), ("help", "The rate is 2 percent. Help with what?"))
+        self.assertEqual((b.state.flow_id, b.state.node_id), ("transfer", "ask_amount"))   # help ended: back again
+        self.assertEqual(b.reply, "How much?")
+
+    def test_a_hand_off_drops_every_parked_flow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp)
+            *_, r = talk(m, Utterance("transfer"), Utterance("I need help"), Utterance("get me an agent"))
+        self.assertEqual(r.trace["parked_dropped"], ["transfer", "help"])
+        self.assertEqual((r.state.meta[PARKED], r.state.flow_id, r.reply), ([], "agent", "Connecting you."))
 
 
 if __name__ == "__main__":

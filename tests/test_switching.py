@@ -56,6 +56,15 @@ FLOWS = {
           say: {type: say, text: "Reporting the lost card.", next: done}
           done: {type: end, action: handoff, reason: card_loss}
     """,
+    "help": """
+        id: help
+        triggers: {any_of: [helpdesk]}
+        interrupts: {priority: 2, any_of: [help]}
+        start: ask_topic
+        nodes:
+          ask_topic: {type: ask, slot: topic, prompt: "What do you need help with?", extractor: text, next: done}
+          done: {type: end}
+    """,
     "pay": """
         id: pay
         triggers: {any_of: [pay]}
@@ -156,11 +165,15 @@ class SwitchTest(unittest.TestCase):
     def test_interrupt_switches_at_an_ask_and_parks_the_flow(self):
         with tempfile.TemporaryDirectory() as tmp:
             m = build(tmp)
+            _, r = talk(m, Utterance("where is it"), Utterance("please cancel"))
+            self.assertEqual((r.state.flow_id, r.reply), ("cancel", "Which order to cancel?"))
+            self.assertEqual(r.trace["switch"], {"from": "lookup", "to": "cancel", "by": "interrupt"})
+            self.assertEqual(r.state.meta[PARKED], [{"flow": "lookup", "node": "ask_order", "slots": {}}])
             _, r = talk(m, Utterance("where is it"), Utterance("I lost my card"))
+        # a flow that ends with a hand-off leaves nothing to come back to (R7-5)
         self.assertEqual((r.state.flow_id, r.reply), ("lost", "Reporting the lost card."))
-        self.assertEqual(r.trace["switch"], {"from": "lookup", "to": "lost", "by": "interrupt"})
-        self.assertEqual(r.state.meta[PARKED], [{"flow": "lookup", "node": "ask_order", "slots": {}}])
         self.assertEqual(r.actions[0].reason, "card_loss")
+        self.assertEqual((r.state.meta[PARKED], r.trace["parked_dropped"]), ([], ["lookup"]))
 
     def test_plain_triggers_do_not_fire_inside_a_flow(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -208,7 +221,7 @@ class SwitchTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             m = build(tmp, flows)
             _, r = talk(m, Utterance("where is it"), Utterance("cancel and stop"))
-            self.assertEqual(r.state.flow_id, "other")   # same priority, two words beat one
+            self.assertEqual(r.trace["switch"]["to"], "other")   # same priority, two words beat one
             self.assertEqual(r.trace["interrupt"]["specificity"], 2)
             _, r = talk(m, Utterance("where is it"), Utterance("cancel"))
             self.assertEqual(r.trace["interrupt"]["ties"], ["other"])
@@ -229,7 +242,7 @@ class SwitchTest(unittest.TestCase):
     def test_parked_flows_stack_up(self):
         with tempfile.TemporaryDirectory() as tmp:
             m = build(tmp)
-            *_, r = talk(m, Utterance("where is it"), Utterance("cancel it"), Utterance("I lost my card"))
+            *_, r = talk(m, Utterance("where is it"), Utterance("cancel it"), Utterance("I need help"))
         self.assertEqual([p["flow"] for p in r.state.meta[PARKED]], ["lookup", "cancel"])
 
     def test_after_a_switched_flow_ends_plain_triggers_apply(self):
@@ -284,7 +297,7 @@ class DomainSwitchTest(unittest.TestCase):
 
     def test_balance_check_switches_to_card_loss(self):
         _, r = talk(domain("bank", "en"), Utterance("I'd like to check my balance"), Utterance("Oh wait I just lost my card"))
-        self.assertEqual((r.state.flow_id, r.state.meta[PARKED][0]["flow"]), ("card_loss", "balance_inquiry"))
+        self.assertEqual((r.state.flow_id, r.trace["parked_dropped"]), ("card_loss", ["balance_inquiry"]))
 
     @needs_kiwi
     def test_korean_plan_change_switches_to_outage_report(self):

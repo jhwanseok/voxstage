@@ -286,16 +286,41 @@ class FlowManager(DialogueManager):
                 outcome = HANDLERS[node.type](run, node)
             except (MissingAttribute, FormatError) as exc:   # fail visibly: apology, then a person (decision R4-2)
                 run.trace.update(failed=node_id, error=str(exc))
+                self._drop_parked(run)
                 new = state.evolve(flow_id=run.flow.id, node_id=node_id, slots=run.slots, meta=run.meta)
                 return DMResult(self.pack.missing_reply, new, (HandOff("missing_attribute"),), run.trace)
             except ExprError as exc:
                 raise FlowRuntimeError(f"{run.flow.path}: node {node_id}: {exc}") from exc
+            if isinstance(outcome, Done) and run.meta.get(PARKED):
+                if run.actions:   # a person or the end of the call takes over: nothing to come back to (R7-5)
+                    self._drop_parked(run)
+                else:
+                    return self._resume(run, state)
             if isinstance(outcome, (Wait, Done)):
                 run.meta[ASK_MISSES] = 0
                 new = state.evolve(flow_id=run.flow.id, node_id=outcome.node_id, slots=run.slots, meta=run.meta)
                 return DMResult(" ".join(run.out), new, tuple(run.actions), run.trace)
             node_id = outcome
         raise FlowRuntimeError(f"{run.flow.path}: more than {MAX_NODES_PER_TURN} nodes in one turn")
+
+
+    def _drop_parked(self, run: Run) -> None:
+        if run.meta.get(PARKED):
+            run.trace["parked_dropped"] = [p["flow"] for p in run.meta[PARKED]]
+            run.meta[PARKED] = []
+
+    def _resume(self, run: Run, state) -> DMResult:
+        """The switched-in flow ended without an action: the newest parked flow asks its pending question again,
+        with the slots it had (R7-5, R7-2)."""
+        *rest, top = run.meta[PARKED]
+        flow = self.flows[top["flow"]]
+        node = flow.nodes[top["node"]]
+        meta = {**run.meta, PARKED: rest, ASK_MISSES: 0}
+        back = Run(self, flow, dict(top["slots"]), meta)
+        run.out.append(node.data["prompt"].render(back.env()))
+        run.trace["resumed"] = {"flow": flow.id, "node": node.id}
+        new = state.evolve(flow_id=flow.id, node_id=node.id, slots=top["slots"], meta=meta)
+        return DMResult(" ".join(run.out), new, tuple(run.actions), run.trace)
 
 
 def build_manager(domains_dir: str, domain: str, lang: str, tools: ToolExecutor) -> FlowManager:
