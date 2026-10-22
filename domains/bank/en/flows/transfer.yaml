@@ -1,0 +1,12 @@
+# Transfer (R7-6): amount, receiving account, then the fake API makes it. No confirmation before the call until R9.
+id: transfer
+triggers: {any_of: [transfer, send], none_of: [fee, fees, charge, cost, limit, abroad, overseas, international, how, schedule, recurring]}
+captures: {amount: {extractor: number}, to_account: {extractor: choice, choices: [savings, checking]}}
+start: ask_amount
+nodes:
+  ask_amount: {type: ask, slot: amount, prompt: "How much would you like to transfer?", extractor: number, next: ask_to}
+  ask_to: {type: ask, slot: to_account, prompt: "To which account, savings or checking?", extractor: choice, choices: [savings, checking], next: make}
+  make: {type: call, tool: make_transfer, args: {amount: "{amount}", to_account: "{to_account}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "I've sent {amount | money('USD')} to your {to_account} account. Your reference is {result.reference}.", next: done}
+  say_fail: {type: say, text: "I'm unable to make that transfer right now. Please try again later.", next: done}
+  done: {type: end}

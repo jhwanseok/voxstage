@@ -12,12 +12,16 @@ from voxstage.dialogue import step
 from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, RuleError, load_max_parked, parse_pattern
 from voxstage.rules.faq import MISSES
 from voxstage.rules.flows import load_flows
-from voxstage.rules.interpreter import ASK_MISSES, PARKED, FlowManager, decide
+from voxstage.evaluate import RecordingTools
+from voxstage.rules.interpreter import ASK_MISSES, PARKED, FlowManager, build_manager, decide
+from voxstage.rules.tokenize import kiwi_available
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import Dtmf, Utterance
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "domains")
 BANK_TOOLS = os.path.join(ROOT, "bank", "tools.yaml")
+
+needs_kiwi = unittest.skipUnless(kiwi_available(), "kiwipiepy missing: pip install 'voxstage[ko]'")
 
 POLICY = AskPolicy("not valid.", "use the keypad.", "giving up.", 2, "handoff")
 ANSWERS = {"hours": "We open at 9.", "fee": "Transfers cost 5 dollars."}
@@ -227,6 +231,56 @@ class ParkedLimitTest(unittest.TestCase):
         for d in ("bank", "shop", "telecom"):
             for lang in ("en", "ko"):
                 self.assertEqual(load_max_parked(os.path.join(ROOT, d, lang, "rules", "config.yaml")), 2)
+
+
+def domain(name, lang, tools=None):
+    tools = tools or FakeApiExecutor.from_yaml(os.path.join(ROOT, name, "tools.yaml"))
+    return build_manager(ROOT, name, lang, tools)
+
+
+class DomainContentTest(unittest.TestCase):
+    def test_transfer_calls_make_transfer_with_both_slots(self):
+        tools = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, "bank", "tools.yaml")))
+        *_, r = talk(domain("bank", "en", tools), Utterance("I want to make a transfer"), Utterance("50"),
+                     Utterance("savings"))
+        self.assertEqual([(c["name"], c["args"]) for c in tools.records],
+                         [("make_transfer", {"amount": "50", "to_account": "savings"})])
+        self.assertIn("TR1001", r.reply)
+
+    def test_bank_c02_first_two_turns(self):
+        a, b = talk(domain("bank", "en"), Utterance("I want to make a transfer"), Utterance("Wait what time do you close"))
+        self.assertEqual(a.state.flow_id, "transfer")
+        self.assertIn("How much", a.reply)
+        self.assertIn("9 a.m. to 4 p.m.", b.reply)
+        self.assertEqual((b.state.flow_id, b.state.node_id, b.trace["decided"]), ("transfer", "ask_amount", "side_question"))
+
+    def test_return_request_both_orders(self):
+        m = domain("shop", "en")
+        r, = talk(m, Utterance("I want to return a laptop"))
+        self.assertIn(m.pack.notices[0].text, r.reply)
+        self.assertTrue(r.reply.endswith("What is your order number?"))
+        a, b, c = talk(m, Utterance("I want to return an item"), Dtmf("1001"), Utterance("a laptop"))
+        self.assertEqual((a.reply, b.reply), ("What is your order number?", "What would you like to return?"))
+        self.assertIn(m.pack.notices[0].text, c.reply)
+        self.assertEqual(c.state.slots, {"order_id": "1001", "item": "electronics"})
+
+    def test_change_plan_with_and_without_captures(self):
+        m = domain("telecom", "en")
+        r, = talk(m, Utterance("I want to downgrade to the basic plan"))
+        self.assertEqual(r.state.slots, {"plan": "basic", "direction": "downgrade"})
+        self.assertIn(m.pack.notices[0].text, r.reply)
+        a, b = talk(m, Utterance("I want to change my plan"), Utterance("The plus plan"))
+        self.assertEqual(a.reply, "Which plan would you like, basic or plus?")
+        self.assertEqual((b.state.slots, b.state.node_id), ({"plan": "plus"}, "ask_direction"))
+
+    @needs_kiwi
+    def test_korean_twins(self):
+        a, b, c = talk(domain("shop", "ko"), Utterance("반품하고 싶은데요"), Utterance("아 잠깐만요 근데 배송은 보통 며칠 걸려요"), Dtmf("1001"))
+        self.assertIn("주문번호", a.reply)
+        self.assertEqual(b.trace["decided"], "side_question")
+        self.assertEqual(c.state.slots, {"order_id": "1001"})
+        *_, r = talk(domain("bank", "ko"), Utterance("이체하려고 하는데요"), Utterance("50"), Utterance("저축 계좌로요"))
+        self.assertIn("저축 계좌로 보냈습니다", r.reply)
 
 
 if __name__ == "__main__":

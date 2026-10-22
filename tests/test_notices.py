@@ -192,8 +192,10 @@ class ShippedNoticesTest(unittest.TestCase):
 
     def test_the_caller_is_asked_when_the_condition_depends_on_a_missing_word(self):
         m, a = self.talk("shop", "en", "I want to return something")
-        self.assertEqual(a.reply, "What would you like to return?")
-        r = step(m, a.state, Utterance("my laptop"))
+        self.assertEqual(a.reply, "What is your order number?")   # item not named: order number first (R7-7)
+        b = step(m, a.state, Dtmf("1001"))
+        self.assertEqual(b.reply, "What would you like to return?")
+        r = step(m, b.state, Utterance("my laptop"))
         self.assertIn(m.pack.notices[0].text, r.reply)
 
     @needs_kiwi

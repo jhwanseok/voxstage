@@ -1,9 +1,19 @@
-# 고지문은 상품 분류에 따라 달라진다. 분류는 고객의 말(capture)이나 질문 한 번으로 정해진다. 영어 쌍둥이와 노드 구조가 같다.
+# 고지문은 상품 종류에 따라 다르다. 첫 말에 상품이 있으면 고지 후 주문번호, 없으면 주문번호, 상품, 고지 순서(R7-7, YAML 분기;
+# form 노드는 R10-3). 영어 쌍둥이와 노드 구조가 같다.
 id: return_request
 triggers: {any_of: [반품, 환불], none_of: [어떻, 방법, 기한, 규정]}
 captures: {item: {extractor: choice, choices: {노트북: electronics, 컴퓨터: electronics, 휴대폰: electronics, 태블릿: electronics, 이어폰: electronics, 헤드폰: electronics, 카메라: electronics, 티셔츠: clothing, 셔츠: clothing, 자켓: clothing, 바지: clothing, 원피스: clothing, 신발: clothing, 옷: clothing}}}
-start: ask_item
+start: route
 nodes:
+  route:
+    type: branch
+    cases:
+      - {when: "'item' in slots", next: intro_known}
+    else: ask_order_first
+  intro_known: {type: say, text: "반품 접수를 도와드릴게요.", next: notice_known}
+  notice_known: {type: notices, next: ask_order_last}
+  ask_order_last: {type: ask, slot: order_id, prompt: "주문번호를 입력해 주세요.", extractor: digits, length: 4, next: done}
+  ask_order_first: {type: ask, slot: order_id, prompt: "주문번호를 입력해 주세요.", extractor: digits, length: 4, next: ask_item}
   ask_item: {type: ask, slot: item, prompt: "어떤 상품을 반품하시나요?", extractor: choice, choices: {노트북: electronics, 컴퓨터: electronics, 휴대폰: electronics, 태블릿: electronics, 이어폰: electronics, 헤드폰: electronics, 카메라: electronics, 티셔츠: clothing, 셔츠: clothing, 자켓: clothing, 바지: clothing, 원피스: clothing, 신발: clothing, 옷: clothing}, next: intro}
   intro: {type: say, text: "반품 접수를 도와드릴게요.", next: notice}
   notice: {type: notices, next: done}

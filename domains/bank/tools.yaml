@@ -21,6 +21,11 @@ tools:
         return: {fee: 5, currency: USD}
     default:
       error: not_found
+  make_transfer:
+    params: [amount, to_account]
+    rules: []
+    default:              # every transfer is accepted (R7-6); no failure rule yet
+      return: {reference: TR1001}
   verify_identity:
     params: [account_last4, pin]
     rules:

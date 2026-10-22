@@ -1,9 +1,19 @@
-# The notice depends on the item's category, which comes from the caller's words (a capture) or one question.
+# The notice depends on the item's category. Item named in the first words: notice first, then the order number;
+# otherwise the order number, the item, then the notice (R7-7, a YAML branch; a form node is R10-3).
 id: return_request
 triggers: {any_of: [return, send back], none_of: [how, policy, deadline, refund]}
 captures: {item: {extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}}}
-start: ask_item
+start: route
 nodes:
+  route:
+    type: branch
+    cases:
+      - {when: "'item' in slots", next: intro_known}
+    else: ask_order_first
+  intro_known: {type: say, text: "I can help you start that return.", next: notice_known}
+  notice_known: {type: notices, next: ask_order_last}
+  ask_order_last: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: done}
+  ask_order_first: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: ask_item}
   ask_item: {type: ask, slot: item, prompt: "What would you like to return?", extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}, next: intro}
   intro: {type: say, text: "I can help you start that return.", next: notice}
   notice: {type: notices, next: done}
