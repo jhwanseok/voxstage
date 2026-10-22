@@ -401,6 +401,8 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
     raw_nodes = raw["nodes"]
     if not isinstance(raw_nodes, dict) or not raw_nodes:
         raise FlowError(f"{path}: `nodes` must be a non-empty mapping")
+    if flow_id == "main_menu":   # reserved: the state after `cancel`, when no flow runs (R8-3)
+        raise FlowError(f"{path}: `main_menu` is reserved and cannot be a flow id")
     if os.path.splitext(os.path.basename(path))[0] != flow_id:
         raise FlowError(f"{path}: file name must be the flow id `{flow_id}`")
     names = frozenset(n["slot"] for n in raw_nodes.values()

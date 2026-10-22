@@ -1,0 +1,4 @@
+# Global commands, checked before anything else in every state (R8-4, R8-5). Same pattern language as triggers.
+cancel: {any_of: [cancel, forget it, never mind, nevermind, scratch that, changed my mind, stop], none_of: [how, what, why]}
+back: {any_of: [go back, back up, previous, redo, step back]}
+agent: {any_of: [agent, person, human, representative, operator, customer service, someone]}

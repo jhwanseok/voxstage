@@ -1,0 +1,5 @@
+# Global commands, checked before anything else in every state (R8-4, R8-5). Same pattern language as triggers.
+# "cancel it" and "cancel the order" mean the cancel_order flow in this domain, not stopping the task (R8-5).
+cancel: {any_of: [cancel, forget it, never mind, nevermind, scratch that, changed my mind, stop], none_of: [how, what, why, order, orders, cancel it]}
+back: {any_of: [go back, back up, previous, redo, step back]}
+agent: {any_of: [agent, person, human, representative, operator, customer service, someone]}

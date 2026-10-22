@@ -39,7 +39,8 @@ class Fallback:
 
 
 WORDING_KEYS = ("fallback.miss", "fallback.exceed", "ask.invalid", "ask.keypad_only", "ask.exceed",
-                "flow.attribute_missing", "flow.no_flow", "confirm.declined")
+                "flow.attribute_missing", "flow.no_flow", "confirm.declined", "command.cancelled", "command.agent")
+COMMANDS = ("cancel", "back", "agent")   # global commands (R8-4)
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ class DomainPack:
     wording: dict = field(default_factory=dict)   # situation key -> text (R5-1)
     max_parked: int = 2                        # flows a switch may set aside (R7-3)
     confirm_words: Optional[tuple] = None      # (yes words, no words) for confirm nodes (R7-12)
+    commands: tuple = ()                       # cancel, back, agent as Patterns (R8-4)
 
     def notice(self, notice_id: str) -> Notice:
         return next(n for n in self.notices if n.id == notice_id)
@@ -108,6 +110,10 @@ class DomainPack:
             if not os.path.exists(confirm_path):
                 raise RuleError(f"{confirm_path}: missing (yes and no words for confirm nodes)")
             extra["confirm_words"] = load_confirm_words(confirm_path)
+            commands_path = os.path.join(rules_dir, "commands.yaml")
+            if not os.path.exists(commands_path):
+                raise RuleError(f"{commands_path}: missing (cancel, back and agent words)")
+            extra["commands"] = load_commands(commands_path)
         return cls(domain, lang, answers, patterns, fallback,
                    os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive,
                    notices=notices, wording=wording, **extra)
@@ -231,6 +237,19 @@ def load_confirm_words(path: str) -> tuple:
     if shared:
         raise RuleError(f"{path}: words in both lists: {shared}")
     return yes, no
+
+
+def load_commands(path: str) -> tuple:
+    """`rules/commands.yaml`: exactly `cancel`, `back` and `agent`, each a word-group pattern (R8-4)."""
+    raw = _read(path)
+    if not isinstance(raw, dict) or set(raw) != set(COMMANDS):
+        raise RuleError(f"{path}: needs exactly {list(COMMANDS)}")
+    out = []
+    for name in COMMANDS:
+        if not isinstance(raw[name], dict):
+            raise RuleError(f"{path}: {name} must be a word-group pattern")
+        out.append(parse_pattern(path, {"id": name, **raw[name]}))
+    return tuple(out)
 
 
 def load_sensitive_slots(path: str) -> frozenset:

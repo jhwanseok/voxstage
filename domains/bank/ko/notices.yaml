@@ -15,3 +15,5 @@ wording:
   flow.attribute_missing: "죄송합니다, 지금은 답변드리기 어려워요. 상담사에게 연결해 드릴게요."
   flow.no_flow: "죄송합니다, 그 부분은 도와드리기 어렵습니다."
   confirm.declined: "알겠습니다. 진행하지 않았어요."
+  command.cancelled: "알겠습니다, 취소했어요. 다른 도움이 필요하세요?"
+  command.agent: "상담원에게 연결해 드릴게요."

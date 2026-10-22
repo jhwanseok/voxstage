@@ -15,3 +15,5 @@ wording:
   flow.attribute_missing: "I'm sorry, I can't answer that right now. Let me connect you to an agent."
   flow.no_flow: "I can't help with that."
   confirm.declined: "All right, I have not done it."
+  command.cancelled: "All right, I have cancelled that. What else can I help you with?"
+  command.agent: "I'll connect you to an agent now."
