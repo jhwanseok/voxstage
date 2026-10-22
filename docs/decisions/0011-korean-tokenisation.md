@@ -47,6 +47,24 @@ pattern word of two or more syllables as a substring of the space-stripped joine
 ## Open questions
 
 - Whether other analyzers are compared later (as an experiment, not a baseline change).
+- Interjections are kept for yes or no answers only; see the amendment below.
+
+## Amendment 2026-10-22: yes and no answers keep interjections
+
+Kiwi tags 네, 예, 응, 아니요 and 아뇨 as interjections (`IC`). The content morphemes above do not include interjections,
+so a Korean caller answering a confirm node (R7-12) with "네" or "아니요" produced no token and could never match.
+Rule matching (FAQ patterns, flow triggers, interrupts, slot extraction) keeps the content morphemes as decided above.
+Only the analysis of a yes or no answer at a `confirm` node also keeps interjections
+(`Tokenizer.analyze_answer`; for English it is the same as `analyze`).
+Decided by jhwanseok (asked for this amendment on 2026-10-22 after the R7b handoff note raised it).
+
+- Why not add interjections everywhere: it would change the tokens of every FAQ query and trigger, and so the R1
+  numbers, for a problem that only exists at yes or no questions.
+- Public basis: none found; this repo's own test validates it (`tests/test_confirm.py`,
+  `test_korean_yes_and_no_are_interjections_kept_for_answers`: `analyze("네 맞아요")` gives `맞`, `analyze_answer`
+  gives `네 맞`).
+- Known consequence of the same rule, left as it is (decision R7-9): dependent nouns (`NNB`, for example 시 in
+  "몇 시까지") are dropped too, so a pattern word such as `몇시` can never match.
 
 ## Decider's note
 
