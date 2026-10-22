@@ -24,6 +24,7 @@ from .matching import Matcher
 from .tokenize import Tokenizer, for_lang
 
 ASK_MISSES = "ask_misses"   # consecutive unusable answers at the current ask (R3)
+PARKED = "parked"           # flows set aside by a switch, newest last: {flow, node, slots} (R6-1)
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
 

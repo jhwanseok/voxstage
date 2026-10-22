@@ -182,6 +182,8 @@ class Flow:
     slots: frozenset
     buttons: tuple = ()
     captures: tuple = ()   # of (slot, extractor spec): slots read from the words that started the flow
+    interrupts: Pattern | None = None   # words that may start this flow while another one runs (R6-4)
+    carry: tuple = ()      # slots copied from the parked flow on a switch (R6-2)
 
 
 @dataclass(frozen=True)
@@ -261,13 +263,16 @@ def extractor_spec(raw: dict, where: str) -> dict:
 @register_node_type("ask", edges=lambda d: [d["next"]], waits=True)
 def _ask(raw, ctx):
     """Asks for a slot and waits. If the slot is already filled (a capture, or an earlier answer) the ask is skipped."""
-    ctx.only(raw, {"slot", "prompt", "extractor", "length", "choices", "next"})
+    ctx.only(raw, {"slot", "prompt", "extractor", "length", "choices", "interruptible", "next"})
     spec = extractor_spec(raw, ctx.where)
+    interruptible = raw.get("interruptible", True)
+    if not isinstance(interruptible, bool):
+        raise FlowError(f"{ctx.where}: `interruptible` is true or false")
     slot = ctx.need(raw, "slot")
     if slot in ctx.sensitive and spec["extractor"] != "digits":
         raise FlowError(f"{ctx.where}: `{slot}` is a sensitive slot (keypad only), so its extractor must be digits")
     return {"slot": slot, "prompt": ctx.template(ctx.need(raw, "prompt"), "prompt"), **spec,
-            "next": ctx.need(raw, "next")}
+            "interruptible": interruptible, "next": ctx.need(raw, "next")}
 
 
 @register_node_type("call", edges=lambda d: [d["on_ok"], d["on_error"]])
@@ -358,8 +363,9 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
         except yaml.YAMLError as exc:
             raise FlowError(f"{path}: invalid YAML ({exc})") from exc
     if not isinstance(raw, dict) or not {"id", "triggers", "start", "nodes"} <= set(raw) \
-            or set(raw) - {"id", "triggers", "start", "nodes", "buttons", "captures"}:
-        raise FlowError(f"{path}: needs id, triggers, start and nodes (and optionally buttons, captures)")
+            or set(raw) - {"id", "triggers", "start", "nodes", "buttons", "captures", "interrupts", "carry"}:
+        raise FlowError(f"{path}: needs id, triggers, start and nodes "
+                        f"(and optionally buttons, captures, interrupts, carry)")
     raw_captures = raw.get("captures") or {}
     if not isinstance(raw_captures, dict):
         raise FlowError(f"{path}: `captures` must map slot names to extractors")
@@ -393,7 +399,22 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
         triggers = parse_pattern(path, {"id": flow_id, **(raw["triggers"] or {})})
     except ValueError as exc:
         raise FlowError(str(exc)) from exc
-    flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons), tuple(captures))
+    interrupts = None
+    if raw.get("interrupts") is not None:
+        if not isinstance(raw["interrupts"], dict):
+            raise FlowError(f"{path}: `interrupts` is a word-group pattern with an optional priority")
+        try:
+            interrupts = parse_pattern(path, {"id": flow_id, **raw["interrupts"]})
+        except ValueError as exc:
+            raise FlowError(f"{path}: interrupts: {exc}") from exc
+    carry = raw.get("carry") or []
+    if not isinstance(carry, list) or not all(isinstance(c, str) for c in carry):
+        raise FlowError(f"{path}: `carry` must be a list of slot names")
+    unknown = sorted(set(carry) - names)
+    if unknown:
+        raise FlowError(f"{path}: carry {unknown}: not slots of this flow (an ask slot or a capture)")
+    flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons), tuple(captures),
+                interrupts, tuple(carry))
     _validate_graph(flow)
     return flow
 
