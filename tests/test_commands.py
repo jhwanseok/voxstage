@@ -14,7 +14,8 @@ from voxstage.domain_pack import (COMMANDS, WORDING_KEYS, AskPolicy, DomainPack,
                                   parse_pattern)
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, load_flows
-from voxstage.rules.interpreter import ASK_MISSES, ASKED, MAIN_MENU, PARKED, FlowManager
+from voxstage.rules.interpreter import ASK_MISSES, ASKED, MAIN_MENU, PARKED, FlowManager, build_manager
+from voxstage.rules.tokenize import kiwi_available
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import Dtmf, Utterance
 
@@ -236,6 +237,53 @@ class BackTest(unittest.TestCase):
             *_, resumed, r = talk(m, Utterance("pay"), Utterance("50"), Utterance("lost"), Dtmf("1234"), Utterance("go back"))
         self.assertEqual((resumed.state.node_id, resumed.state.meta[ASKED]), ("ask_to", ["ask_amount"]))
         self.assertEqual(r.state.node_id, "ask_amount")
+
+
+def domain(name, lang):
+    tools = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, name, "tools.yaml")))
+    return build_manager(ROOT, name, lang, tools), tools
+
+
+class DomainCommandTest(unittest.TestCase):
+    def test_change_address_back_then_agent(self):
+        m, tools = domain("shop", "en")
+        a, b, c, d = talk(m, Utterance("I want to change my delivery address"), Dtmf("1001"), Utterance("Go back"),
+                          Utterance("I'd rather speak to a person"))
+        self.assertEqual((a.state.flow_id, b.reply), ("change_address", "What is the new delivery address?"))
+        self.assertEqual((c.state.node_id, c.state.slots), ("ask_order", {"order_id": "1001"}))
+        self.assertEqual((d.actions, tools.records), ((HandOff("caller_request"),), []))
+
+    def test_change_address_confirms_before_the_update(self):
+        m, tools = domain("shop", "en")
+        *_, c, r = talk(m, Utterance("I want to change my delivery address"), Dtmf("1001"), Utterance("12 Oak Street"),
+                        Utterance("yes"))
+        self.assertIn("12 Oak Street", c.reply)
+        self.assertEqual([x["args"] for x in tools.records], [{"order_id": "1001", "address": "12 Oak Street"}])
+
+    def test_shop_cancel_with_an_order_reference_goes_to_cancel_order(self):
+        m, _ = domain("shop", "en")
+        _, r = talk(m, Utterance("Where is my order"), Utterance("Actually I want to cancel it"))
+        self.assertEqual(r.state.flow_id, "cancel_order")
+        _, r = talk(m, Utterance("Where is my order"), Utterance("never mind"))
+        self.assertEqual(r.state.flow_id, MAIN_MENU)
+
+    def test_bank_cancel_then_agent(self):
+        m, _ = domain("bank", "en")
+        _, b, c = talk(m, Utterance("I want to make a transfer"), Utterance("Actually forget it cancel that"),
+                       Utterance("Can I talk to a real person"))
+        self.assertEqual((b.state.flow_id, b.state.slots, b.actions), (MAIN_MENU, {}, ()))
+        self.assertEqual(c.actions, (HandOff("caller_request"),))
+
+    @unittest.skipUnless(kiwi_available(), "kiwipiepy missing")
+    def test_korean_commands(self):
+        m, _ = domain("telecom", "ko")
+        _, b, c = talk(m, Utterance("요금제 변경하려고요"), Utterance("아 됐어요 그냥 안 할게요"), Utterance("상담원 연결해 주세요"))
+        self.assertEqual((b.state.flow_id, c.actions), (MAIN_MENU, (HandOff("caller_request"),)))
+        m, _ = domain("shop", "ko")
+        _, _, c = talk(m, Utterance("배송지 좀 바꾸려고요"), Dtmf("1001"), Utterance("아 뒤로 갈게요"))
+        self.assertEqual((c.state.node_id, c.state.slots), ("ask_order", {"order_id": "1001"}))
+        _, r = talk(m, Utterance("제 주문 어디쯤 왔어요"), Utterance("아 그냥 그거 취소할게요"))
+        self.assertEqual(r.state.flow_id, "cancel_order")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,13 @@
+# 배송지 변경 (R8-6): 주문번호, 새 주소를 묻고, 위험 도구 호출 전에 확인을 받은 뒤 가짜 API로 바꾼다.
+# 영어 쌍둥이와 노드 구조가 같다.
+id: change_address
+triggers: {all_of: [[주소, 배송지]], any_of: [바꾸, 변경, 새], none_of: [어떻, 방법, 있]}
+start: ask_order
+nodes:
+  ask_order: {type: ask, slot: order_id, prompt: "주문번호를 입력해 주세요.", extractor: digits, length: 4, next: ask_address}
+  ask_address: {type: ask, slot: address, prompt: "새 배송지 주소를 말씀해 주세요.", extractor: text, next: confirm}
+  confirm: {type: confirm, prompt: "주문 {order_id}의 배송지를 {address}(으)로 바꿀까요?", on_yes: update, on_no: done}
+  update: {type: call, tool: update_address, args: {order_id: "{order_id}", address: "{address}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "변경했습니다. 주문 {order_id}은(는) 새 주소로 배송됩니다.", next: done}
+  say_fail: {type: say, text: "지금은 주소를 바꿀 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

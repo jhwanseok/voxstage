@@ -23,6 +23,12 @@ tools:
         return: {fee: 6, currency: USD}
     default:
       error: not_found
+  update_address:
+    params: [order_id, address]
+    risky: true           # changes the order: a flow must confirm before calling it (R7-12, R8-6)
+    rules: []
+    default:
+      return: {status: updated}
   verify_identity:
     params: [order_id, zip_code]
     rules:

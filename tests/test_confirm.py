@@ -72,10 +72,11 @@ class RiskyToolTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             FakeApiExecutor({"tools": {"t": {"params": [], "risky": "yes", "default": {"return": {}}}}})
 
-    def test_make_transfer_is_the_only_risky_tool(self):
+    def test_the_risky_tools(self):
         root = os.path.join(os.path.dirname(__file__), "..", "domains")
         found = {d: risky_tools(os.path.join(root, d, "tools.yaml")) for d in ("bank", "shop", "telecom")}
-        self.assertEqual(found, {"bank": frozenset({"make_transfer"}), "shop": frozenset(), "telecom": frozenset()})
+        self.assertEqual(found, {"bank": frozenset({"make_transfer"}), "shop": frozenset({"update_address"}),
+                                 "telecom": frozenset()})
 
     def test_a_risky_call_needs_a_confirm_first(self):
         self.assertIn("risky", load_error(UNCONFIRMED))

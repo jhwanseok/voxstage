@@ -1,0 +1,12 @@
+# Change the delivery address (R8-6): order number, new address, a yes before the risky call, then the fake API.
+id: change_address
+triggers: {all_of: [[address]], any_of: [change, update, new, different], none_of: [how, can, could]}
+start: ask_order
+nodes:
+  ask_order: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: ask_address}
+  ask_address: {type: ask, slot: address, prompt: "What is the new delivery address?", extractor: text, next: confirm}
+  confirm: {type: confirm, prompt: "Shall I change the delivery address of order {order_id} to {address}?", on_yes: update, on_no: done}
+  update: {type: call, tool: update_address, args: {order_id: "{order_id}", address: "{address}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "Done. Order {order_id} will be delivered to the new address.", next: done}
+  say_fail: {type: say, text: "I'm unable to change that address right now. Please try again later.", next: done}
+  done: {type: end}
