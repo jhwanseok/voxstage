@@ -1,6 +1,6 @@
 # The notice applies to a downgrade only; the direction comes from the caller's words or one question.
 id: change_plan
-triggers: {all_of: [[plan], [downgrade, upgrade, lower, higher]], none_of: [how, much, price, cost]}
+triggers: {all_of: [[plan], [downgrade, upgrade, lower, higher, change]], none_of: [how, much, price, cost]}
 captures: {direction: {extractor: choice, choices: {downgrade: downgrade, lower: downgrade, upgrade: upgrade, higher: upgrade}}}
 start: ask_direction
 nodes:
