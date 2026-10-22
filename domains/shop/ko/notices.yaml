@@ -15,3 +15,4 @@ wording:
   ask.exceed: "죄송합니다, 입력을 확인하지 못했어요. 상담사에게 연결해 드릴게요."
   flow.attribute_missing: "죄송합니다, 지금은 답변드리기 어려워요. 상담사에게 연결해 드릴게요."
   flow.no_flow: "죄송합니다, 그 부분은 도와드리기 어렵습니다."
+  confirm.declined: "알겠습니다. 진행하지 않았어요."

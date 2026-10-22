@@ -39,7 +39,7 @@ class Fallback:
 
 
 WORDING_KEYS = ("fallback.miss", "fallback.exceed", "ask.invalid", "ask.keypad_only", "ask.exceed",
-                "flow.attribute_missing", "flow.no_flow")
+                "flow.attribute_missing", "flow.no_flow", "confirm.declined")
 
 
 @dataclass(frozen=True)

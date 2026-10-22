@@ -9,7 +9,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from voxstage.dialogue import HandOff, step
-from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, RuleError, load_confirm_words, parse_pattern
+from voxstage.domain_pack import (WORDING_KEYS, AskPolicy, DomainPack, Fallback, RuleError, load_confirm_words,
+                                  load_registry, parse_pattern)
 from voxstage.rules.tokenize import kiwi_available
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, load_flows, risky_tools
@@ -237,6 +238,28 @@ class ConfirmWordsTest(unittest.TestCase):
     def test_confirm_keys_are_checked(self):
         self.assertIn("unknown keys", load_error(CONFIRMED.replace("on_no: done}", "on_no: done, maybe: done}")))
         self.assertIn("needs `on_no`", load_error(CONFIRMED.replace(", on_no: done}", "}")))
+
+
+class DeclinedWordingTest(unittest.TestCase):
+    def test_confirm_declined_is_required_and_present_everywhere(self):
+        self.assertIn("confirm.declined", WORDING_KEYS)
+        root = os.path.join(os.path.dirname(__file__), "..", "domains")
+        for d in ("bank", "shop", "telecom"):
+            for lang in ("en", "ko"):
+                _, wording = load_registry(os.path.join(root, d, lang, "notices.yaml"))
+                self.assertTrue(wording["confirm.declined"].strip())
+
+    def test_a_registry_without_it_does_not_load(self):
+        root = os.path.join(os.path.dirname(__file__), "..", "domains")
+        with open(os.path.join(root, "bank", "en", "notices.yaml"), encoding="utf-8") as f:
+            text = "".join(line for line in f if "confirm.declined" not in line)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "notices.yaml")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            with self.assertRaises(RuleError) as cm:
+                load_registry(path)
+        self.assertIn("confirm.declined", str(cm.exception))
 
 
 if __name__ == "__main__":

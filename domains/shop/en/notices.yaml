@@ -15,3 +15,4 @@ wording:
   ask.exceed: "I'm sorry, I still can't get that. Let me connect you to an agent."
   flow.attribute_missing: "I'm sorry, I can't answer that right now. Let me connect you to an agent."
   flow.no_flow: "I can't help with that."
+  confirm.declined: "All right, I have not done it."

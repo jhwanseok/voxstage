@@ -297,7 +297,7 @@ class FlowManager(DialogueManager):
         if answer == "yes":
             return self._run(run, state, node.data["on_yes"])
         if answer == "no":   # the risky tool is not called
-            run.out.append(self.pack.wording.get("confirm.declined", "All right, I have not done that."))
+            run.out.append(self.pack.wording.get("confirm.declined", "All right, I have not done it."))
             return self._run(run, state, node.data["on_no"])
         return self._unusable(flow, node, state, run, False)
 
