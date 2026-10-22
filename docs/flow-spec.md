@@ -122,12 +122,41 @@ When a flow that was switched in ends:
 `rules/config.yaml` sets how many flows may be parked: `switch: {max_parked: 2}` (default 2, at least 1). Parking
 beyond it drops the oldest, silently, and lists it in `trace["parked_dropped"]`.
 
+## Confirming risky actions (R7b)
+
+A tool that changes something for the caller is marked in `tools.yaml` (decision R7-12):
+
+```yaml
+make_transfer:
+  params: [amount, to_account]
+  risky: true
+```
+
+A `call` to a risky tool must be reached only from the `on_yes` of a `confirm` node, and cannot be the start; the
+loader rejects anything else, so a flow cannot forget the question.
+
+```yaml
+confirm: {type: confirm, prompt: "Shall I send {amount | money('USD')} to your {to_account} account?", on_yes: make, on_no: done}
+```
+
+- The keys are `on_yes` / `on_no`, not `yes` / `no`: YAML reads those bare keys as booleans.
+- At a waiting `confirm` nothing breaks in: no button switch, no `interrupts:`, no FAQ side question.
+- Keypad 1 is yes and 2 is no. Speech is yes when it has a yes word and no no word, no in the opposite case, and
+  unclear otherwise. The words are in `domains/<domain>/<lang>/rules/confirm.yaml` (`yes_words`, `no_words`; quote
+  "yes" and "no"), required for every pack with a `rules/config.yaml`. Korean answers keep interjections (네, 예,
+  아니요), which rule matching otherwise drops (`Tokenizer.analyze_answer`).
+- No: the registry wording `confirm.declined` is said and the flow goes to `on_no`; the tool is not called.
+  Unclear: the `ask` re-prompt policy (same counter, then hand-off); the tool is never called on it.
+- At a keypad-only `ask`, a side question whose spoken words contain digits gets `ask.keypad_only` before the FAQ
+  answer (R7-11).
+
 ## Node types
 
 | Type | Fields | Behaviour |
 |---|---|---|
 | `say` | `text`, `next` | Adds the rendered text to the reply. |
 | `ask` | `slot`, `prompt`, `extractor`, `length` (digits only), `choices` (choice only), optional `interruptible` (default true), `next` | Adds the prompt and waits. The next turn's input fills the slot; if it contains no value, the prompt is asked again (see the re-prompt policy above). |
+| `confirm` | `prompt`, `on_yes`, `on_no` | Asks yes or no and waits; required before a risky tool (see above). |
 | `call` | `tool`, `args`, `on_ok`, `on_error` | Calls the tool through the tool port. The result is `result` (`{error: code}` on failure). |
 | `branch` | `cases: [{when, next}]`, `else` | First case whose expression is true; otherwise `else`. |
 | `notices` | optional `ids`, `next` | Says the applicable registry notices in priority order. |
