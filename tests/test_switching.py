@@ -168,7 +168,8 @@ class SwitchTest(unittest.TestCase):
             _, r = talk(m, Utterance("where is it"), Utterance("please cancel"))
             self.assertEqual((r.state.flow_id, r.reply), ("cancel", "Which order to cancel?"))
             self.assertEqual(r.trace["switch"], {"from": "lookup", "to": "cancel", "by": "interrupt"})
-            self.assertEqual(r.state.meta[PARKED], [{"flow": "lookup", "node": "ask_order", "slots": {}, "asked": []}])
+            self.assertEqual(r.state.meta[PARKED], [{"flow": "lookup", "node": "ask_order", "slots": {}, "asked": [],
+                                                       "form_slot": None, "form_said": {}}])
             _, r = talk(m, Utterance("where is it"), Utterance("I lost my card"))
         # a flow that ends with a hand-off leaves nothing to come back to (R7-5)
         self.assertEqual((r.state.flow_id, r.reply), ("lost", "Reporting the lost card."))

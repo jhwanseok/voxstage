@@ -31,8 +31,12 @@ MAIN_MENU = "main_menu"     # reserved flow_id after `cancel`: no flow runs (R8-
 READBACK = "readback"       # the slot read back most recently, the one a correction changes (R9-1, R9-2)
 CORRECTIONS = "corrections"  # corrections per slot, for the limit (R9-3)
 OFFER = "offer"             # a confusion partner offered after a bare no: {slot, value} (R9-2)
+FORM_SLOT = "form_slot"     # the slot a waiting form asks for (R10-3)
+FORM_SAID = "form_said"     # say_when_ready items already said, per form node (R10-3)
 DATE_CHOICES = "date_choices"   # the two readings of an ambiguous date, asked at the current ask (R11-2)
-RUNTIME = (ASK_MISSES, PARKED, ASKED, DATE_CHOICES, READBACK, CORRECTIONS, OFFER, "result", "faq_misses")   # meta written while talking; `cancel` clears it
+RUNTIME = (ASK_MISSES, PARKED, ASKED, DATE_CHOICES, READBACK, CORRECTIONS, OFFER, FORM_SLOT, FORM_SAID, "result",
+           "faq_misses")
+FRESH = {ASKED: [], FORM_SAID: {}, FORM_SLOT: None}   # what a flow that starts begins with   # meta written while talking; `cancel` clears it
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
 
@@ -90,6 +94,42 @@ def run_ask(run: Run, node: Node):
         return node.data["next"]
     run.out.append(node.data["prompt"].render(run.env()))
     return Wait(node.id)
+
+
+@handler("form")
+def run_form(run: Run, node: Node):
+    """Say what has become sayable, then ask the first slot that is still empty (R10-3)."""
+    said = {k: list(v) for k, v in (run.meta.get(FORM_SAID) or {}).items()}
+    done = said.setdefault(node.id, [])
+    env = run.env()
+    for i, item in enumerate(node.data["say_when_ready"]):
+        if i not in done and all(n in run.slots for n in item["needs"]):
+            done.append(i)
+            if "say" in item:
+                run.out.append(item["say"].render(env))
+            else:
+                for notice, cond in item["notices"]:
+                    if cond is None or cond.evaluate(env):
+                        run.out.append(notice.text)
+                        run.trace.setdefault("notices", []).append(notice.id)
+    run.meta[FORM_SAID] = said
+    forced = run.meta.get(FORM_SLOT)
+    for spec in node.data["slots"]:
+        if spec["slot"] not in run.slots or spec["slot"] == forced:
+            run.meta[FORM_SLOT] = spec["slot"]
+            run.out.append(spec["prompt"].render(env))
+            return Wait(node.id)
+    run.meta[FORM_SLOT] = None
+    return node.data["next"]
+
+
+def as_question(node: Node, meta: dict) -> Node:
+    """A waiting form behaves as an `ask` for the slot it asks (R10-3); other nodes are returned as they are."""
+    if node.type != "form":
+        return node
+    slot = meta.get(FORM_SLOT) or node.data["slots"][0]["slot"]
+    spec = next(sp for sp in node.data["slots"] if sp["slot"] == slot)
+    return Node(node.id, "ask", {**spec, "next": node.id})
 
 
 @handler("confirm")
@@ -248,31 +288,33 @@ class FlowManager(DialogueManager):
             if command is not None:
                 return self._command(command.id, state, {"command": command.id, "command_match": match})
         flow = self.flows.get(state.flow_id) if state.flow_id else None
-        waiting = flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type in ("ask", "confirm")
+        current = as_question(flow.nodes[state.node_id], state.meta) \
+            if flow is not None and state.node_id in flow.nodes else None
+        waiting = current is not None and current.type in ("ask", "confirm")
         if waiting and state.meta.get(OFFER):   # the answer to "did you mean 30?" (R9-2)
             return self._answer_offer(flow, state, turn_input)
         if waiting and isinstance(turn_input, Utterance):   # corrections come right after the commands (R9-4)
             corrected = self._correction(flow, state, turn_input)
             if corrected is not None:
                 return corrected
-        if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "confirm":
+        if waiting and current.type == "confirm":
             return self._answer_confirm(flow, state, turn_input)   # nothing breaks in here (R7-12)
-        if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "ask":
-            if flow.nodes[state.node_id].data["interruptible"]:   # interrupts first, then the answer (R6-5)
+        if waiting and current.type == "ask":
+            if current.data["interruptible"]:   # interrupts first, then the answer (R6-5)
                 switched = self._switch(flow, state, turn_input)
                 if switched is not None:
                     return switched
             return self._answer_ask(flow, state, turn_input)
         if isinstance(turn_input, ButtonPress) and turn_input.button_id in self.buttons:
             flow = self.flows[self.buttons[turn_input.button_id]]
-            run = Run(self, flow, {}, {**state.meta, ASKED: []}, trace={"flow": flow.id, "button": turn_input.button_id})
+            run = Run(self, flow, {}, {**state.meta, **FRESH}, trace={"flow": flow.id, "button": turn_input.button_id})
             return self._run(run, state, flow.start)
         if isinstance(turn_input, Utterance) and self.flows:
             trigger, trace = self.matcher.match(turn_input.text)
             if trigger is not None:
                 flow = self.flows[trigger.id]
                 captured = self._capture(flow, turn_input, state.meta.get("now"))
-                run = Run(self, flow, captured, {**state.meta, ASKED: []},
+                run = Run(self, flow, captured, {**state.meta, **FRESH},
                           trace={"flow": flow.id, "trigger": trace, "captured": dict(captured)})
                 return self._run(run, state, flow.start)
         if self.faq is not None:
@@ -298,12 +340,20 @@ class FlowManager(DialogueManager):
                             (HandOff("caller_request"),), trace)
         flow = self.flows.get(state.flow_id) if state.flow_id else None
         node = flow.nodes.get(state.node_id) if flow is not None else None
+        node = as_question(node, state.meta) if node is not None else None
         if node is None or node.type not in ("ask", "confirm"):   # back with nothing to go back in
             return DMResult(wording.get("flow.no_flow", "I can't help with that."), state, trace=trace)
         asked = list(state.meta.get(ASKED, ()))
-        target = flow.nodes[asked.pop()] if asked else node   # at the first question: the same question
-        run = Run(self, flow, dict(state.slots), {**state.meta, ASKED: asked, ASK_MISSES: 0},
-                  trace={**trace, "flow": flow.id, "back_to": target.id})
+        entry = asked.pop() if asked else None   # at the first question: the same question
+        meta = {**state.meta, ASKED: asked, ASK_MISSES: 0}
+        if entry is None:
+            target = node
+        else:   # "form#slot" for a question asked by a form
+            node_id, _, slot = entry.partition("#")
+            if slot:
+                meta[FORM_SLOT] = slot
+            target = as_question(flow.nodes[node_id], meta)
+        run = Run(self, flow, dict(state.slots), meta, trace={**trace, "flow": flow.id, "back_to": entry or node.id})
         new = state.evolve(node_id=target.id, meta=run.meta)   # the slot stays until a new answer (R8-1)
         return DMResult(target.data["prompt"].render(run.env()), new, trace=run.trace)
 
@@ -326,13 +376,15 @@ class FlowManager(DialogueManager):
         else:
             return None
         parked = [*state.meta.get(PARKED, ()), {"flow": flow.id, "node": state.node_id, "slots": dict(state.slots),
-                                                "asked": list(state.meta.get(ASKED, ()))}]
+                                                "asked": list(state.meta.get(ASKED, ())),
+                                                "form_slot": state.meta.get(FORM_SLOT),
+                                                "form_said": dict(state.meta.get(FORM_SAID) or {})}]
         if len(parked) > self.pack.max_parked:   # the oldest goes; nothing is said (R7-3)
             trace["parked_dropped"] = [p["flow"] for p in parked[:-self.pack.max_parked]]
             parked = parked[-self.pack.max_parked:]
         carried = {slot: state.slots[slot] for slot in target.carry if slot in state.slots}
         captured = self._capture(target, turn_input, state.meta.get("now"))
-        run = Run(self, target, {**carried, **captured}, {**state.meta, PARKED: parked, ASK_MISSES: 0, ASKED: []},
+        run = Run(self, target, {**carried, **captured}, {**state.meta, **FRESH, PARKED: parked, ASK_MISSES: 0},
                   trace={"flow": target.id, "switch": {"from": flow.id, "to": target.id, "by": by}, **trace,
                          "carried": carried, "captured": captured})
         return self._run(run, state, target.start)
@@ -356,7 +408,7 @@ class FlowManager(DialogueManager):
         return out
 
     def _answer_ask(self, flow: Flow, state, turn_input):
-        node = flow.nodes[state.node_id]
+        node = as_question(flow.nodes[state.node_id], state.meta)
         slot = node.data["slot"]
         keypad_only = slot in self.pack.sensitive_slots
         spoken_at_keypad = keypad_only and isinstance(turn_input, Utterance)
@@ -395,7 +447,9 @@ class FlowManager(DialogueManager):
         run.slots[slot] = value
         run.trace["extracted"] = {slot: value}
         run.meta.pop(DATE_CHOICES, None)
-        run.meta[ASKED] = [*state.meta.get(ASKED, ()), node.id]   # for `back` (R8-1)
+        asked_as = f"{node.id}#{slot}" if flow.nodes[node.id].type == "form" else node.id
+        run.meta[ASKED] = [*state.meta.get(ASKED, ()), asked_as]   # for `back` (R8-1)
+        run.meta[FORM_SLOT] = None
         return self._run(run, state, node.data["next"])
 
     def confirm_answer(self, turn_input) -> str:
@@ -432,7 +486,7 @@ class FlowManager(DialogueManager):
 
     def _take_other_slots(self, flow: Flow, state, changed: dict) -> DMResult:
         """Set the slots, read back what is listed, and ask the current question (or confirm) again."""
-        node = flow.nodes[state.node_id]
+        node = as_question(flow.nodes[state.node_id], state.meta)
         run = Run(self, flow, {**state.slots, **changed}, {**state.meta, ASK_MISSES: 0},
                   trace={"flow": flow.id, "captured": dict(changed)})
         run.out.append(node.data["prompt"].render(run.env()))
@@ -472,7 +526,7 @@ class FlowManager(DialogueManager):
         analysis = self.tok.analyze_answer(turn_input.text)   # keeps 아니요 (R9-5)
         if Matcher((self.pack.correction,), self.tok).score(self.pack.correction, turn_input.text, analysis) is None:
             return None
-        node = flow.nodes[state.node_id]
+        node = as_question(flow.nodes[state.node_id], state.meta)
         found = [str(n) for n in normalize.numbers(turn_input.text, self.pack.lang)]
         if node.type == "confirm" and not found:   # a bare no at a confirm is a decline, not a correction
             return None
@@ -512,7 +566,7 @@ class FlowManager(DialogueManager):
     def _set_corrected(self, flow: Flow, state, slot: str, value: str, trace: dict) -> DMResult:
         """The slot takes the new value; it is read back and the current question is asked again with it."""
         run = Run(self, flow, {**state.slots, slot: value}, {**state.meta, ASK_MISSES: 0}, trace=trace)
-        node = flow.nodes[state.node_id]
+        node = as_question(flow.nodes[state.node_id], state.meta)
         run.out.append(node.data["prompt"].render(run.env()))
         self._read_back(run, state.slots)
         new = state.evolve(slots=run.slots, meta=run.meta)
@@ -520,10 +574,17 @@ class FlowManager(DialogueManager):
 
     def _ask_slot_again(self, flow: Flow, state, slot: str, trace: dict) -> DMResult:
         """An odd correction: the slot's own question again; the old value stays until a new answer (R9-3)."""
+        meta = {**state.meta, ASK_MISSES: 0}
         ask = next((n for n in flow.nodes.values() if n.type == "ask" and n.data["slot"] == slot), None)
+        if ask is None:   # a form question (R10-3)
+            form = next((n for n in flow.nodes.values() if n.type == "form"
+                         and any(sp["slot"] == slot for sp in n.data["slots"])), None)
+            if form is not None:
+                meta[FORM_SLOT] = slot
+                ask = as_question(form, meta)
         if ask is None:
-            ask = flow.nodes[state.node_id]
-        run = Run(self, flow, dict(state.slots), {**state.meta, ASK_MISSES: 0}, trace={**trace, "ask_again": ask.id})
+            ask = as_question(flow.nodes[state.node_id], state.meta)
+        run = Run(self, flow, dict(state.slots), meta, trace={**trace, "ask_again": ask.id})
         new = state.evolve(node_id=ask.id, meta=run.meta)
         return DMResult(ask.data["prompt"].render(run.env()), new, trace=run.trace)
 
@@ -575,8 +636,9 @@ class FlowManager(DialogueManager):
         with the slots it had (R7-5, R7-2)."""
         *rest, top = run.meta[PARKED]
         flow = self.flows[top["flow"]]
-        node = flow.nodes[top["node"]]
-        meta = {**run.meta, PARKED: rest, ASK_MISSES: 0, ASKED: list(top.get("asked", ()))}
+        meta = {**run.meta, PARKED: rest, ASK_MISSES: 0, ASKED: list(top.get("asked", ())),
+                FORM_SLOT: top.get("form_slot"), FORM_SAID: dict(top.get("form_said") or {})}
+        node = as_question(flow.nodes[top["node"]], meta)
         back = Run(self, flow, dict(top["slots"]), meta)
         run.out.append(node.data["prompt"].render(back.env()))
         run.trace["resumed"] = {"flow": flow.id, "node": node.id}

@@ -9,7 +9,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from voxstage.dialogue import step
-from voxstage.domain_pack import AskPolicy, DomainPack, Fallback
+from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, parse_pattern
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, load_flows
 from voxstage.rules.interpreter import ASK_MISSES, FlowManager, cue_windows
@@ -129,6 +129,90 @@ class LaterTurnTest(unittest.TestCase):
         self.assertEqual((r.reply, r.state.node_id, tools.records), ("Change order 1001 to 2 in large?", "confirm", []))
         *_, r = talk(m, Utterance("change it in medium"), Utterance("2"), Dtmf("1001"), Utterance("make it large"), Utterance("yes"))
         self.assertEqual([x["args"]["size"] for x in tools.records], ["large"])
+
+
+FORM = """
+    id: ret
+    triggers: {any_of: [return]}
+    captures: {item: {extractor: choice, choices: [laptop, shirt]},
+               kind: {extractor: choice, choices: {laptop: electronics, shirt: clothing}}}
+    start: collect
+    nodes:
+      collect:
+        type: form
+        slots:
+          - {slot: order_id, prompt: "Order number?", extractor: digits, length: 4}
+          - {slot: item, prompt: "Which item?", extractor: choice, choices: [laptop, shirt]}
+        say_when_ready:
+          - {needs: [kind], say: "Category {kind}."}
+          - {needs: [item, order_id], say: "Got {item} from {order_id}."}
+        next: done
+      done: {type: end}
+"""
+
+
+def build_form(tmp, flow=FORM):
+    flows = os.path.join(tmp, "flows")
+    os.makedirs(flows, exist_ok=True)
+    with open(os.path.join(flows, "ret.yaml"), "w", encoding="utf-8") as f:
+        f.write(textwrap.dedent(flow))
+    tools = os.path.join(ROOT, "shop", "tools.yaml")
+    commands = tuple(parse_pattern("t", {"id": n, "any_of": w}) for n, w in
+                     (("cancel", ["cancel"]), ("back", ["go back"]), ("agent", ["agent"])))
+    pack = DomainPack("shop", "en", {"ship": "Shipping takes 3 days."},
+                      (parse_pattern("t", {"id": "ship", "any_of": ["shipping"]}),), Fallback("sorry", "bye"), "", "",
+                      None, AskPolicy("not valid.", "keypad.", "giving up.", 2, "handoff"), frozenset(),
+                      commands=commands, wording={"flow.no_flow": "Nothing."})
+    return FlowManager(pack, FakeApiExecutor.from_yaml(tools), load_flows(flows, tools))
+
+
+class FormTest(unittest.TestCase):
+    def test_item_known_first_says_its_part_at_once_then_asks_what_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build_form(tmp)
+            a, b = talk(m, Utterance("return a laptop"), Dtmf("1001"))
+        self.assertEqual(a.reply, "Category electronics. Order number?")
+        self.assertEqual((b.reply, b.state.node_id), ("Got laptop from 1001.", "done"))
+
+    def test_nothing_known_asks_in_order_and_says_each_part_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build_form(tmp)
+            a, b, c = talk(m, Utterance("return something"), Dtmf("1001"), Utterance("the shirt"))
+        self.assertEqual((a.reply, b.reply), ("Order number?", "Which item?"))
+        self.assertEqual(c.reply, "Category clothing. Got shirt from 1001.")
+
+    def test_back_inside_a_form(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build_form(tmp)
+            *_, r = talk(m, Utterance("return something"), Dtmf("1001"), Utterance("go back"))
+        self.assertEqual((r.reply, r.state.slots), ("Order number?", {"order_id": "1001"}))
+        *_, r = talk(m, Utterance("return something"), Dtmf("1001"), Utterance("go back"), Dtmf("2002"))
+        self.assertEqual((r.reply, r.state.slots["order_id"]), ("Which item?", "2002"))
+
+    def test_a_side_question_inside_a_form(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build_form(tmp)
+            _, r = talk(m, Utterance("return something"), Utterance("how long does shipping take"))
+        self.assertEqual((r.reply, r.state.node_id), ("Shipping takes 3 days. Order number?", "collect"))
+
+    def test_an_invalid_answer_inside_a_form_is_reprompted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build_form(tmp)
+            _, r = talk(m, Utterance("return something"), Utterance("hmm"))
+        self.assertEqual((r.reply, r.state.meta[ASK_MISSES]), ("not valid. Order number?", 1))
+
+    def test_load_errors(self):
+        bad = [FORM.replace("""        slots:
+          - {slot: order_id, prompt: "Order number?", extractor: digits, length: 4}
+          - {slot: item, prompt: "Which item?", extractor: choice, choices: [laptop, shirt]}""", "        slots: []"),
+               FORM.replace('extractor: digits, length: 4}', 'extractor: digits, length: 4, next: done}'),
+               FORM.replace("needs: [kind]", "needs: [colour]"),
+               FORM.replace('say: "Category {kind}."', 'shout: "Category."'),
+               FORM.replace("{slot: item, prompt", "{slot: order_id, prompt")]
+        for text in bad:
+            with tempfile.TemporaryDirectory() as tmp:
+                with self.assertRaises(FlowError, msg=text[:60]):
+                    build_form(tmp, text)
 
 
 if __name__ == "__main__":

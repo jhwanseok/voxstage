@@ -18,7 +18,7 @@ from __future__ import annotations
 import glob
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable
 
 import yaml
@@ -285,6 +285,42 @@ def _confirm(raw, ctx):
             "on_no": ctx.need(raw, "on_no")}
 
 
+@register_node_type("form", edges=lambda d: [d["next"]], waits=True)
+def _form(raw, ctx):
+    """The slots a flow needs, in asking order; filled ones are skipped. `say_when_ready` items are said once, in the
+    first turn their slots are all known (R10-3). Each slot is an ask spec without `next`."""
+    ctx.only(raw, {"slots", "say_when_ready", "next"})
+    raw_slots = ctx.need(raw, "slots", list)
+    if not raw_slots:
+        raise FlowError(f"{ctx.where}: `slots` is empty")
+    slots, seen = [], set()
+    for i, spec in enumerate(raw_slots):
+        if not isinstance(spec, dict) or "next" in spec:
+            raise FlowError(f"{ctx.where}: slots[{i}] is an ask spec (slot, prompt, extractor, ...) without next")
+        data = _ask({**spec, "next": ctx.node_id}, replace(ctx, node_id=f"{ctx.node_id}.slots[{i}]"))
+        if data["slot"] in seen:
+            raise FlowError(f"{ctx.where}: slot `{data['slot']}` twice")
+        seen.add(data["slot"])
+        slots.append(data)
+    items = []
+    for i, item in enumerate(raw.get("say_when_ready") or []):
+        where = f"{ctx.where}.say_when_ready[{i}]"
+        if not isinstance(item, dict) or "needs" not in item or len(set(item) - {"needs"}) != 1 \
+                or not set(item) - {"needs"} <= {"say", "notices"}:
+            raise FlowError(f"{where}: needs `needs` and one of `say` or `notices`")
+        needs = item["needs"]
+        if not isinstance(needs, list) or not needs or not set(needs) <= ctx.names:
+            raise FlowError(f"{where}: `needs` must list slots of this flow")
+        if "say" in item:
+            items.append({"needs": tuple(needs), "say": ctx.template(item["say"], f"say_when_ready[{i}]")})
+        else:
+            ids = item["notices"]
+            sub = _notices({"next": ctx.node_id, **({} if ids == "all" else {"ids": ids})},
+                           replace(ctx, node_id=f"{ctx.node_id}.say_when_ready[{i}]"))
+            items.append({"needs": tuple(needs), "notices": sub["items"]})
+    return {"slots": tuple(slots), "say_when_ready": tuple(items), "next": ctx.need(raw, "next")}
+
+
 @register_node_type("call", edges=lambda d: [d["on_ok"], d["on_error"]])
 def _call(raw, ctx):
     ctx.only(raw, {"tool", "args", "on_ok", "on_error"})
@@ -414,7 +450,9 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
         raise FlowError(f"{path}: file name must be the flow id `{flow_id}`")
     names = frozenset(n["slot"] for n in raw_nodes.values()
                       if isinstance(n, dict) and n.get("type") == "ask" and isinstance(n.get("slot"), str)) \
-        | frozenset(raw_captures)
+        | frozenset(raw_captures) \
+        | frozenset(spec["slot"] for n in raw_nodes.values() if isinstance(n, dict) and n.get("type") == "form"
+                    for spec in (n.get("slots") or []) if isinstance(spec, dict) and isinstance(spec.get("slot"), str))
     nodes = {}
     for node_id, body in raw_nodes.items():
         if not isinstance(body, dict) or body.get("type") not in NODE_TYPES:
