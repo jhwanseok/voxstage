@@ -189,9 +189,26 @@ never commands. Then come the button switch, `interrupts:` and the answer / FAQ 
 | `goto` | `next` | Jumps. |
 | `end` | optional `action: handoff` (with `reason`) or `end_call` | Ends the flow; the action is returned in `DMResult.actions`. |
 
-Extractors: `text` (the words as given), `digits` (one run of digits, or keypad digits; optional exact `length`),
-`number` (the first number), `choice` (the first of `choices` found in the words). Spoken numbers such as
-"twenty five hundred" arrive with R11.
+Extractors: `text` (the words as given), `digits` (one run of digits, keypad digits, or digits said one by one:
+"four eight two one", "사팔이일"; optional exact `length`), `number` (the first number, written or spoken:
+"twenty five hundred", "이천오백", "두 개"), `choice` (the first of `choices` found in the words), and since R11
+`date` (an ISO date), `month_start` (the first day of the month referred to: "starting next month" -> the 1st),
+`day` (a day of the month: "the twentieth", "이십 일") and `time_window` (morning / afternoon / evening).
+
+## Numbers, dates and the clock (R11)
+
+Spoken values are read by `voxstage/normalize/`, a self-contained package (it imports nothing else from
+`voxstage`; decision R11-1) for English and Korean, covering what the datasets need. Numbers that are part of a date
+("the fifteenth", "십오일") are not numbers. Korean native numerals count only before a counter (두 개), so 네 (yes)
+is never four; a numeral at the start of a Korean word counts only when the rest of the word is a unit, a counter,
+a particle, 일 or 월, so 이체 or 오전 are never numbers.
+
+`date` and `month_start` need the scenario clock, `setup.now` (in `state.meta["now"]`); without it they fail like a
+missing attribute (apology and hand-off). Dates follow fixed rules, written to `trace` (decision R11-2): a day
+without a month, or a month and day without a year, is the nearest date not in the past; Korean "다음 주 X요일" is
+that weekday of the next calendar week; English "next Monday" said on a Monday is next week's. Only an English
+"next / this + weekday" whose weekday still lies ahead this week has two readings: the bot says `date.ambiguous`
+with both dates numbered 1 and 2 (not a miss) and takes keypad 1 / 2 or one of the two dates.
 
 ## Templates and expressions
 
