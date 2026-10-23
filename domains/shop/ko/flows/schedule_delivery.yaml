@@ -1,0 +1,14 @@
+# 배송 예약 (R11-3): 말로 한 수량, 날짜, 시간대를 시나리오 시계 기준으로 읽고, 확인 후 예약한다. 영어 쌍둥이와 노드 구조가 같다.
+id: schedule_delivery
+triggers: {all_of: [[보내, 배송, 받]], any_of: [오늘, 내일, 모레, 오전, 오후, 아침, 저녁], none_of: [어떻, 방법, 주소, 배송지, 얼마]}
+captures: {quantity: {extractor: number}, delivery_date: {extractor: date}, delivery_window: {extractor: time_window}}
+start: ask_quantity
+nodes:
+  ask_quantity: {type: ask, slot: quantity, prompt: "몇 개 보내 드릴까요?", extractor: number, next: ask_date}
+  ask_date: {type: ask, slot: delivery_date, prompt: "언제 받으실 건가요?", extractor: date, next: ask_window}
+  ask_window: {type: ask, slot: delivery_window, prompt: "오전, 오후, 저녁 중 언제가 좋으세요?", extractor: time_window, next: confirm}
+  confirm: {type: confirm, prompt: "{delivery_date | date} {'오전' if delivery_window == 'morning' else '오후' if delivery_window == 'afternoon' else '저녁'}에 {quantity | count}개 배송을 예약할까요?", on_yes: book, on_no: done}
+  book: {type: call, tool: schedule_delivery, args: {quantity: "{quantity}", delivery_date: "{delivery_date}", delivery_window: "{delivery_window}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "{delivery_date | date}에 배송되도록 예약했습니다.", next: done}
+  say_fail: {type: say, text: "지금은 배송 예약을 할 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

@@ -12,7 +12,9 @@ from voxstage.dialogue import HandOff, step
 from voxstage.domain_pack import AskPolicy, DomainPack, Fallback
 from voxstage.rules.flows import FlowError, load_flows
 from voxstage.domain_pack import WORDING_KEYS
-from voxstage.rules.interpreter import ASK_MISSES, DATE_CHOICES, FlowManager
+from voxstage.evaluate import RecordingTools
+from voxstage.rules.interpreter import ASK_MISSES, DATE_CHOICES, FlowManager, build_manager
+from voxstage.rules.tokenize import kiwi_available
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import Dtmf, Utterance
 
@@ -144,6 +146,37 @@ class AmbiguousDateTest(unittest.TestCase):
         for d in ("bank", "shop", "telecom"):
             for lang in ("en", "ko"):
                 self.assertTrue(DomainPack.load(ROOT, d, lang).wording["date.ambiguous"])
+
+
+def domain(name, lang):
+    tools = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, name, "tools.yaml")))
+    return build_manager(ROOT, name, lang, tools), tools
+
+
+class C07FlowsTest(unittest.TestCase):
+    CASES = [
+        ("bank", "en", ["Schedule a transfer of twenty five hundred dollars for the fifteenth of next month", "savings"],
+         "schedule_transfer", {"amount": "2500", "date": "2026-11-15", "to_account": "savings"}),
+        ("shop", "en", ["Deliver two of them tomorrow morning"],
+         "schedule_delivery", {"quantity": "2", "delivery_date": "2026-10-06", "delivery_window": "morning"}),
+        ("telecom", "en", ["Move my bill date to the twentieth starting next month"],
+         "change_bill_date", {"bill_day": "20", "effective_from": "2026-11-01"}),
+        ("bank", "ko", ["다음 달 십오일에 이천오백 달러 예약 이체 걸어 주세요", "저축 계좌요"],
+         "schedule_transfer", {"amount": "2500", "date": "2026-11-15", "to_account": "savings"}),
+        ("shop", "ko", ["두 개 내일 오전에 보내 주세요"],
+         "schedule_delivery", {"quantity": "2", "delivery_date": "2026-10-06", "delivery_window": "morning"}),
+        ("telecom", "ko", ["다음 달부터 청구일을 이십 일로 바꿔 주세요"],
+         "change_bill_date", {"bill_day": "20", "effective_from": "2026-11-01"}),
+    ]
+
+    def test_each_flow_confirms_then_calls_with_the_normalised_values(self):
+        for name, lang, words, tool, args in self.CASES:
+            if lang == "ko" and not kiwi_available():
+                continue
+            m, tools = domain(name, lang)
+            *_, before, after = talk(m, *[Utterance(w) for w in words], Dtmf("1"))
+            self.assertEqual(before.state.node_id, "confirm", (name, lang))
+            self.assertEqual([(c["name"], c["args"]) for c in tools.records], [(tool, args)], (name, lang))
 
 
 if __name__ == "__main__":

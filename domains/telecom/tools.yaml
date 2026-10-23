@@ -26,6 +26,12 @@ tools:
         return: {amount_due: 45, currency: USD, due_date: "2026-10-20"}
     default:
       error: not_found
+  change_bill_date:
+    params: [bill_day, effective_from]
+    risky: true           # changes billing: confirm first (R7-12, R11-3)
+    rules: []
+    default:
+      return: {status: changed}
   verify_identity:
     params: [account_last4, pin]
     rules:

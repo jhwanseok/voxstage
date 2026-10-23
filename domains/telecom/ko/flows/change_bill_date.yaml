@@ -1,0 +1,13 @@
+# 청구일 변경 (R11-3): 말로 한 날짜와 시작 달을 읽고, 확인 후 바꾼다. 영어 쌍둥이와 노드 구조가 같다.
+id: change_bill_date
+triggers: {all_of: [[청구일, 청구, 결제일]], any_of: [바꾸, 변경, 옮기], none_of: [어떻, 방법, 언제, 얼마]}
+captures: {bill_day: {extractor: day}, effective_from: {extractor: month_start}}
+start: ask_day
+nodes:
+  ask_day: {type: ask, slot: bill_day, prompt: "매달 며칠로 바꿔 드릴까요?", extractor: day, next: ask_from}
+  ask_from: {type: ask, slot: effective_from, prompt: "어느 달부터 바꿀까요?", extractor: month_start, next: confirm}
+  confirm: {type: confirm, prompt: "{effective_from | date}부터 청구일을 매달 {bill_day}일로 바꿀까요?", on_yes: change, on_no: done}
+  change: {type: call, tool: change_bill_date, args: {bill_day: "{bill_day}", effective_from: "{effective_from}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "변경했습니다. {effective_from | date}부터 매달 {bill_day}일에 청구됩니다.", next: done}
+  say_fail: {type: say, text: "지금은 청구일을 바꿀 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

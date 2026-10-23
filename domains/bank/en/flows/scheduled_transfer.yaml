@@ -1,0 +1,14 @@
+# A transfer on a later date (R11-3): amount and date read from spoken words against the scenario clock, a yes first.
+id: scheduled_transfer
+triggers: {any_of: [schedule, scheduled], none_of: [how, what, fee, fees]}
+captures: {amount: {extractor: number}, date: {extractor: date}, to_account: {extractor: choice, choices: [savings, checking]}}
+start: ask_amount
+nodes:
+  ask_amount: {type: ask, slot: amount, prompt: "What amount would you like to transfer?", extractor: number, next: ask_date}
+  ask_date: {type: ask, slot: date, prompt: "On which date?", extractor: date, next: ask_to}
+  ask_to: {type: ask, slot: to_account, prompt: "To which account, savings or checking?", extractor: choice, choices: [savings, checking], next: confirm}
+  confirm: {type: confirm, prompt: "Shall I send {amount | money('USD')} to your {to_account} account on {date | date}?", on_yes: book, on_no: done}
+  book: {type: call, tool: schedule_transfer, args: {amount: "{amount}", date: "{date}", to_account: "{to_account}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "Done. The transfer is set for {date | date}. Your reference is {result.reference}.", next: done}
+  say_fail: {type: say, text: "I'm unable to set up that transfer right now. Please try again later.", next: done}
+  done: {type: end}

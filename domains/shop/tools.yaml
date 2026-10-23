@@ -29,6 +29,12 @@ tools:
     rules: []
     default:
       return: {status: updated}
+  schedule_delivery:
+    params: [quantity, delivery_date, delivery_window]
+    risky: true           # books a delivery: confirm first (R7-12, R11-3)
+    rules: []
+    default:
+      return: {status: scheduled}
   verify_identity:
     params: [order_id, zip_code]
     rules:

@@ -1,0 +1,14 @@
+# Book a delivery (R11-3): quantity, date and time window read from spoken words against the scenario clock, a yes first.
+id: schedule_delivery
+triggers: {all_of: [[deliver, delivered, send]], any_of: [today, tomorrow, morning, afternoon, evening], none_of: [how, can, could, address, long, cost]}
+captures: {quantity: {extractor: number}, delivery_date: {extractor: date}, delivery_window: {extractor: time_window}}
+start: ask_quantity
+nodes:
+  ask_quantity: {type: ask, slot: quantity, prompt: "How many would you like?", extractor: number, next: ask_date}
+  ask_date: {type: ask, slot: delivery_date, prompt: "On which day should it arrive?", extractor: date, next: ask_window}
+  ask_window: {type: ask, slot: delivery_window, prompt: "Morning, afternoon or evening?", extractor: time_window, next: confirm}
+  confirm: {type: confirm, prompt: "Shall I book the delivery of {quantity | count} for {delivery_date | date}, in the {delivery_window}?", on_yes: book, on_no: done}
+  book: {type: call, tool: schedule_delivery, args: {quantity: "{quantity}", delivery_date: "{delivery_date}", delivery_window: "{delivery_window}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "Done. The delivery is booked for {delivery_date | date}.", next: done}
+  say_fail: {type: say, text: "I'm unable to book that delivery right now. Please try again later.", next: done}
+  done: {type: end}

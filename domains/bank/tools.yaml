@@ -27,6 +27,12 @@ tools:
     rules: []
     default:              # every transfer is accepted (R7-6); no failure rule yet
       return: {reference: TR1001}
+  schedule_transfer:
+    params: [amount, date, to_account]
+    risky: true           # moves money later: confirm first (R7-12, R11-3)
+    rules: []
+    default:
+      return: {reference: TS1001}
   verify_identity:
     params: [account_last4, pin]
     rules:
