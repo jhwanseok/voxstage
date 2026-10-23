@@ -188,9 +188,9 @@ class ShippedFlowsTest(unittest.TestCase):
             self.assertIn(words, r.reply)
             self.assertEqual(tools.records[0]["args"], {"amount": "500", "grade": grade})
 
-    def test_bank_fee_asks_when_the_amount_is_only_spoken_in_words(self):
-        r, _ = say("bank", "en", "What is the fee if I transfer five hundred dollars", {"grade": "gold"})
-        self.assertEqual(r.reply, "How much would you like to transfer?")   # spoken numbers arrive with R11
+    def test_bank_fee_reads_an_amount_spoken_in_words(self):
+        r, tools = say("bank", "en", "What is the fee if I transfer five hundred dollars", {"grade": "gold"})
+        self.assertEqual(tools.records[0]["args"]["amount"], "500")   # spoken numbers are read since R11
 
     def test_missing_customer_attribute_hands_off_in_a_shipped_flow(self):
         r, tools = say("shop", "en", "How much is shipping")

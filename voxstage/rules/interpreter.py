@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from .. import normalize
 from ..dialogue import DialogueManager, DMResult, EndCall, HandOff
 from ..domain_pack import DomainPack
 from ..tools import ToolExecutor
@@ -148,8 +149,12 @@ def decide(extracted: Optional[str], faq) -> str:
 
 
 # --- slot extraction ----------------------------------------------------------------------------------
-def extract(node: Node, turn_input, tok: Tokenizer) -> Optional[str]:
-    """The slot value for an `ask` node, or None when the input does not contain one."""
+CLOCKED = ("date", "month_start")   # extractors that need the scenario clock, `meta["now"]` (R11-2)
+
+
+def extract(node: Node, turn_input, tok: Tokenizer, now=None):
+    """The slot value for an `ask` node, or None when the input does not contain one. A `date` can also come back as
+    `normalize.Ambiguous` (two real readings, R11-2). Spoken numbers, days and dates are read by `normalize` (R11)."""
     kind, length = node.data["extractor"], node.data["length"]
     if isinstance(turn_input, Dtmf):
         text = turn_input.digits
@@ -159,13 +164,28 @@ def extract(node: Node, turn_input, tok: Tokenizer) -> Optional[str]:
         return None
     if kind == "text":
         return text.strip() or None
+    lang = tok.lang
     if kind == "digits":
         groups = re.findall(r"\d+", text)
         digits = "".join(groups) if len(groups) == 1 else (groups[0] if groups else "")
+        if not digits and isinstance(turn_input, Utterance):   # said digit by digit: "four eight two one"
+            digits = normalize.digit_string(text, lang) or ""
         return digits if digits and (length is None or len(digits) == length) else None
     if kind == "number":
-        m = re.search(r"\d+(?:\.\d+)?", text.replace(",", ""))
-        return m.group(0) if m else None
+        found = normalize.numbers(text, lang)
+        return str(found[0]) if found else None
+    if kind in CLOCKED:
+        if now is None:
+            raise MissingAttribute(f"the `{kind}` extractor needs the clock (`now` in the request meta)")
+        found = normalize.date(text, lang, now) if kind == "date" else normalize.month_start(text, lang, now)
+        if isinstance(found, normalize.Ambiguous):
+            return found
+        return found.iso if found else None
+    if kind == "day":
+        day = normalize.day_of_month(text, lang)
+        return str(day) if day else None
+    if kind == "time_window":
+        return normalize.time_window(text, lang)
     if kind == "choice":
         analysis = tok.analyze(text)
         return next((value for word, value in node.data["choices"] if tok.has(analysis, word)), None)
@@ -194,6 +214,13 @@ class FlowManager(DialogueManager):
 
     # -- entry point --------------------------------------------------------------------------------
     def respond(self, state, turn_input):
+        try:
+            return self._respond(state, turn_input)
+        except MissingAttribute as exc:   # e.g. a date extractor without a clock: fail visibly (R4-2)
+            return DMResult(self.pack.missing_reply, state, (HandOff("missing_attribute"),),
+                            {"failed": state.node_id, "error": str(exc)})
+
+    def _respond(self, state, turn_input):
         if isinstance(turn_input, Utterance) and self.commands is not None:   # first, in every state (R8-5)
             command, match = self.commands.match(turn_input.text)
             if command is not None:
@@ -215,7 +242,7 @@ class FlowManager(DialogueManager):
             trigger, trace = self.matcher.match(turn_input.text)
             if trigger is not None:
                 flow = self.flows[trigger.id]
-                captured = self._capture(flow, turn_input)
+                captured = self._capture(flow, turn_input, state.meta.get("now"))
                 run = Run(self, flow, captured, {**state.meta, ASKED: []},
                           trace={"flow": flow.id, "trigger": trace, "captured": dict(captured)})
                 return self._run(run, state, flow.start)
@@ -275,20 +302,20 @@ class FlowManager(DialogueManager):
             trace["parked_dropped"] = [p["flow"] for p in parked[:-self.pack.max_parked]]
             parked = parked[-self.pack.max_parked:]
         carried = {slot: state.slots[slot] for slot in target.carry if slot in state.slots}
-        captured = self._capture(target, turn_input)
+        captured = self._capture(target, turn_input, state.meta.get("now"))
         run = Run(self, target, {**carried, **captured}, {**state.meta, PARKED: parked, ASK_MISSES: 0, ASKED: []},
                   trace={"flow": target.id, "switch": {"from": flow.id, "to": target.id, "by": by}, **trace,
                          "carried": carried, "captured": captured})
         return self._run(run, state, target.start)
 
-    def _capture(self, flow: Flow, turn_input) -> dict:
+    def _capture(self, flow: Flow, turn_input, now=None) -> dict:
         """Slots the first utterance already contains ("How much is the plus plan" fills `plan`)."""
         out = {}
         if not isinstance(turn_input, Utterance):
             return out
         for slot, spec in flow.captures:
-            value = extract(Node(f"capture:{slot}", "capture", spec), turn_input, self.tok)
-            if value is not None:
+            value = extract(Node(f"capture:{slot}", "capture", spec), turn_input, self.tok, now)
+            if value is not None and not isinstance(value, normalize.Ambiguous):   # two readings: the ask will ask
                 out[slot] = value
         return out
 
@@ -297,7 +324,7 @@ class FlowManager(DialogueManager):
         slot = node.data["slot"]
         keypad_only = slot in self.pack.sensitive_slots
         spoken_at_keypad = keypad_only and isinstance(turn_input, Utterance)
-        value = None if spoken_at_keypad else extract(node, turn_input, self.tok)
+        value = None if spoken_at_keypad else extract(node, turn_input, self.tok, state.meta.get("now"))
         faq = None   # evaluated every turn, so turns where both match show in the trace (R7-4)
         if self.faq is not None and isinstance(turn_input, Utterance):
             faq, _ = self.faq.match(turn_input.text)
