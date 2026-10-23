@@ -44,6 +44,7 @@ NUMBERS = [
     ("ko", "네 맞아요", []),                               # 네 is yes, not four
     ("ko", "이체하려고 하는데요", []),                     # 이 in 이체 is not two
     ("ko", "오전에 사람이랑 이번 주에", []),
+    ("ko", "천일 주문에서 산 재킷", [1001]),                # 천일 is 1001, not a day
     ("ko", "십삼삼", []),                                   # not a cardinal and not digits: no number, no crash
 ]
 

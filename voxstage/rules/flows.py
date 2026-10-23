@@ -388,9 +388,15 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
         raise FlowError(f"{path}: `captures` must map slot names to extractors")
     captures = []
     for slot, body in raw_captures.items():
-        if not isinstance(body, dict) or set(body) - {"extractor", "length", "choices"}:
-            raise FlowError(f"{path}: capture {slot}: needs extractor (and length or choices)")
+        if not isinstance(body, dict) or set(body) - {"extractor", "length", "choices", "cue"}:
+            raise FlowError(f"{path}: capture {slot}: needs extractor (and length, choices or cue)")
         spec = extractor_spec(body, f"{path}: capture {slot}")
+        cue = body.get("cue")
+        if cue is not None:   # a number counts only next to one of these words (R10-1)
+            if spec["extractor"] not in ("number", "digits") or not isinstance(cue, list) or not cue \
+                    or not all(isinstance(c, str) and c.strip() for c in cue):
+                raise FlowError(f"{path}: capture {slot}: `cue` is a list of words, for number or digits captures")
+        spec["cue"] = tuple(str(c).lower() for c in cue) if cue else ()
         if spec["extractor"] == "text" or slot in sensitive:
             raise FlowError(f"{path}: capture {slot}: a captured slot cannot be free text or sensitive (keypad only)")
         captures.append((slot, spec))

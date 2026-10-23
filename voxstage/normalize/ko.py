@@ -108,7 +108,7 @@ def scan(text: str) -> list:
             continue
         if len(run) >= 2 and run[-1] == "일" and not rest.startswith(UNITS) and not nxt.startswith(UNITS):
             value = _sino(run[:-1])   # "십오일", "이십일에": in a day phrase the last 일 is the day
-            if value:
+            if value and value <= 31:   # 천일 is 1001, not day 1000
                 out.append(("day", value))
                 continue
         if not all(ch in DIGITS for ch in run) and _sino(run) is None:   # "십삼삼": neither a cardinal nor digits

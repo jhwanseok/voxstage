@@ -154,6 +154,18 @@ def decide(extracted: Optional[str], faq) -> str:
 
 # --- slot extraction ----------------------------------------------------------------------------------
 CLOCKED = ("date", "month_start")   # extractors that need the scenario clock, `meta["now"]` (R11-2)
+# Values that cannot be mistaken for the answer to another question; these captures also run on later turns (R10-1)
+DISTINCT = ("choice", "date", "month_start", "day", "time_window", "duration")
+
+
+def cue_windows(text: str, cues: tuple) -> list:
+    """The words around each cue word: two before, two after ("order 1001", "5580으로 끝나는", "천일 주문에서")."""
+    words, out = text.split(), []
+    for i, w in enumerate(words):
+        plain = w.lower().strip(".,!?")
+        if any(plain == c or (not c.isascii() and plain.startswith(c)) for c in cues):
+            out.append(" ".join(words[max(0, i - 2):i + 3]))
+    return out
 
 
 def extract(node: Node, turn_input, tok: Tokenizer, now=None):
@@ -322,13 +334,20 @@ class FlowManager(DialogueManager):
                          "carried": carried, "captured": captured})
         return self._run(run, state, target.start)
 
-    def _capture(self, flow: Flow, turn_input, now=None) -> dict:
+    def _capture(self, flow: Flow, turn_input, now=None, later: bool = False, skip: Optional[str] = None) -> dict:
         """Slots the first utterance already contains ("How much is the plus plan" fills `plan`)."""
         out = {}
         if not isinstance(turn_input, Utterance):
             return out
         for slot, spec in flow.captures:
-            value = extract(Node(f"capture:{slot}", "capture", spec), turn_input, self.tok, now)
+            if slot == skip or (later and spec["extractor"] not in DISTINCT and not spec.get("cue")):
+                continue   # a bare number never fills another slot after the first words (R10-1)
+            node = Node(f"capture:{slot}", "capture", spec)
+            if spec.get("cue"):
+                value = next((v for v in (extract(node, Utterance(w), self.tok, now)
+                                          for w in cue_windows(turn_input.text, spec["cue"])) if v is not None), None)
+            else:
+                value = extract(node, turn_input, self.tok, now)
             if value is not None and not isinstance(value, normalize.Ambiguous):   # two readings: the ask will ask
                 out[slot] = value
         return out
@@ -350,9 +369,17 @@ class FlowManager(DialogueManager):
         faq = None   # evaluated every turn, so turns where both match show in the trace (R7-4)
         if self.faq is not None and isinstance(turn_input, Utterance):
             faq, _ = self.faq.match(turn_input.text)
+        changed = self._other_slots(flow, state, turn_input, slot) if isinstance(turn_input, Utterance) else {}
+        if value is not None:   # the words went to the asked slot first; only choice words also fill others
+            kinds = {s_: spec["extractor"] for s_, spec in flow.captures}
+            changed = {k: v for k, v in changed.items() if kinds.get(k) == "choice"}
+        if value is None and changed:   # only other slots were given: take them, ask again, not a miss (R10-1)
+            return self._take_other_slots(flow, state, changed)
         decided = decide(value, faq)
-        run = Run(self, flow, dict(state.slots), {**state.meta},
+        run = Run(self, flow, {**state.slots, **changed}, {**state.meta},
                   trace={"flow": flow.id, "ask": node.id, "faq": faq.id if faq else None, "decided": decided})
+        if changed:
+            run.trace["captured"] = dict(changed)
         if decided == "side_question":   # answer it, ask the pending question again; nothing else moves (R7-2)
             run.trace["extracted"] = None
             parts = [self.faq.pack.answers[faq.id], node.data["prompt"].render(run.env())]
@@ -382,6 +409,10 @@ class FlowManager(DialogueManager):
 
     def _answer_confirm(self, flow: Flow, state, turn_input):
         node = flow.nodes[state.node_id]
+        if isinstance(turn_input, Utterance):   # "make it fourteen days": change the slot, confirm again (R10-1)
+            changed = self._other_slots(flow, state, turn_input, None)
+            if changed:
+                return self._take_other_slots(flow, state, changed)
         answer = self.confirm_answer(turn_input)
         run = Run(self, flow, dict(state.slots), {**state.meta}, trace={"flow": flow.id, "confirm": answer})
         if answer == "yes":
@@ -390,6 +421,20 @@ class FlowManager(DialogueManager):
             run.out.append(self.pack.wording.get("confirm.declined", "All right, I have not done it."))
             return self._run(run, state, node.data["on_no"])
         return self._unusable(flow, node, state, run, False)
+
+    def _other_slots(self, flow: Flow, state, turn_input, asked: Optional[str]) -> dict:
+        """Captured values for slots other than the asked one that differ from what is filled (R10-1)."""
+        found = self._capture(flow, turn_input, state.meta.get("now"), later=True, skip=asked)
+        return {k: v for k, v in found.items() if state.slots.get(k) != v}
+
+    def _take_other_slots(self, flow: Flow, state, changed: dict) -> DMResult:
+        """Set the slots, read back what is listed, and ask the current question (or confirm) again."""
+        node = flow.nodes[state.node_id]
+        run = Run(self, flow, {**state.slots, **changed}, {**state.meta, ASK_MISSES: 0},
+                  trace={"flow": flow.id, "captured": dict(changed)})
+        run.out.append(node.data["prompt"].render(run.env()))
+        self._read_back(run, state.slots)
+        return DMResult(" ".join(run.out), state.evolve(slots=run.slots, meta=run.meta), trace=run.trace)
 
     def _ask_which_date(self, node: Node, state, found) -> DMResult:
         """Two real readings: name both, numbered, and wait; this is not a miss (R11-2)."""

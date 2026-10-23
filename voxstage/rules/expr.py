@@ -105,8 +105,8 @@ def _eval(node: ast.AST, env: Mapping) -> Any:
         case ast.Name(id=name):
             if name in FUNCTIONS:
                 raise ExprError(f"function `{name}` used without a call")
-            if name not in env:
-                raise ExprError(f"`{name}` has no value yet")
+            if name not in env:   # a slot of the flow that is not filled: an explicit default(...) may apply (R10-4)
+                raise MissingAttribute(f"`{name}` has no value yet")
             return env[name]
         case ast.Attribute(value=value, attr=attr):
             base = _eval(value, env)
