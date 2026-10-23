@@ -87,6 +87,13 @@ MONTH_STARTS = [
     ("ko", "다음 달부터", "2026-11-01"), ("ko", "다음달부터요", "2026-11-01"), ("ko", "삼월부터", "2027-03-01"),
 ]
 
+DURATIONS = [
+    ("en", "for ten days", 10), ("en", "Make it fourteen days", 14), ("en", "for 3 days", 3), ("en", "for a day", 1),
+    ("en", "on the tenth", None), ("en", "ten dollars", None),
+    ("ko", "해외 로밍 십 일만 추가해 주세요", 10), ("ko", "십사 일로 해 주세요", 14), ("ko", "10일간이요", 10),
+    ("ko", "삼일 동안", 3), ("ko", "일요일에", None), ("ko", "십 달러", None),
+]
+
 WINDOWS = [
     ("en", "tomorrow morning", "morning"), ("en", "in the afternoon", "afternoon"), ("en", "at night", "evening"),
     ("en", "tomorrow", None),
@@ -117,6 +124,10 @@ class NormalizeTables(unittest.TestCase):
     def test_month_starts(self):
         for lang, text, expected in MONTH_STARTS:
             self.assertEqual(N.month_start(text, lang, NOW).iso, expected, (lang, text))
+
+    def test_durations(self):
+        for lang, text, expected in DURATIONS:
+            self.assertEqual(N.duration_days(text, lang), expected, (lang, text))
 
     def test_time_windows(self):
         for lang, text, expected in WINDOWS:

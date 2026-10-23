@@ -162,6 +162,32 @@ def day_of_month(text: str) -> Optional[int]:
     return None
 
 
+def duration_days(text: str) -> Optional[int]:
+    """A number right before 일 / 일간 as a length of time: "십 일만", "10일간", "십사 일로" (R10-5). The unit is the
+    cue, so a date phrase such as "십오일에" also reads as 15; the flow decides which extractor a slot uses."""
+    ws = [w for w in _PUNCT.sub(" ", text).split() if w]
+    for i, w in enumerate(ws):
+        m = re.fullmatch(r"(\d+)일(간|동안)?(.*)", w)
+        if m and not m.group(3).startswith("요일"):
+            return int(m.group(1))
+        k = 0
+        while k < len(w) and w[k] in NUMERAL_CHARS:
+            k += 1
+        run, rest = w[:k], w[k:]
+        if not run:
+            continue
+        if len(run) >= 2 and run[-1] == "일" and _rest_ok(rest):
+            value = _sino(run[:-1])
+            if value:
+                return value
+        nxt = ws[i + 1] if i + 1 < len(ws) else ""
+        if rest == "" and nxt.startswith("일") and not nxt.startswith("일요일"):
+            value = _sino(run)
+            if value:
+                return value
+    return None
+
+
 def _compact(text: str) -> str:
     return text.replace(" ", "")
 

@@ -202,6 +202,9 @@ def extract(node: Node, turn_input, tok: Tokenizer, now=None):
         return str(day) if day else None
     if kind == "time_window":
         return normalize.time_window(text, lang)
+    if kind == "duration":
+        days = normalize.duration_days(text, lang)
+        return str(days) if days else None
     if kind == "choice":
         analysis = tok.analyze(text)
         return next((value for word, value in node.data["choices"] if tok.has(analysis, word)), None)

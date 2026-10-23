@@ -151,6 +151,19 @@ def day_of_month(text: str) -> Optional[int]:
     return None
 
 
+def duration_days(text: str) -> Optional[int]:
+    """A number right before day / days: "ten days", "for 14 days", "a day" (R10-5)."""
+    items = scan(text)
+    for idx, (kind, v) in enumerate(items):
+        if kind == "word" and v in ("day", "days") and idx > 0:
+            prev_kind, prev = items[idx - 1]
+            if prev_kind == "number":
+                return int(prev)
+            if prev_kind == "word" and prev in ("a", "one"):
+                return 1
+    return None
+
+
 def month_start(text: str, now) -> Optional[D.DateValue]:
     today, ws = D.clock(now), words(text)
     for i, w in enumerate(ws):

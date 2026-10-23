@@ -36,8 +36,12 @@ def month_start(text: str, lang: str, now):
     return _lang(lang).month_start(text, now)
 
 
+def duration_days(text: str, lang: str):
+    return _lang(lang).duration_days(text)
+
+
 def time_window(text: str, lang: str):
     return _lang(lang).time_window(text)
 
 
-__all__ = ["Ambiguous", "DateValue", "numbers", "digit_string", "day_of_month", "date", "month_start", "time_window"]
+__all__ = ["Ambiguous", "DateValue", "numbers", "digit_string", "day_of_month", "date", "month_start", "time_window", "duration_days"]

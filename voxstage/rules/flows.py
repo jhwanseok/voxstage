@@ -27,7 +27,8 @@ from ..domain_pack import Pattern, parse_pattern
 from .expr import Expr, ExprError, MissingAttribute, compile_expr
 from .formatters import FORMATTERS
 
-EXTRACTORS = ("text", "digits", "number", "choice", "date", "month_start", "day", "time_window")   # R11 adds the last four
+EXTRACTORS = ("text", "digits", "number", "choice", "date", "month_start", "day", "time_window",   # R11: the last four
+              "duration")   # R10-5
 
 
 class FlowError(ValueError):
