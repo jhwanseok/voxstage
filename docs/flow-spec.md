@@ -194,12 +194,52 @@ A misheard value can only be corrected if the caller hears it (decisions R9-1 to
 - `rules/config.yaml` `correction: {max_corrections: 2, on_exceed: handoff}`: the next correction of the same slot
   says `ask.exceed` and returns `HandOff("correction_failed")` (or `EndCall`).
 
+## Many slots at once and the form node (R10)
+
+Captures apply on every turn, not only to the first words (decisions R10-1 to R10-6):
+
+```yaml
+captures:
+  size:     {extractor: choice, choices: [small, medium, large]}
+  order_id: {extractor: digits, length: 4, cue: [order]}   # only a number within two words of "order"
+  duration_days: {extractor: duration}                     # "ten days", "십 일": the unit is the cue
+```
+
+- On the first words every capture runs. On later turns, while a flow waits at a question or a `confirm`, only
+  values that cannot be mistaken are taken for other slots: `choice` words, `date`, `month_start`, `day`,
+  `time_window` and `duration` values, and numbers next to their `cue` words. A bare number never fills another
+  slot, and when the asked slot took a value from the words, only `choice` words also fill other slots.
+- At a question, other slots that changed are set; if the asked slot got nothing, the question is asked again (not a
+  miss). At a `confirm`, a change sets the slot and asks the confirm again, with no tool call. Listed slots are
+  read back (R9).
+- A Korean cue matches the start of a word (주문에서 has 주문).
+- A slot that is not filled is a missing attribute in templates and conditions, so `{size | default('')}` or
+  `'size' in slots` handle a slot that is only captured, never asked.
+
+A `form` node asks for what is missing, in order, and says parts of the conversation as soon as they can be said:
+
+```yaml
+collect:
+  type: form
+  slots:                                   # ask specs without next, in asking order; filled ones are skipped
+    - {slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4}
+    - {slot: item, prompt: "What would you like to return?", extractor: choice, choices: {...}}
+  say_when_ready:                          # each said once, in the first turn its slots are all known
+    - {needs: [item], say: "I can help you start that return."}
+    - {needs: [item_category], notices: all}
+  next: confirm
+```
+
+A waiting form question is handled exactly like a waiting `ask` (commands, corrections, switches, side questions,
+keypad-only slots, `back`, park and resume, the re-prompt policy).
+
 ## Node types
 
 | Type | Fields | Behaviour |
 |---|---|---|
 | `say` | `text`, `next` | Adds the rendered text to the reply. |
 | `ask` | `slot`, `prompt`, `extractor`, `length` (digits only), `choices` (choice only), optional `interruptible` (default true), `next` | Adds the prompt and waits. The next turn's input fills the slot; if it contains no value, the prompt is asked again (see the re-prompt policy above). |
+| `form` | `slots`, optional `say_when_ready`, `next` | Asks the first empty slot and waits; says ready parts once; then `next` (see above). |
 | `confirm` | `prompt`, `on_yes`, `on_no` | Asks yes or no and waits; required before a risky tool (see above). |
 | `call` | `tool`, `args`, `on_ok`, `on_error` | Calls the tool through the tool port. The result is `result` (`{error: code}` on failure). |
 | `branch` | `cases: [{when, next}]`, `else` | First case whose expression is true; otherwise `else`. |
