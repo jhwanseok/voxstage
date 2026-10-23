@@ -19,3 +19,5 @@ wording:
   command.cancelled: "알겠습니다, 취소했어요. 다른 도움이 필요하세요?"
   command.agent: "상담원에게 연결해 드릴게요."
   date.ambiguous: "어느 날짜를 말씀하신 건가요?"
+  readback: "{value}요."
+  correction.offer: "{value} 맞으세요?"

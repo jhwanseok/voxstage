@@ -19,3 +19,5 @@ wording:
   command.cancelled: "All right, I have cancelled that. What else can I help you with?"
   command.agent: "I'll connect you to an agent now."
   date.ambiguous: "Which date do you mean?"
+  readback: "{value}."
+  correction.offer: "Did you mean {value}?"

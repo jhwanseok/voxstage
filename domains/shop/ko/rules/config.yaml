@@ -12,3 +12,8 @@ ask:
 # A switch to another flow sets the running one aside (R6); at most max_parked are kept, the oldest is dropped (R7-3).
 switch:
   max_parked: 2
+
+# Corrections of one read-back slot before the caller is handed off (R9-3).
+correction:
+  max_corrections: 2
+  on_exceed: handoff

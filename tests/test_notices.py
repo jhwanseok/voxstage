@@ -9,7 +9,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from voxstage.dialogue import HandOff, step
-from voxstage.domain_pack import WORDING_KEYS, DomainPack, Fallback, RuleError, load_registry
+from voxstage.domain_pack import PLACEHOLDER_KEYS, WORDING_KEYS, DomainPack, Fallback, RuleError, load_registry
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.faq import FaqRuleManager
 from voxstage.rules.flows import FlowError, load_flows
@@ -22,7 +22,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "domains")
 BANK_TOOLS = os.path.join(ROOT, "bank", "tools.yaml")
 needs_kiwi = unittest.skipUnless(kiwi_available(), "kiwipiepy missing: pip install 'voxstage[ko]'")
 
-WORDING = "\n".join(f"  {k}: \"w:{k}\"" for k in WORDING_KEYS)
+WORDING = "\n".join(f"  {k}: \"w:{k}{' {value}' if k in PLACEHOLDER_KEYS else ''}\"" for k in WORDING_KEYS)
 
 
 def registry(tmp, notices_yaml, wording=WORDING):
@@ -148,6 +148,8 @@ class WordingTest(unittest.TestCase):
             shutil.copy(os.path.join(ROOT, "bank", "en", "rules", "faq_patterns.yaml"), base)
             shutil.copy(os.path.join(ROOT, "bank", "en", "rules", "confirm.yaml"), base)
             shutil.copy(os.path.join(ROOT, "bank", "en", "rules", "commands.yaml"), base)
+            for name in ("corrections.yaml", "confusions.yaml"):
+                shutil.copy(os.path.join(ROOT, "bank", "en", "rules", name), base)
             shutil.copy(BANK_TOOLS, os.path.join(tmp, "bank", "tools.yaml"))
             registry(os.path.join(tmp, "bank", "en"), 'a: {fixed: true, priority: 1, text: "A."}\n',
                      WORDING.replace('"w:fallback.miss"', '"Pardon?"'))

@@ -1,0 +1,3 @@
+# Slots whose value is read back when it is filled, so a misheard value can be corrected (R9-1). Language-free.
+readback_slots:
+  quantity: count

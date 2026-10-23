@@ -1,0 +1,2 @@
+# Words that mark a correction of the value just read back (R9-2). Matched on the answer analysis (R9-5).
+correction: {any_of: ["no", not, wrong, i said, instead]}

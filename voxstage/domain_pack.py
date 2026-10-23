@@ -40,7 +40,8 @@ class Fallback:
 
 WORDING_KEYS = ("fallback.miss", "fallback.exceed", "ask.invalid", "ask.keypad_only", "ask.exceed",
                 "flow.attribute_missing", "flow.no_flow", "confirm.declined", "command.cancelled", "command.agent",
-                "date.ambiguous")
+                "date.ambiguous", "readback", "correction.offer")
+PLACEHOLDER_KEYS = ("readback", "correction.offer")   # the only wording with a `{value}` placeholder (R9)
 COMMANDS = ("cancel", "back", "agent")   # global commands (R8-4)
 
 
@@ -52,6 +53,13 @@ class Notice:
     text: str
     priority: int
     applies_when: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class CorrectionPolicy:
+    """How many corrections of one slot are taken before the caller is handed off (R9-3)."""
+    max_corrections: int = 2
+    on_exceed: str = "handoff"   # handoff | end_call
 
 
 @dataclass(frozen=True)
@@ -82,6 +90,10 @@ class DomainPack:
     max_parked: int = 2                        # flows a switch may set aside (R7-3)
     confirm_words: Optional[tuple] = None      # (yes words, no words) for confirm nodes (R7-12)
     commands: tuple = ()                       # cancel, back, agent as Patterns (R8-4)
+    readback: dict = field(default_factory=dict)   # slot -> formatter call, e.g. "money('USD')" (R9-1)
+    correction: Optional[Pattern] = None       # words that mark a correction (R9-2)
+    confusions: dict = field(default_factory=dict)   # value -> its confusable partner, both ways (R9-2)
+    correction_policy: Optional[CorrectionPolicy] = None
 
     def notice(self, notice_id: str) -> Notice:
         return next(n for n in self.notices if n.id == notice_id)
@@ -115,6 +127,16 @@ class DomainPack:
             if not os.path.exists(commands_path):
                 raise RuleError(f"{commands_path}: missing (cancel, back and agent words)")
             extra["commands"] = load_commands(commands_path)
+            for name, key, loader in (("corrections.yaml", "correction", load_correction),
+                                      ("confusions.yaml", "confusions", load_confusions)):
+                path = os.path.join(rules_dir, name)
+                if not os.path.exists(path):
+                    raise RuleError(f"{path}: missing (R9 correction words and confusion pairs)")
+                extra[key] = loader(path)
+            extra["correction_policy"] = load_correction_policy(cfg_path)
+        rb_path = os.path.join(domains_dir, domain, "readback_slots.yaml")
+        if os.path.exists(rb_path):
+            extra["readback"] = load_readback_slots(rb_path)
         return cls(domain, lang, answers, patterns, fallback,
                    os.path.join(domains_dir, domain, "tools.yaml"), base, None, ask, sensitive,
                    notices=notices, wording=wording, **extra)
@@ -178,8 +200,8 @@ def load_fallback(path: str, wording: dict) -> Fallback:
     """Counts and the action come from the config; the words come from the registry (`fallback.miss`, `.exceed`)."""
     raw = _read(path)
     fb = raw.get("fallback") if isinstance(raw, dict) else None
-    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "switch"}:
-        raise RuleError(f"{path}: needs a top-level 'fallback' mapping (and optionally 'ask', 'switch') only")
+    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "switch", "correction"}:
+        raise RuleError(f"{path}: needs a top-level 'fallback' mapping (and optionally 'ask', 'switch', 'correction')")
     extra = set(fb) - {"max_misses", "on_exceed"}
     if extra:
         raise RuleError(f"{path}: unknown fallback keys {sorted(extra)} (wording lives in notices.yaml)")
@@ -253,6 +275,62 @@ def load_commands(path: str) -> tuple:
     return tuple(out)
 
 
+def load_readback_slots(path: str) -> dict:
+    """`readback_slots.yaml`: slot -> formatter call. Language-free, one file per domain (R9-1)."""
+    from .rules.formatters import FORMATTERS   # the formatter registry; imported here to keep the pack loader light
+    raw = _read(path)
+    if not isinstance(raw, dict) or set(raw) != {"readback_slots"} or not isinstance(raw["readback_slots"], dict):
+        raise RuleError(f"{path}: needs a top-level 'readback_slots' mapping (slot -> formatter)")
+    out = {}
+    for slot, call in raw["readback_slots"].items():
+        name = str(call).split("(")[0].strip()
+        if name not in FORMATTERS:
+            raise RuleError(f"{path}: {slot}: unknown formatter `{name}` (known: {sorted(FORMATTERS)})")
+        out[str(slot)] = str(call)
+    return out
+
+
+def load_correction(path: str) -> Pattern:
+    """`rules/corrections.yaml`: exactly one pattern, `correction` (R9-2)."""
+    raw = _read(path)
+    if not isinstance(raw, dict) or set(raw) != {"correction"} or not isinstance(raw["correction"], dict):
+        raise RuleError(f"{path}: needs exactly a 'correction' word-group pattern")
+    return parse_pattern(path, {"id": "correction", **raw["correction"]})
+
+
+def load_confusions(path: str) -> dict:
+    """`rules/confusions.yaml`: `pairs` of numbers a recogniser confuses, written by hand (R9-2)."""
+    raw = _read(path)
+    if not isinstance(raw, dict) or set(raw) != {"pairs"} or not isinstance(raw["pairs"], list):
+        raise RuleError(f"{path}: needs exactly a 'pairs' list")
+    out = {}
+    for pair in raw["pairs"]:
+        if not (isinstance(pair, list) and len(pair) == 2 and all(isinstance(v, int) and not isinstance(v, bool)
+                                                                   for v in pair) and pair[0] != pair[1]):
+            raise RuleError(f"{path}: every pair is two different integers, got {pair!r}")
+        for v in pair:
+            if str(v) in out:
+                raise RuleError(f"{path}: {v} is in two pairs")
+        out[str(pair[0])], out[str(pair[1])] = str(pair[1]), str(pair[0])
+    return out
+
+
+def load_correction_policy(path: str) -> CorrectionPolicy:
+    raw = _read(path)
+    c = raw.get("correction") if isinstance(raw, dict) else None
+    if c is None:
+        return CorrectionPolicy()
+    if not isinstance(c, dict) or set(c) - {"max_corrections", "on_exceed"}:
+        raise RuleError(f"{path}: 'correction' takes max_corrections and on_exceed only")
+    n = c.get("max_corrections", 2)
+    if not isinstance(n, int) or isinstance(n, bool) or n < 0:
+        raise RuleError(f"{path}: correction.max_corrections must be an integer >= 0")
+    action = c.get("on_exceed", "handoff")
+    if action not in ("handoff", "end_call"):
+        raise RuleError(f"{path}: correction.on_exceed must be handoff or end_call")
+    return CorrectionPolicy(n, action)
+
+
 def load_sensitive_slots(path: str) -> frozenset:
     raw = _read(path)
     if not isinstance(raw, dict) or set(raw) != {"sensitive_slots"}:
@@ -271,6 +349,9 @@ def load_registry(path: str) -> tuple:
         extra = sorted(set(wording or {}) - set(WORDING_KEYS))
         raise RuleError(f"{path}: wording must have exactly the situation keys {list(WORDING_KEYS)}"
                         f" (missing {missing}, unknown {extra})")
+    for key in PLACEHOLDER_KEYS:
+        if "{value}" not in str(wording[key]):
+            raise RuleError(f"{path}: wording `{key}` must contain {{value}}")
     for key, text in wording.items():
         if not isinstance(text, str) or not text.strip():
             raise RuleError(f"{path}: wording.{key} must be a non-empty string")
