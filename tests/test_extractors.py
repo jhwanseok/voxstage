@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from voxstage.dialogue import HandOff, step
 from voxstage.domain_pack import AskPolicy, DomainPack, Fallback
 from voxstage.rules.flows import FlowError, load_flows
-from voxstage.rules.interpreter import FlowManager
+from voxstage.domain_pack import WORDING_KEYS
+from voxstage.rules.interpreter import ASK_MISSES, DATE_CHOICES, FlowManager
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import Dtmf, Utterance
 
@@ -94,6 +95,55 @@ class ExtractorTest(unittest.TestCase):
                 f.write(textwrap.dedent(FLOW).replace("extractor: time_window, next", "extractor: hour, next"))
             with self.assertRaises(FlowError):
                 load_flows(tmp, BANK_TOOLS)
+
+
+WHEN = """
+    id: plan
+    triggers: {any_of: [plan]}
+    start: ask_when
+    nodes:
+      ask_when: {type: ask, slot: when, prompt: "When?", extractor: date, next: done}
+      done: {type: end}
+"""
+
+
+class AmbiguousDateTest(unittest.TestCase):
+    def test_two_readings_are_named_and_not_a_miss(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp, WHEN)
+            _, r = talk(m, Utterance("plan"), Utterance("next Tuesday"))
+        self.assertEqual(r.reply, "Which date do you mean? 1: October 6, 2026, 2: October 13, 2026.")
+        self.assertEqual((r.state.node_id, r.state.slots, r.state.meta.get(ASK_MISSES, 0)), ("ask_when", {}, 0))
+        self.assertEqual(r.state.meta[DATE_CHOICES], ["2026-10-06", "2026-10-13"])
+        self.assertIn("two readings", r.trace["rule"])
+
+    def test_answered_by_keypad_or_by_one_of_the_dates(self):
+        for answer, expected in ((Dtmf("2"), "2026-10-13"), (Dtmf("1"), "2026-10-06"),
+                                 (Utterance("October 13"), "2026-10-13"), (Utterance("the 6th"), "2026-10-06")):
+            with tempfile.TemporaryDirectory() as tmp:
+                m = build(tmp, WHEN)
+                *_, r = talk(m, Utterance("plan"), Utterance("next Tuesday"), answer)
+            self.assertEqual(r.state.slots, {"when": expected}, answer)
+            self.assertNotIn(DATE_CHOICES, r.state.meta)
+
+    def test_another_date_or_nothing_follows_the_reprompt_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp, WHEN)
+            *_, a, b = talk(m, Utterance("plan"), Utterance("next Tuesday"), Utterance("on Friday"), Dtmf("3"))
+        self.assertEqual((a.state.slots, a.state.meta[ASK_MISSES], a.reply), ({}, 1, "not valid. When?"))
+        self.assertEqual((b.state.meta[ASK_MISSES], b.state.meta[DATE_CHOICES]), (2, ["2026-10-06", "2026-10-13"]))
+
+    def test_one_reading_is_taken_at_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = build(tmp, WHEN)
+            _, r = talk(m, Utterance("plan"), Utterance("next Monday"))
+        self.assertEqual(r.state.slots, {"when": "2026-10-12"})
+
+    def test_the_wording_is_required_everywhere(self):
+        self.assertIn("date.ambiguous", WORDING_KEYS)
+        for d in ("bank", "shop", "telecom"):
+            for lang in ("en", "ko"):
+                self.assertTrue(DomainPack.load(ROOT, d, lang).wording["date.ambiguous"])
 
 
 if __name__ == "__main__":

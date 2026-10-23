@@ -18,7 +18,7 @@ from ..domain_pack import DomainPack
 from ..tools import ToolExecutor
 from ..turn import ButtonPress, Dtmf, Utterance
 from .expr import ExprError, MissingAttribute
-from .formatters import FormatError
+from .formatters import FORMATTERS, FormatError
 from .faq import FaqRuleManager
 from .flows import Flow, FlowError, Node, load_flows
 from .matching import Matcher
@@ -28,7 +28,8 @@ ASK_MISSES = "ask_misses"   # consecutive unusable answers at the current ask (R
 PARKED = "parked"           # flows set aside by a switch, newest last: {flow, node, slots, asked} (R6-1)
 ASKED = "asked"             # answered asks of the running flow, oldest first, for `back` (R8-1)
 MAIN_MENU = "main_menu"     # reserved flow_id after `cancel`: no flow runs (R8-3)
-RUNTIME = (ASK_MISSES, PARKED, ASKED, "result", "faq_misses")   # meta written while talking; `cancel` clears it
+DATE_CHOICES = "date_choices"   # the two readings of an ambiguous date, asked at the current ask (R11-2)
+RUNTIME = (ASK_MISSES, PARKED, ASKED, DATE_CHOICES, "result", "faq_misses")   # meta written while talking; `cancel` clears it
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
 
@@ -325,6 +326,14 @@ class FlowManager(DialogueManager):
         keypad_only = slot in self.pack.sensitive_slots
         spoken_at_keypad = keypad_only and isinstance(turn_input, Utterance)
         value = None if spoken_at_keypad else extract(node, turn_input, self.tok, state.meta.get("now"))
+        choices = state.meta.get(DATE_CHOICES)
+        if choices:   # the caller was asked which of two dates (R11-2): keypad 1 / 2 or one of the dates
+            if isinstance(turn_input, Dtmf) and turn_input.digits in ("1", "2"):
+                value = choices[int(turn_input.digits) - 1]
+            elif value not in choices:
+                value = None
+        elif isinstance(value, normalize.Ambiguous):
+            return self._ask_which_date(node, state, value)
         faq = None   # evaluated every turn, so turns where both match show in the trace (R7-4)
         if self.faq is not None and isinstance(turn_input, Utterance):
             faq, _ = self.faq.match(turn_input.text)
@@ -342,6 +351,7 @@ class FlowManager(DialogueManager):
             return self._unusable(flow, node, state, run, spoken_at_keypad)
         run.slots[slot] = value
         run.trace["extracted"] = {slot: value}
+        run.meta.pop(DATE_CHOICES, None)
         run.meta[ASKED] = [*state.meta.get(ASKED, ()), node.id]   # for `back` (R8-1)
         return self._run(run, state, node.data["next"])
 
@@ -367,6 +377,16 @@ class FlowManager(DialogueManager):
             run.out.append(self.pack.wording.get("confirm.declined", "All right, I have not done it."))
             return self._run(run, state, node.data["on_no"])
         return self._unusable(flow, node, state, run, False)
+
+    def _ask_which_date(self, node: Node, state, found) -> DMResult:
+        """Two real readings: name both, numbered, and wait; this is not a miss (R11-2)."""
+        lang = self.pack.lang
+        write = FORMATTERS["date"].fn
+        lead = self.pack.wording.get("date.ambiguous", "Which date do you mean?")
+        reply = f"{lead} 1: {write(found.first, lang)}, 2: {write(found.second, lang)}."
+        meta = {**state.meta, DATE_CHOICES: [found.first, found.second]}
+        trace = {"flow": state.flow_id, "ask": node.id, "ambiguous": [found.first, found.second], "rule": found.rule}
+        return DMResult(reply, state.evolve(meta=meta), trace=trace)
 
     def _unusable(self, flow: Flow, node: Node, state, run: Run, spoken_at_keypad: bool):
         """No usable answer: re-ask, and after the configured number of re-prompts hand off or end the call."""

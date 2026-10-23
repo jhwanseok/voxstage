@@ -39,7 +39,8 @@ class Fallback:
 
 
 WORDING_KEYS = ("fallback.miss", "fallback.exceed", "ask.invalid", "ask.keypad_only", "ask.exceed",
-                "flow.attribute_missing", "flow.no_flow", "confirm.declined", "command.cancelled", "command.agent")
+                "flow.attribute_missing", "flow.no_flow", "confirm.declined", "command.cancelled", "command.agent",
+                "date.ambiguous")
 COMMANDS = ("cancel", "back", "agent")   # global commands (R8-4)
 
 
