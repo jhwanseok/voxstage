@@ -176,6 +176,24 @@ never commands. Then come the button switch, `interrupts:` and the answer / FAQ 
   the order" means the `cancel_order` flow. The shop `cancel` command therefore has `none_of` words for an order
   reference; the clash is settled in domain data, not in the core.
 
+## Read-back and corrections (R9)
+
+A misheard value can only be corrected if the caller hears it (decisions R9-1 to R9-5).
+
+- `domains/<domain>/readback_slots.yaml` lists the slots that are read back, each with a formatter
+  (`amount: "money('USD')"`, `quantity: count`). When such a slot gets a new value (an answer, a capture, a
+  correction), the registry wording `readback` (it contains `{value}`) leads the reply: "$13. To which account?".
+  The newest one is kept in `state.meta["readback"]`.
+- Right after the global commands, while a flow waits at an `ask` or a `confirm`, an utterance that matches
+  `rules/corrections.yaml` (one `correction` pattern, matched on the answer analysis, so Korean keeps 아니요)
+  corrects that slot: the number that differs from the current value replaces it, the value is read back and the
+  current question (or confirm) is asked again. At a `confirm` a correction needs a number; a bare no declines.
+- A correction without a number offers the partner from `rules/confusions.yaml` (`pairs: [[13, 30], ...]`, written by
+  hand) with `correction.offer`; yes or keypad 1 takes it, anything else asks the slot's question again.
+- An odd correction (only the current value, several differing values, no partner) asks the slot's question again.
+- `rules/config.yaml` `correction: {max_corrections: 2, on_exceed: handoff}`: the next correction of the same slot
+  says `ask.exceed` and returns `HandOff("correction_failed")` (or `EndCall`).
+
 ## Node types
 
 | Type | Fields | Behaviour |
@@ -228,4 +246,4 @@ types, `next` links, tools and arguments; only texts and triggers differ (a test
 
 ## Not yet
 
-Correction (R9), identity gate (R13).
+Identity gate (R13).
