@@ -8,6 +8,12 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from voxstage.dialogue import EndCall, HandOff, step
+from voxstage.evaluate import RecordingTools
+from voxstage.rules.interpreter import CORRECTIONS, OFFER, READBACK, build_manager
+from voxstage.rules.tokenize import kiwi_available
+from voxstage.tools import FakeApiExecutor
+from voxstage.turn import Dtmf, Utterance
 from voxstage.domain_pack import (PLACEHOLDER_KEYS, CorrectionPolicy, DomainPack, RuleError, load_confusions,
                                   load_correction, load_correction_policy, load_readback_slots, load_registry)
 
@@ -77,6 +83,45 @@ class FilesTest(unittest.TestCase):
             os.remove(os.path.join(tmp, "bank", "en", "rules", "corrections.yaml"))
             with self.assertRaises(RuleError):
                 DomainPack.load(tmp, "bank", "en")
+
+
+def domain(name, lang):
+    tools = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, name, "tools.yaml")))
+    return build_manager(ROOT, name, lang, tools), tools
+
+
+def talk(m, *inputs):
+    state, out = m.initial_state("s"), []
+    for i in inputs:
+        r = step(m, state, i)
+        state = r.state
+        out.append(r)
+    return out
+
+
+class ReadBackTest(unittest.TestCase):
+    def test_an_answer_is_read_back(self):
+        m, _ = domain("bank", "en")
+        _, r = talk(m, Utterance("I want to make a transfer"), Utterance("50"))
+        self.assertEqual(r.reply, "$50. To which account, savings or checking?")
+        self.assertEqual((r.trace["readback"], r.state.meta[READBACK]), (["amount"], "amount"))
+
+    def test_a_capture_is_read_back(self):
+        m, _ = domain("bank", "en")
+        r, = talk(m, Utterance("Transfer thirteen dollars please"))
+        self.assertEqual(r.reply, "$13. To which account, savings or checking?")
+
+    def test_a_slot_not_listed_is_not_read_back(self):
+        m, _ = domain("bank", "en")
+        _, _, r = talk(m, Utterance("I want to make a transfer"), Utterance("50"), Utterance("savings"))
+        self.assertTrue(r.reply.startswith("Shall I send"))
+        self.assertNotIn("readback", r.trace)
+
+    @unittest.skipUnless(kiwi_available(), "kiwipiepy missing")
+    def test_korean_read_back(self):
+        m, _ = domain("bank", "ko")
+        r, = talk(m, Utterance("삼십 달러 이체해 주세요"))
+        self.assertTrue(r.reply.startswith("30달러요."), r.reply)
 
 
 if __name__ == "__main__":

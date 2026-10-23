@@ -20,7 +20,7 @@ from ..turn import ButtonPress, Dtmf, Utterance
 from .expr import ExprError, MissingAttribute
 from .formatters import FORMATTERS, FormatError
 from .faq import FaqRuleManager
-from .flows import Flow, FlowError, Node, load_flows
+from .flows import Flow, FlowError, Node, compile_template, load_flows
 from .matching import Matcher
 from .tokenize import Tokenizer, for_lang
 
@@ -28,8 +28,11 @@ ASK_MISSES = "ask_misses"   # consecutive unusable answers at the current ask (R
 PARKED = "parked"           # flows set aside by a switch, newest last: {flow, node, slots, asked} (R6-1)
 ASKED = "asked"             # answered asks of the running flow, oldest first, for `back` (R8-1)
 MAIN_MENU = "main_menu"     # reserved flow_id after `cancel`: no flow runs (R8-3)
+READBACK = "readback"       # the slot read back most recently, the one a correction changes (R9-1, R9-2)
+CORRECTIONS = "corrections"  # corrections per slot, for the limit (R9-3)
+OFFER = "offer"             # a confusion partner offered after a bare no: {slot, value} (R9-2)
 DATE_CHOICES = "date_choices"   # the two readings of an ambiguous date, asked at the current ask (R11-2)
-RUNTIME = (ASK_MISSES, PARKED, ASKED, DATE_CHOICES, "result", "faq_misses")   # meta written while talking; `cancel` clears it
+RUNTIME = (ASK_MISSES, PARKED, ASKED, DATE_CHOICES, READBACK, CORRECTIONS, OFFER, "result", "faq_misses")   # meta written while talking; `cancel` clears it
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
 
@@ -210,6 +213,9 @@ class FlowManager(DialogueManager):
         self.matcher = Matcher([f.triggers for f in self.flows.values()], self.tok)
         self.buttons = {b: f.id for f in self.flows.values() for b in f.buttons}
         self.commands = Matcher(pack.commands, self.tok) if pack.commands else None
+        self.readback = {slot: compile_template("{value | " + call + "}", f"readback_slots.yaml: {slot}",
+                                                frozenset({"value"}))
+                         for slot, call in pack.readback.items()}
         self.faq = faq if faq is not None else (
             FaqRuleManager(pack, self.tok) if pack.patterns and pack.fallback else None)
 
@@ -402,6 +408,17 @@ class FlowManager(DialogueManager):
         lead = policy.keypad_reply if spoken_at_keypad else policy.invalid_reply
         return DMResult(f"{lead} {node.data['prompt'].render(run.env())}", new, trace=run.trace)
 
+    def _read_back(self, run: Run, before: dict) -> None:
+        """Every read-back slot whose value changed this turn leads the reply with its value (R9-1)."""
+        said = []
+        for slot, template in self.readback.items():
+            if slot in run.slots and run.slots[slot] != before.get(slot):
+                value = template.render({"value": run.slots[slot], "_lang": self.pack.lang})
+                said.append(self.pack.wording.get("readback", "{value}.").replace("{value}", value))
+                run.meta[READBACK] = slot
+                run.trace.setdefault("readback", []).append(slot)
+        run.out[:0] = said
+
     def _run(self, run: Run, state, node_id: str):
         for _ in range(MAX_NODES_PER_TURN):
             node = run.flow.nodes[node_id]
@@ -414,6 +431,8 @@ class FlowManager(DialogueManager):
                 return DMResult(self.pack.missing_reply, new, (HandOff("missing_attribute"),), run.trace)
             except ExprError as exc:
                 raise FlowRuntimeError(f"{run.flow.path}: node {node_id}: {exc}") from exc
+            if isinstance(outcome, (Wait, Done)):
+                self._read_back(run, state.slots if state.flow_id == run.flow.id else {})
             if isinstance(outcome, Done) and run.meta.get(PARKED):
                 if run.actions:   # a person or the end of the call takes over: nothing to come back to (R7-5)
                     self._drop_parked(run)
