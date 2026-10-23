@@ -233,6 +233,13 @@ class FlowManager(DialogueManager):
             if command is not None:
                 return self._command(command.id, state, {"command": command.id, "command_match": match})
         flow = self.flows.get(state.flow_id) if state.flow_id else None
+        waiting = flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type in ("ask", "confirm")
+        if waiting and state.meta.get(OFFER):   # the answer to "did you mean 30?" (R9-2)
+            return self._answer_offer(flow, state, turn_input)
+        if waiting and isinstance(turn_input, Utterance):   # corrections come right after the commands (R9-4)
+            corrected = self._correction(flow, state, turn_input)
+            if corrected is not None:
+                return corrected
         if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "confirm":
             return self._answer_confirm(flow, state, turn_input)   # nothing breaks in here (R7-12)
         if flow is not None and state.node_id in flow.nodes and flow.nodes[state.node_id].type == "ask":
@@ -407,6 +414,70 @@ class FlowManager(DialogueManager):
             return DMResult(policy.exceed_reply, new, (action,), {**run.trace, "escalated": policy.on_exceed})
         lead = policy.keypad_reply if spoken_at_keypad else policy.invalid_reply
         return DMResult(f"{lead} {node.data['prompt'].render(run.env())}", new, trace=run.trace)
+
+    # -- corrections (R9) ---------------------------------------------------------------------------------
+    def _correction(self, flow: Flow, state, turn_input) -> Optional[DMResult]:
+        """"No, I said thirty": the slot read back most recently takes the number that differs from its value."""
+        slot = state.meta.get(READBACK)
+        if self.pack.correction is None or slot not in state.slots or slot not in flow.slots:
+            return None
+        analysis = self.tok.analyze_answer(turn_input.text)   # keeps 아니요 (R9-5)
+        if Matcher((self.pack.correction,), self.tok).score(self.pack.correction, turn_input.text, analysis) is None:
+            return None
+        node = flow.nodes[state.node_id]
+        found = [str(n) for n in normalize.numbers(turn_input.text, self.pack.lang)]
+        if node.type == "confirm" and not found:   # a bare no at a confirm is a decline, not a correction
+            return None
+        current = state.slots[slot]
+        new = list(dict.fromkeys(n for n in found if n != current))
+        trace = {"flow": flow.id, "correction": {"slot": slot, "from": current, "heard": found}}
+        counts = dict(state.meta.get(CORRECTIONS, {}))
+        counts[slot] = counts.get(slot, 0) + 1
+        meta = {**state.meta, CORRECTIONS: counts}
+        policy = self.pack.correction_policy
+        if policy is not None and counts[slot] > policy.max_corrections:   # (R9-3)
+            action = HandOff("correction_failed") if policy.on_exceed == "handoff" else EndCall()
+            trace["correction"]["result"] = "limit"
+            reply = self.pack.ask.exceed_reply if self.pack.ask else "Let me connect you to an agent."
+            return DMResult(reply, state.evolve(meta=meta), (action,), trace)
+        if len(new) == 1:
+            trace["correction"]["result"] = new[0]
+            return self._set_corrected(flow, state.evolve(meta=meta), slot, new[0], trace)
+        partner = self.pack.confusions.get(current) if not found else None
+        if partner is not None:   # a bare no: offer the confusable partner once
+            trace["correction"]["result"] = "offer"
+            meta[OFFER] = {"slot": slot, "value": partner}
+            shown = self.readback[slot].render({"value": partner, "_lang": self.pack.lang}) if slot in self.readback else partner
+            reply = self.pack.wording.get("correction.offer", "Did you mean {value}?").replace("{value}", shown)
+            return DMResult(reply, state.evolve(meta=meta), trace=trace)
+        trace["correction"]["result"] = "ask again"
+        return self._ask_slot_again(flow, state.evolve(meta=meta), slot, trace)
+
+    def _answer_offer(self, flow: Flow, state, turn_input) -> DMResult:
+        offer = state.meta[OFFER]
+        meta = {k: v for k, v in state.meta.items() if k != OFFER}
+        trace = {"flow": flow.id, "offer": dict(offer)}
+        if self.confirm_answer(turn_input) == "yes":
+            return self._set_corrected(flow, state.evolve(meta=meta), offer["slot"], offer["value"], trace)
+        return self._ask_slot_again(flow, state.evolve(meta=meta), offer["slot"], trace)   # (R9-3)
+
+    def _set_corrected(self, flow: Flow, state, slot: str, value: str, trace: dict) -> DMResult:
+        """The slot takes the new value; it is read back and the current question is asked again with it."""
+        run = Run(self, flow, {**state.slots, slot: value}, {**state.meta, ASK_MISSES: 0}, trace=trace)
+        node = flow.nodes[state.node_id]
+        run.out.append(node.data["prompt"].render(run.env()))
+        self._read_back(run, state.slots)
+        new = state.evolve(slots=run.slots, meta=run.meta)
+        return DMResult(" ".join(run.out), new, trace=run.trace)
+
+    def _ask_slot_again(self, flow: Flow, state, slot: str, trace: dict) -> DMResult:
+        """An odd correction: the slot's own question again; the old value stays until a new answer (R9-3)."""
+        ask = next((n for n in flow.nodes.values() if n.type == "ask" and n.data["slot"] == slot), None)
+        if ask is None:
+            ask = flow.nodes[state.node_id]
+        run = Run(self, flow, dict(state.slots), {**state.meta, ASK_MISSES: 0}, trace={**trace, "ask_again": ask.id})
+        new = state.evolve(node_id=ask.id, meta=run.meta)
+        return DMResult(ask.data["prompt"].render(run.env()), new, trace=run.trace)
 
     def _read_back(self, run: Run, before: dict) -> None:
         """Every read-back slot whose value changed this turn leads the reply with its value (R9-1)."""

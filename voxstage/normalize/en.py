@@ -51,6 +51,41 @@ def _cardinal(seq: list) -> int:
     return total + current
 
 
+def _follows(prev: str, word: str) -> bool:
+    """Can `word` continue the number that `prev` is part of? ("twenty five" yes, "thirteen thirty" no)."""
+    if word in SCALES:
+        return prev not in SCALES or (prev == "hundred" and word == "thousand")
+    if prev in SCALES:
+        return True
+    if prev in TENS:
+        return word in UNITS and word not in ("zero", "oh")
+    return False
+
+
+def _split_numbers(seq: list) -> list:
+    """Cardinals where the grammar of English numbers allows; units said one by one become one digit string."""
+    chunks, current = [], []
+    for w in seq:
+        if current and not _follows(current[-1], w):
+            chunks.append(current)
+            current = []
+        current.append(w)
+    if current:
+        chunks.append(current)
+    out, run = [], []
+    for chunk in chunks + [None]:
+        if chunk is not None and len(chunk) == 1 and chunk[0] in UNITS:
+            run.append(chunk[0])
+            continue
+        if run:
+            out.append(("digits", "".join(str(UNITS[x]) for x in run)) if len(run) >= 2
+                       else ("number", UNITS[run[0]]))
+            run = []
+        if chunk is not None:
+            out.append(("number", _cardinal(chunk)))
+    return out
+
+
 def _ordinal_at(ws: list, i: int) -> Optional[tuple]:
     """(day, next index) for "fifteenth", "twenty first", "15th" at position i."""
     w = ws[i]
@@ -83,23 +118,7 @@ def scan(text: str) -> list:
             while j < len(ws) and (_is_number_word(ws[j]) or ws[j] in ("a", "and")) and _ordinal_at(ws, j) is None:
                 j += 1
             seq = [x for x in ws[i:j] if x not in ("a", "and")]
-            while seq and seq[-1] in ("a", "and"):
-                seq.pop()
-            if len(seq) >= 2 and all(x in UNITS for x in seq):   # said digit by digit: "four eight two one"
-                out.append(("digits", "".join(str(UNITS[x]) for x in seq)))
-            else:
-                # a teen or ten directly before units said one by one is two numbers: "fifteen one five"
-                k = 1
-                while k < len(seq) and not (seq[k - 1] in TEENS and seq[k] in UNITS) and \
-                        not (seq[k - 1] in UNITS and seq[k] in UNITS):
-                    k += 1
-                out.append(("number", _cardinal(seq[:k])))
-                if k < len(seq):
-                    rest = seq[k:]
-                    if len(rest) >= 2 and all(x in UNITS for x in rest):
-                        out.append(("digits", "".join(str(UNITS[x]) for x in rest)))
-                    else:
-                        out.append(("number", _cardinal(rest)))
+            out.extend(_split_numbers(seq))
             i = j if j > i else i + 1
             continue
         out.append(("word", w))

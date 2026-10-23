@@ -124,5 +124,73 @@ class ReadBackTest(unittest.TestCase):
         self.assertTrue(r.reply.startswith("30달러요."), r.reply)
 
 
+class CorrectionTest(unittest.TestCase):
+    def start(self, *more):
+        m, tools = domain("bank", "en")
+        return m, tools, talk(m, Utterance("Transfer thirteen dollars please"), *more)
+
+    def test_one_new_value_replaces_the_read_back_slot(self):
+        for words in ("No I said thirty dollars", "No not thirteen thirty", "That's wrong it's thirty dollars"):
+            _, _, (_, r) = self.start(Utterance(words))
+            self.assertEqual(r.state.slots, {"amount": "30"}, words)
+            self.assertEqual(r.reply, "$30. To which account, savings or checking?", words)
+            self.assertEqual((r.trace["correction"]["result"], r.state.node_id), ("30", "ask_to"))
+
+    def test_other_slots_stay(self):
+        m, _, (_, c, r) = self.start(Utterance("savings"), Utterance("No I said thirty dollars"))
+        self.assertEqual(c.state.node_id, "confirm")
+        self.assertEqual(r.state.slots, {"amount": "30", "to_account": "savings"})
+        self.assertEqual(r.reply, "$30. Shall I send $30 to your savings account?")
+
+    def test_a_bare_no_at_a_confirm_declines(self):
+        _, tools, (_, _, r) = self.start(Utterance("savings"), Utterance("no"))
+        self.assertEqual((r.state.node_id, tools.records), ("done", []))
+        self.assertNotIn("correction", r.trace)
+
+    def test_a_bare_no_at_an_ask_offers_the_partner(self):
+        _, _, (_, r) = self.start(Utterance("no that's wrong"))
+        self.assertEqual((r.reply, r.state.meta[OFFER]), ("Did you mean $30?", {"slot": "amount", "value": "30"}))
+        for answer, expected in ((Utterance("yes"), "30"), (Dtmf("1"), "30")):
+            _, _, (_, _, r) = self.start(Utterance("no that's wrong"), answer)
+            self.assertEqual((r.state.slots["amount"], r.state.node_id), (expected, "ask_to"))
+            self.assertNotIn(OFFER, r.state.meta)
+        _, _, (_, _, r) = self.start(Utterance("no that's wrong"), Utterance("no"))
+        self.assertEqual((r.state.node_id, r.reply, r.state.slots["amount"]),
+                         ("ask_amount", "What amount would you like to transfer?", "13"))
+
+    def test_odd_corrections_ask_the_slot_question_again(self):
+        for words in ("No I said thirteen", "No not forty or fifty"):
+            _, _, (_, r) = self.start(Utterance(words))
+            self.assertEqual((r.state.node_id, r.trace["correction"]["result"]), ("ask_amount", "ask again"), words)
+        _, _, (_, _, r) = self.start(Utterance("No I said thirteen"), Utterance("thirty"))
+        self.assertEqual((r.state.slots, r.state.node_id), ({"amount": "30"}, "ask_to"))
+
+    def test_without_a_number_partner_it_asks_again(self):
+        m, _ = domain("bank", "en")
+        _, r = talk(m, Utterance("Transfer two hundred dollars"), Utterance("no that's wrong"))
+        self.assertEqual(r.state.node_id, "ask_amount")
+
+    def test_the_correction_limit(self):
+        m, _ = domain("bank", "en")
+        *rs, r = talk(m, Utterance("Transfer thirteen dollars please"), Utterance("No I said thirty"),
+                      Utterance("No I said forty"), Utterance("No I said fifty"))
+        self.assertEqual([x.state.meta.get(CORRECTIONS, {}).get("amount") for x in rs[1:]], [1, 2])
+        self.assertEqual(r.actions, (HandOff("correction_failed"),))
+
+    def test_no_correction_without_a_read_back(self):
+        m, _ = domain("bank", "en")
+        _, r = talk(m, Utterance("I want to make a transfer"), Utterance("no not now"))
+        self.assertNotIn("correction", r.trace)
+
+    @unittest.skipUnless(kiwi_available(), "kiwipiepy missing")
+    def test_korean_corrections(self):
+        m, _ = domain("bank", "ko")
+        _, r = talk(m, Utterance("십삼 달러 이체해 주세요"), Utterance("아니요 삼십 달러라고 했어요"))
+        self.assertEqual(r.state.slots, {"amount": "30"})
+        self.assertTrue(r.reply.startswith("30달러요."), r.reply)
+        _, r = talk(m, Utterance("십삼 달러 이체해 주세요"), Utterance("십삼 말고 삼십 달러요 삼십"))
+        self.assertEqual(r.state.slots, {"amount": "30"})
+
+
 if __name__ == "__main__":
     unittest.main()

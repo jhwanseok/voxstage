@@ -20,6 +20,8 @@ NUMBERS = [
     ("en", "Change the quantity to fifty", [50]),
     ("en", "No fifteen one five", [15, 15]),
     ("en", "No forty not fourteen", [40, 14]),
+    ("en", "No not thirteen thirty", [13, 30]),           # a teen ends a number: not 43
+    ("en", "twenty five", [25]),
     ("en", "four eight two one", [4821]),
     ("en", "$2,500 please", [2500]),
     ("en", "the fifteenth of next month", []),          # a day, not a number
