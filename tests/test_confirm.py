@@ -76,8 +76,8 @@ class RiskyToolTest(unittest.TestCase):
         root = os.path.join(os.path.dirname(__file__), "..", "domains")
         found = {d: risky_tools(os.path.join(root, d, "tools.yaml")) for d in ("bank", "shop", "telecom")}
         self.assertEqual(found, {"bank": frozenset({"make_transfer", "schedule_transfer"}),
-                                 "shop": frozenset({"update_address", "schedule_delivery"}),
-                                 "telecom": frozenset({"change_bill_date"})})
+                                 "shop": frozenset({"update_address", "schedule_delivery", "update_quantity"}),
+                                 "telecom": frozenset({"change_bill_date", "set_data_plan"})})
 
     def test_a_risky_call_needs_a_confirm_first(self):
         self.assertIn("risky", load_error(UNCONFIRMED))

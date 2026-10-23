@@ -1,0 +1,13 @@
+# 주문 수량 변경 (R9-4): 수량을 되읽어 잘못 들은 숫자를 고칠 수 있게 하고, 확인 후 바꾼다. 영어 쌍둥이와 노드 구조가 같다.
+id: change_quantity
+triggers: {all_of: [[수량]], any_of: [바꾸, 변경], none_of: [어떻, 방법]}
+captures: {quantity: {extractor: number}}
+start: ask_quantity
+nodes:
+  ask_quantity: {type: ask, slot: quantity, prompt: "수량을 몇 개로 할까요?", extractor: number, next: ask_order}
+  ask_order: {type: ask, slot: order_id, prompt: "주문번호를 입력해 주세요.", extractor: digits, length: 4, next: confirm}
+  confirm: {type: confirm, prompt: "주문 {order_id}의 수량을 {quantity | count}개로 바꿀까요?", on_yes: update, on_no: done}
+  update: {type: call, tool: update_quantity, args: {order_id: "{order_id}", quantity: "{quantity}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "변경했습니다. 주문 {order_id}의 수량은 {quantity | count}개입니다.", next: done}
+  say_fail: {type: say, text: "지금은 수량을 바꿀 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

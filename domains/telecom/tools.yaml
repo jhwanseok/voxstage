@@ -32,6 +32,12 @@ tools:
     rules: []
     default:
       return: {status: changed}
+  set_data_plan:
+    params: [plan_gb]
+    risky: true           # changes the plan: confirm first (R7-12, R9-4)
+    rules: []
+    default:
+      return: {status: changed}
   verify_identity:
     params: [account_last4, pin]
     rules:

@@ -1,0 +1,12 @@
+# Choose a data plan by size (R9-4): the size is read back, so a misheard number can be corrected; a yes first.
+id: data_plan
+triggers: {all_of: [[plan]], any_of: [gigabyte, gigabytes, gb], none_of: [how, much, price, cost]}
+captures: {plan_gb: {extractor: number}}
+start: ask_size
+nodes:
+  ask_size: {type: ask, slot: plan_gb, prompt: "How many gigabytes would you like?", extractor: number, next: confirm}
+  confirm: {type: confirm, prompt: "Shall I switch you to the {plan_gb | count} gigabyte plan?", on_yes: change, on_no: done}
+  change: {type: call, tool: set_data_plan, args: {plan_gb: "{plan_gb}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "Done. You are now on the {plan_gb | count} gigabyte plan.", next: done}
+  say_fail: {type: say, text: "I'm unable to change your plan right now. Please try again later.", next: done}
+  done: {type: end}

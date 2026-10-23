@@ -44,6 +44,7 @@ NUMBERS = [
     ("ko", "네 맞아요", []),                               # 네 is yes, not four
     ("ko", "이체하려고 하는데요", []),                     # 이 in 이체 is not two
     ("ko", "오전에 사람이랑 이번 주에", []),
+    ("ko", "십삼삼", []),                                   # not a cardinal and not digits: no number, no crash
 ]
 
 DIGIT_STRINGS = [

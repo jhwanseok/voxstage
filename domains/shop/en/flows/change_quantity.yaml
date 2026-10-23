@@ -1,0 +1,13 @@
+# Change the quantity of an order (R9-4): the quantity is read back, so a misheard number can be corrected; a yes first.
+id: change_quantity
+triggers: {all_of: [[quantity]], any_of: [change, update, make, set], none_of: [how]}
+captures: {quantity: {extractor: number}}
+start: ask_quantity
+nodes:
+  ask_quantity: {type: ask, slot: quantity, prompt: "What quantity would you like?", extractor: number, next: ask_order}
+  ask_order: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: confirm}
+  confirm: {type: confirm, prompt: "Shall I change the quantity of order {order_id} to {quantity | count}?", on_yes: update, on_no: done}
+  update: {type: call, tool: update_quantity, args: {order_id: "{order_id}", quantity: "{quantity}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "Done. Order {order_id} now has a quantity of {quantity | count}.", next: done}
+  say_fail: {type: say, text: "I'm unable to change that order right now. Please try again later.", next: done}
+  done: {type: end}

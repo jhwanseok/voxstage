@@ -192,5 +192,31 @@ class CorrectionTest(unittest.TestCase):
         self.assertEqual(r.state.slots, {"amount": "30"})
 
 
+class C05FlowsTest(unittest.TestCase):
+    """The misheard first turn (asr_text) and the correction, as in C05 noisy mode."""
+
+    def test_shop_quantity(self):
+        m, tools = domain("shop", "en")
+        a, b = talk(m, Utterance("Change the quantity to fifty"), Utterance("No fifteen one five"))
+        self.assertEqual((a.reply, a.state.slots), ("50. What is your order number?", {"quantity": "50"}))
+        self.assertEqual((b.reply, b.state.slots), ("15. What is your order number?", {"quantity": "15"}))
+        *_, r = talk(m, Utterance("Change the quantity to fifty"), Utterance("No fifteen one five"), Dtmf("1001"), Dtmf("1"))
+        self.assertEqual([c["args"] for c in tools.records], [{"order_id": "1001", "quantity": "15"}])
+
+    def test_telecom_plan_size_corrected_at_the_confirm(self):
+        m, tools = domain("telecom", "en")
+        a, b = talk(m, Utterance("I want the fourteen gigabyte plan"), Utterance("No forty not fourteen"))
+        self.assertEqual(a.reply, "14. Shall I switch you to the 14 gigabyte plan?")
+        self.assertEqual((b.reply, b.state.slots, tools.records),
+                         ("40. Shall I switch you to the 40 gigabyte plan?", {"plan_gb": "40"}, []))
+
+    @unittest.skipUnless(kiwi_available(), "kiwipiepy missing")
+    def test_korean_shop_quantity(self):
+        m, _ = domain("shop", "ko")
+        a, b = talk(m, Utterance("수량을 오십 개로 바꿔 주세요"), Utterance("아니요 십오요 일 오 십오 개요"))
+        self.assertEqual((a.state.slots, b.state.slots), ({"quantity": "50"}, {"quantity": "15"}))
+        self.assertTrue(b.reply.startswith("15요."), b.reply)
+
+
 if __name__ == "__main__":
     unittest.main()

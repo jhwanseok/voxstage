@@ -111,7 +111,10 @@ def scan(text: str) -> list:
             if value:
                 out.append(("day", value))
                 continue
-        if all(ch in DIGITS for ch in run) or _sino(run) is None:
+        if not all(ch in DIGITS for ch in run) and _sino(run) is None:   # "십삼삼": neither a cardinal nor digits
+            out.append(("word", w))
+            continue
+        if all(ch in DIGITS for ch in run):
             if len(run) >= 2:   # "사팔이일": said digit by digit
                 out.append(("digits", "".join(str(DIGITS[ch]) for ch in run)))
                 continue

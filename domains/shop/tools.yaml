@@ -35,6 +35,12 @@ tools:
     rules: []
     default:
       return: {status: scheduled}
+  update_quantity:
+    params: [order_id, quantity]
+    risky: true           # changes the order: confirm first (R7-12, R9-4)
+    rules: []
+    default:
+      return: {status: updated}
   verify_identity:
     params: [order_id, zip_code]
     rules:

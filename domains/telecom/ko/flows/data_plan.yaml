@@ -1,0 +1,12 @@
+# 데이터 용량으로 요금제 선택 (R9-4): 용량을 되읽어 잘못 들은 숫자를 고칠 수 있게 하고, 확인 후 바꾼다. 영어 쌍둥이와 노드 구조가 같다.
+id: data_plan
+triggers: {all_of: [[요금제, 요금]], any_of: [기가], none_of: [어떻, 방법, 얼마, 가격]}
+captures: {plan_gb: {extractor: number}}
+start: ask_size
+nodes:
+  ask_size: {type: ask, slot: plan_gb, prompt: "몇 기가 요금제로 할까요?", extractor: number, next: confirm}
+  confirm: {type: confirm, prompt: "{plan_gb | count}기가 요금제로 바꿀까요?", on_yes: change, on_no: done}
+  change: {type: call, tool: set_data_plan, args: {plan_gb: "{plan_gb}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "변경했습니다. 이제 {plan_gb | count}기가 요금제를 쓰십니다.", next: done}
+  say_fail: {type: say, text: "지금은 요금제를 바꿀 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}
