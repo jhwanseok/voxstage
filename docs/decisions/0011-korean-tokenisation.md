@@ -58,6 +58,8 @@ Only the analysis of a yes or no answer at a `confirm` node also keeps interject
 (`Tokenizer.analyze_answer`; for English it is the same as `analyze`).
 Decided by jhwanseok (asked for this amendment on 2026-10-22 after the R7b handoff note raised it).
 
+- Extended 2026-10-23 (decision R9-5): corrections ("아니요, 삼십 달러요") are answers of the same kind, so the
+  correction patterns of R9 are matched on `analyze_answer` too.
 - Why not add interjections everywhere: it would change the tokens of every FAQ query and trigger, and so the R1
   numbers, for a problem that only exists at yes or no questions.
 - Public basis: none found; this repo's own test validates it (`tests/test_confirm.py`,
