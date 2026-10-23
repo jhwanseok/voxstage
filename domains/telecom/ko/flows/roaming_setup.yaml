@@ -1,0 +1,17 @@
+# 부가서비스 기간 추가 (R10-5): 회선, 서비스, 기간을 한 문장에서 받을 수 있고, 확인 후 호출한다. 영어 쌍둥이와 노드 구조가 같다.
+id: roaming_setup
+triggers: {any_of: [로밍], none_of: [어떻, 방법, 얼마, 요금]}
+captures:
+  line_last4: {extractor: digits, length: 4, cue: [끝나는, 끝자리, 끝번호]}
+  feature: {extractor: choice, choices: {로밍: roaming}}
+  duration_days: {extractor: duration}
+start: ask_line
+nodes:
+  ask_line: {type: ask, slot: line_last4, prompt: "어느 회선인가요? 번호 뒤 네 자리를 입력해 주세요.", extractor: digits, length: 4, next: ask_feature}
+  ask_feature: {type: ask, slot: feature, prompt: "어떤 서비스를 추가할까요?", extractor: choice, choices: {로밍: roaming}, next: ask_days}
+  ask_days: {type: ask, slot: duration_days, prompt: "며칠 동안 쓰실 건가요?", extractor: duration, next: confirm}
+  confirm: {type: confirm, prompt: "{line_last4}로 끝나는 번호에 로밍을 {duration_days}일 추가할까요?", on_yes: add, on_no: done}
+  add: {type: call, tool: add_feature, args: {line_last4: "{line_last4}", feature: "{feature}", duration_days: "{duration_days}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "추가했습니다. 로밍을 {duration_days}일 동안 쓰실 수 있어요.", next: done}
+  say_fail: {type: say, text: "지금은 추가할 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

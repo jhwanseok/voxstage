@@ -270,7 +270,7 @@ class DomainContentTest(unittest.TestCase):
         a, b, c = talk(m, Utterance("I want to return an item"), Dtmf("1001"), Utterance("a laptop"))
         self.assertEqual((a.reply, b.reply), ("What is your order number?", "What would you like to return?"))
         self.assertIn(m.pack.notices[0].text, c.reply)
-        self.assertEqual(c.state.slots, {"order_id": "1001", "item": "electronics"})
+        self.assertEqual(c.state.slots, {"order_id": "1001", "item": "laptop", "item_category": "electronics"})   # R10-4
 
     def test_change_plan_with_and_without_captures(self):
         m = domain("telecom", "en")

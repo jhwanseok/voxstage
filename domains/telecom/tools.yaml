@@ -38,6 +38,12 @@ tools:
     rules: []
     default:
       return: {status: changed}
+  add_feature:
+    params: [line_last4, feature, duration_days]
+    risky: true           # adds a paid feature: confirm first (R7-12, R10-5)
+    rules: []
+    default:
+      return: {status: added}
   verify_identity:
     params: [account_last4, pin]
     rules:

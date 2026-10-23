@@ -41,6 +41,12 @@ tools:
     rules: []
     default:
       return: {status: updated}
+  create_return:
+    params: [order_id, item, size]
+    risky: true           # opens a return: confirm first (R7-12, R10-6)
+    rules: []
+    default:
+      return: {reference: RT1001}
   verify_identity:
     params: [order_id, zip_code]
     rules:

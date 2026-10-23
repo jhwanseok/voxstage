@@ -5,7 +5,7 @@ notices:
     fixed: true
     priority: 10
     text: "Electronics can be returned within 14 days if unopened, and opened items are only accepted if defective."
-    applies_when: "item == 'electronics'"
+    applies_when: "item_category == 'electronics'"   # the category, not the item name (R10-4)
 
 wording:
   fallback.miss: "I'm sorry, I didn't catch that. Could you ask it another way?"

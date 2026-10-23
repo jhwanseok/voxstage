@@ -1,20 +1,25 @@
-# The notice depends on the item's category. Item named in the first words: notice first, then the order number;
-# otherwise the order number, the item, then the notice (R7-7, a YAML branch; a form node is R10-3).
+# Start a return (R10-3, R10-4, R10-6): a form asks only what is missing; the notice is said as soon as the category is
+# known, so "return a laptop" hears it first and "return an item" hears it after the item; a yes, then the call.
 id: return_request
 triggers: {any_of: [return, send back], none_of: [how, policy, deadline, refund]}
-captures: {item: {extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}}}
-start: route
+captures:
+  item: {extractor: choice, choices: {blue jacket: blue jacket, laptop: laptop, computer: computer, phone: phone, tablet: tablet, headphones: headphones, camera: camera, shirt: shirt, jacket: jacket, pants: pants, dress: dress, shoes: shoes, sweater: sweater}}
+  item_category: {extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}}
+  order_id: {extractor: digits, length: 4, cue: [order]}
+  size: {extractor: choice, choices: [small, medium, large]}
+start: collect
 nodes:
-  route:
-    type: branch
-    cases:
-      - {when: "'item' in slots", next: intro_known}
-    else: ask_order_first
-  intro_known: {type: say, text: "I can help you start that return.", next: notice_known}
-  notice_known: {type: notices, next: ask_order_last}
-  ask_order_last: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: done}
-  ask_order_first: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: ask_item}
-  ask_item: {type: ask, slot: item, prompt: "What would you like to return?", extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}, next: intro}
-  intro: {type: say, text: "I can help you start that return.", next: notice}
-  notice: {type: notices, next: done}
+  collect:
+    type: form
+    slots:
+      - {slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4}
+      - {slot: item, prompt: "What would you like to return?", extractor: choice, choices: {blue jacket: blue jacket, laptop: laptop, computer: computer, phone: phone, tablet: tablet, headphones: headphones, camera: camera, shirt: shirt, jacket: jacket, pants: pants, dress: dress, shoes: shoes, sweater: sweater}}
+    say_when_ready:
+      - {needs: [item], say: "I can help you start that return."}
+      - {needs: [item_category], notices: all}
+    next: confirm
+  confirm: {type: confirm, prompt: "Shall I start the return of the {item}{(' in size ' + size) if 'size' in slots else ''} from order {order_id}?", on_yes: open, on_no: done}
+  open: {type: call, tool: create_return, args: {order_id: "{order_id}", item: "{item}", size: "{size | default('')}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "Done. Your return reference is {result.reference}.", next: done}
+  say_fail: {type: say, text: "I'm unable to start that return right now. Please try again later.", next: done}
   done: {type: end}

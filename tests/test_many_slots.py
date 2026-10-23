@@ -12,7 +12,8 @@ from voxstage.dialogue import step
 from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, parse_pattern
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, load_flows
-from voxstage.rules.interpreter import ASK_MISSES, FlowManager, cue_windows
+from voxstage.rules.interpreter import ASK_MISSES, FlowManager, build_manager, cue_windows
+from voxstage.rules.tokenize import kiwi_available
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import Dtmf, Utterance
 
@@ -213,6 +214,49 @@ class FormTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 with self.assertRaises(FlowError, msg=text[:60]):
                     build_form(tmp, text)
+
+
+def domain(name, lang):
+    tools = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, name, "tools.yaml")))
+    return build_manager(ROOT, name, lang, tools), tools
+
+
+class C06Test(unittest.TestCase):
+    def test_shop_return_in_one_sentence_then_only_the_size(self):
+        m, tools = domain("shop", "en")
+        a, b, c = talk(m, Utterance("I want to return the blue jacket from order 1001 in size medium"),
+                       Utterance("Actually make it large"), Utterance("yes"))
+        self.assertEqual(a.state.slots, {"item": "blue jacket", "item_category": "clothing", "order_id": "1001",
+                                         "size": "medium"})
+        self.assertEqual(a.state.node_id, "confirm")
+        self.assertEqual(b.state.slots["size"], "large")
+        self.assertIn("in size large from order 1001", b.reply)
+        self.assertEqual([x["args"] for x in tools.records], [{"order_id": "1001", "item": "blue jacket", "size": "large"}])
+
+    def test_shop_return_notice_still_first_for_electronics(self):
+        m, _ = domain("shop", "en")
+        r, = talk(m, Utterance("I want to return a laptop"))
+        self.assertIn(m.pack.notices[0].text, r.reply)
+        self.assertTrue(r.reply.endswith("What is your order number?"))
+
+    def test_telecom_roaming_then_only_the_duration(self):
+        m, tools = domain("telecom", "en")
+        a, b = talk(m, Utterance("Add international roaming to the line ending 5580 for ten days"),
+                    Utterance("Make it fourteen days"))
+        self.assertEqual(a.state.slots, {"line_last4": "5580", "feature": "roaming", "duration_days": "10"})
+        self.assertEqual((b.state.slots["duration_days"], b.state.node_id, tools.records), ("14", "confirm", []))
+
+    @unittest.skipUnless(kiwi_available(), "kiwipiepy missing")
+    def test_korean_c06(self):
+        m, _ = domain("shop", "ko")
+        a, b = talk(m, Utterance("천일 주문에서 산 파란 재킷 반품할 건데 사이즈는 미디엄이었어요"), Utterance("아 라지로 해 주세요"))
+        self.assertEqual(a.state.slots, {"item": "blue jacket", "item_category": "clothing", "order_id": "1001",
+                                         "size": "medium"})
+        self.assertEqual(b.state.slots["size"], "large")
+        m, _ = domain("telecom", "ko")
+        a, b = talk(m, Utterance("5580으로 끝나는 번호에 해외 로밍 십 일만 추가해 주세요"), Utterance("십사 일로 해 주세요"))
+        self.assertEqual(a.state.slots, {"line_last4": "5580", "feature": "roaming", "duration_days": "10"})
+        self.assertEqual(b.state.slots["duration_days"], "14")
 
 
 if __name__ == "__main__":

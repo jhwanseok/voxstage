@@ -1,0 +1,17 @@
+# Add a paid feature for some days (R10-5): line, feature and duration can all come in one sentence; a yes first.
+id: roaming_setup
+triggers: {any_of: [roaming], none_of: [how, much, cost, price, what]}
+captures:
+  line_last4: {extractor: digits, length: 4, cue: [ending, end, ends]}
+  feature: {extractor: choice, choices: [roaming]}
+  duration_days: {extractor: duration}
+start: ask_line
+nodes:
+  ask_line: {type: ask, slot: line_last4, prompt: "Which line? Please enter the last four digits of the number.", extractor: digits, length: 4, next: ask_feature}
+  ask_feature: {type: ask, slot: feature, prompt: "Which feature would you like to add?", extractor: choice, choices: [roaming], next: ask_days}
+  ask_days: {type: ask, slot: duration_days, prompt: "For how many days?", extractor: duration, next: confirm}
+  confirm: {type: confirm, prompt: "Shall I add {feature} to the line ending {line_last4} for {duration_days} days?", on_yes: add, on_no: done}
+  add: {type: call, tool: add_feature, args: {line_last4: "{line_last4}", feature: "{feature}", duration_days: "{duration_days}"}, on_ok: say_done, on_error: say_fail}
+  say_done: {type: say, text: "Done. {feature} is on for {duration_days} days.", next: done}
+  say_fail: {type: say, text: "I'm unable to add that right now. Please try again later.", next: done}
+  done: {type: end}
