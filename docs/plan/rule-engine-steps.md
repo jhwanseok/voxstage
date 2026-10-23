@@ -36,12 +36,14 @@ and the ledger row is filled in.
 R0 ──► R1 ──► R2 ──► R3 ──► R4 ──► R5
                 │
                 ├──► R6 ──► R7 ──► R8
-                ├──► R9 ──► R10
-                ├──► R11
+                ├──► R11 ──► R9 ──► R10
                 ├──► R12 ──► R13
                 └──► R14
                           all ──► R15
 ```
+
+Changed 2026-10-23 (owner's decision): R11 comes before R9, because every C05 utterance is a spoken number
+("thirteen dollars", "오십 개") and the confusion table of R9 needs number words read first.
 
 R0 and R1 come first. R2 (the interpreter) is needed by everything after it. R3 to R14 can be
 reordered among themselves when the arrows allow.
