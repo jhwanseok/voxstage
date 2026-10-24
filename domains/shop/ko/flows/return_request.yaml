@@ -1,9 +1,9 @@
 # 반품 접수 (R10-3, R10-4, R10-6): form이 빠진 것만 묻고, 종류를 알게 되는 즉시 고지문을 말한다. 확인 후 호출.
-# 영어 쌍둥이와 노드 구조가 같다. 상품 값은 영어(blue jacket)로 둔다.
+# 영어 쌍둥이와 노드 구조가 같다. 상품 값은 두 언어가 함께 쓰는 언어 중립 코드다(R10-7).
 id: return_request
 triggers: {any_of: [반품, 환불], none_of: [어떻, 방법, 기한, 규정]}
 captures:
-  item: {extractor: choice, choices: {파랗 재킷: blue jacket, 노트북: laptop, 컴퓨터: computer, 휴대폰: phone, 태블릿: tablet, 이어폰: headphones, 헤드폰: headphones, 카메라: camera, 티셔츠: shirt, 셔츠: shirt, 재킷: jacket, 자켓: jacket, 바지: pants, 원피스: dress, 신발: shoes, 스웨터: sweater}}
+  item: {extractor: choice, choices: {파랗 재킷: blue jacket, 노트북: laptop, 컴퓨터: computer, 휴대폰: phone, 태블릿: tablet, 이어폰: earphones, 헤드폰: headphones, 카메라: camera, 티셔츠: t-shirt, 셔츠: shirt, 재킷: jacket, 자켓: jacket, 바지: pants, 원피스: dress, 신발: shoes, 스웨터: sweater}}
   item_category: {extractor: choice, choices: {노트북: electronics, 컴퓨터: electronics, 휴대폰: electronics, 태블릿: electronics, 이어폰: electronics, 헤드폰: electronics, 카메라: electronics, 티셔츠: clothing, 셔츠: clothing, 재킷: clothing, 자켓: clothing, 바지: clothing, 원피스: clothing, 신발: clothing, 스웨터: clothing, 옷: clothing}}
   order_id: {extractor: digits, length: 4, cue: [주문]}
   size: {extractor: choice, choices: {스몰: small, 미디엄: medium, 라지: large}}
@@ -13,7 +13,7 @@ nodes:
     type: form
     slots:
       - {slot: order_id, prompt: "주문번호를 입력해 주세요.", extractor: digits, length: 4}
-      - {slot: item, prompt: "어떤 상품을 반품하시나요?", extractor: choice, choices: {파랗 재킷: blue jacket, 노트북: laptop, 컴퓨터: computer, 휴대폰: phone, 태블릿: tablet, 이어폰: headphones, 헤드폰: headphones, 카메라: camera, 티셔츠: shirt, 셔츠: shirt, 재킷: jacket, 자켓: jacket, 바지: pants, 원피스: dress, 신발: shoes, 스웨터: sweater}}
+      - {slot: item, prompt: "어떤 상품을 반품하시나요?", extractor: choice, choices: {파랗 재킷: blue jacket, 노트북: laptop, 컴퓨터: computer, 휴대폰: phone, 태블릿: tablet, 이어폰: earphones, 헤드폰: headphones, 카메라: camera, 티셔츠: t-shirt, 셔츠: shirt, 재킷: jacket, 자켓: jacket, 바지: pants, 원피스: dress, 신발: shoes, 스웨터: sweater}}
     say_when_ready:
       - {needs: [item], say: "반품 접수를 도와드릴게요."}
       - {needs: [item_category], notices: all}

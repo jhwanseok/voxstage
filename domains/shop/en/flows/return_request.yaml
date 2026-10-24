@@ -1,10 +1,11 @@
 # Start a return (R10-3, R10-4, R10-6): a form asks only what is missing; the notice is said as soon as the category is
 # known, so "return a laptop" hears it first and "return an item" hears it after the item; a yes, then the call.
+# Item values are language-neutral codes shared with the Korean twin (R10-7).
 id: return_request
 triggers: {any_of: [return, send back], none_of: [how, policy, deadline, refund]}
 captures:
-  item: {extractor: choice, choices: {blue jacket: blue jacket, laptop: laptop, computer: computer, phone: phone, tablet: tablet, headphones: headphones, camera: camera, shirt: shirt, jacket: jacket, pants: pants, dress: dress, shoes: shoes, sweater: sweater}}
-  item_category: {extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}}
+  item: {extractor: choice, choices: {blue jacket: blue jacket, laptop: laptop, computer: computer, phone: phone, tablet: tablet, earphones: earphones, earbuds: earphones, headphones: headphones, camera: camera, t shirt: t-shirt, shirt: shirt, jacket: jacket, pants: pants, dress: dress, shoes: shoes, sweater: sweater}}
+  item_category: {extractor: choice, choices: {laptop: electronics, computer: electronics, phone: electronics, tablet: electronics, earphones: electronics, earbuds: electronics, headphones: electronics, camera: electronics, shirt: clothing, jacket: clothing, pants: clothing, dress: clothing, shoes: clothing, sweater: clothing}}
   order_id: {extractor: digits, length: 4, cue: [order]}
   size: {extractor: choice, choices: [small, medium, large]}
 start: collect
@@ -13,7 +14,7 @@ nodes:
     type: form
     slots:
       - {slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4}
-      - {slot: item, prompt: "What would you like to return?", extractor: choice, choices: {blue jacket: blue jacket, laptop: laptop, computer: computer, phone: phone, tablet: tablet, headphones: headphones, camera: camera, shirt: shirt, jacket: jacket, pants: pants, dress: dress, shoes: shoes, sweater: sweater}}
+      - {slot: item, prompt: "What would you like to return?", extractor: choice, choices: {blue jacket: blue jacket, laptop: laptop, computer: computer, phone: phone, tablet: tablet, earphones: earphones, earbuds: earphones, headphones: headphones, camera: camera, t shirt: t-shirt, shirt: shirt, jacket: jacket, pants: pants, dress: dress, shoes: shoes, sweater: sweater}}
     say_when_ready:
       - {needs: [item], say: "I can help you start that return."}
       - {needs: [item_category], notices: all}

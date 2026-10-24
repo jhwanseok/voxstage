@@ -239,6 +239,18 @@ class C06Test(unittest.TestCase):
         self.assertIn(m.pack.notices[0].text, r.reply)
         self.assertTrue(r.reply.endswith("What is your order number?"))
 
+    def test_item_codes_are_shared_by_both_languages(self):   # R10-7
+        m, _ = domain("shop", "en")
+        for words, code in (("I want to return my earbuds", "earphones"), ("I want to return a t-shirt", "t-shirt"),
+                            ("I want to return a shirt", "shirt")):
+            r, = talk(m, Utterance(words))
+            self.assertEqual(r.state.slots["item"], code, words)
+        if kiwi_available():
+            m, _ = domain("shop", "ko")
+            for words, code in (("이어폰 반품할게요", "earphones"), ("티셔츠 반품할게요", "t-shirt")):
+                r, = talk(m, Utterance(words))
+                self.assertEqual(r.state.slots["item"], code, words)
+
     def test_telecom_roaming_then_only_the_duration(self):
         m, tools = domain("telecom", "en")
         a, b = talk(m, Utterance("Add international roaming to the line ending 5580 for ten days"),
