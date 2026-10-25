@@ -187,9 +187,9 @@ class LedgerTest(unittest.TestCase):
             with open(os.path.join(root, "domains", "bank", "en", "rules", "faq_patterns.yaml"), "w") as f:
                 f.write("entries:\n  - {id: a, all_of: [x]}\n  - {id: b, regex: 'x.*y'}\n")
             m = ledger.measure(root)
-            self.assertEqual(m["code"], {"interpreter_lines": 2, "other_rule_lines": 1})
+            self.assertEqual(m["code"], {"interpreter_lines": 2, "other_rule_lines": 1, "normalize_lines": 0})
             self.assertEqual(m["packs"], [{"domain": "bank", "lang": "en", "flow_lines": 4, "flow_nodes": 2,
-                                           "patterns": 2, "regex": 1}])
+                                           "patterns": 2, "regex": 1, "rule_entries": 1}])   # one trigger
             out = os.path.join(root, "docs", "ledger", "effort.md")
             self.assertEqual(ledger.append_rows(out, "R9", m, "abc1234"), 1)
             ledger.append_rows(out, "R9", m, "abc1234")
@@ -197,6 +197,36 @@ class LedgerTest(unittest.TestCase):
                 text = f.read()
             self.assertEqual(text.count("| R9 | abc1234 | bank | en |"), 2)
             self.assertEqual(text.count("| Step |"), 1)  # header written once
+
+    def test_rule_file_entries_and_normalize_lines(self):   # R11-5
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "voxstage", "normalize"))
+            with open(os.path.join(root, "voxstage", "normalize", "en.py"), "w") as f:
+                f.write("# c\na = 1\nb = 2\n")
+            rules = os.path.join(root, "domains", "bank", "en", "rules")
+            os.makedirs(rules)
+            os.makedirs(os.path.join(root, "domains", "bank", "en", "flows"))
+            with open(os.path.join(root, "domains", "bank", "en", "flows", "a.yaml"), "w") as f:
+                f.write("id: a\ninterrupts: {any_of: [x]}\ncaptures: {o: {extractor: digits, cue: [order, 주문]}}\n"
+                        "nodes: {}\n")
+            for name, text in (("commands.yaml", "cancel: {}\nback: {}\nagent: {}\n"),
+                               ("corrections.yaml", "correction: {any_of: [no]}\n"),
+                               ("confusions.yaml", "pairs: [[13, 30], [14, 40]]\n"),
+                               ("confirm.yaml", "yes_words: [a, b]\nno_words: [c]\n")):
+                with open(os.path.join(rules, name), "w", encoding="utf-8") as f:
+                    f.write(text)
+            with open(os.path.join(root, "domains", "bank", "readback_slots.yaml"), "w") as f:
+                f.write("readback_slots: {amount: count}\n")
+            m = ledger.measure(root)
+        self.assertEqual(m["code"]["normalize_lines"], 2)
+        # trigger 1 + interrupts 1 + capture 1 + cues 2 + commands 3 + correction 1 + pairs 2 + words 3 + read-back 1
+        self.assertEqual(m["packs"][0]["rule_entries"], 15)
+
+    def test_help_is_not_a_step(self):
+        with tempfile.TemporaryDirectory() as root:
+            out = os.path.join(root, "effort.md")
+            self.assertEqual(ledger.main(["--help", "--out", out]), 2)
+            self.assertFalse(os.path.exists(out))
 
     def test_measure_works_on_the_real_tree(self):
         m = ledger.measure()

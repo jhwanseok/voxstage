@@ -4,8 +4,11 @@
 docs/ledger/effort.md, together with the commit it was measured at.
 
 Counted per domain and language: YAML lines and nodes in `flows/`, patterns and regular-expression patterns in
-`rules/faq_patterns.yaml`. Counted once for the repo: interpreter lines (interpreter.py, flows.py, expr.py under
-voxstage/rules/) and other rule-code lines. Blank lines and comment-only lines are not counted.
+`rules/faq_patterns.yaml`, and rule-file entries (decision R11-5): one per flow trigger, `interrupts`, capture and
+cue word, plus the global commands, correction patterns, confusion pairs, yes and no words, read-back slots and
+sensitive slots. Counted once for the repo: interpreter lines (interpreter.py, flows.py, expr.py under
+voxstage/rules/), other rule-code lines, and the lines of `voxstage/normalize/`. Blank lines and comment-only lines
+are not counted.
 """
 
 from __future__ import annotations
@@ -23,8 +26,8 @@ from . import dataset
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 INTERPRETER_FILES = ("interpreter.py", "flows.py", "expr.py")
 HEADER = ("| Step | Commit | Domain | Lang | Flow YAML lines | Flow nodes | Patterns | Regex patterns "
-          "| Interpreter lines | Other rule-code lines |")
-RULE = "|---|---|---|---|---|---|---|---|---|---|"
+          "| Interpreter lines | Other rule-code lines | Rule-file entries | Normalize lines |")
+RULE = "|---|---|---|---|---|---|---|---|---|---|---|---|"
 
 
 def code_lines(path: str) -> int:
@@ -35,6 +38,32 @@ def code_lines(path: str) -> int:
 def _yaml(path: str):
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def _count(path: str, key=None) -> int:
+    if not os.path.exists(path):
+        return 0
+    data = _yaml(path) or {}
+    value = data.get(key, {}) if key else data
+    return len(value) if isinstance(value, (list, dict)) else 0
+
+
+def rule_entries(root: str, domain: str, lang: str, flow_files: list) -> int:
+    """Entries of the rule files other than the FAQ patterns (R11-5)."""
+    n = 0
+    for p in flow_files:
+        raw = _yaml(p) or {}
+        n += 1 + (1 if raw.get("interrupts") else 0)
+        for cap in (raw.get("captures") or {}).values():
+            n += 1 + len((cap or {}).get("cue") or [])
+    rules = os.path.join(root, "domains", domain, lang, "rules")
+    n += _count(os.path.join(rules, "commands.yaml"))
+    n += _count(os.path.join(rules, "corrections.yaml"))
+    n += _count(os.path.join(rules, "confusions.yaml"), "pairs")
+    n += _count(os.path.join(rules, "confirm.yaml"), "yes_words") + _count(os.path.join(rules, "confirm.yaml"), "no_words")
+    n += _count(os.path.join(root, "domains", domain, "readback_slots.yaml"), "readback_slots")
+    n += _count(os.path.join(root, "domains", domain, "sensitive_slots.yaml"), "sensitive_slots")
+    return n
 
 
 def measure(root: str = ROOT) -> dict:
@@ -70,8 +99,11 @@ def measure(root: str = ROOT) -> dict:
                 patterns = len(entries)
                 regex = sum(1 for e in entries if isinstance(e, dict) and "regex" in e)
             packs.append({"domain": d, "lang": lang, "flow_lines": lines, "flow_nodes": nodes,
-                          "patterns": patterns, "regex": regex})
-    return {"code": {"interpreter_lines": interp, "other_rule_lines": other}, "packs": packs}
+                          "patterns": patterns, "regex": regex,
+                          "rule_entries": rule_entries(root, d, lang, flow_files)})
+    normalize_lines = sum(code_lines(p) for p in glob.glob(os.path.join(root, "voxstage", "normalize", "*.py")))
+    return {"code": {"interpreter_lines": interp, "other_rule_lines": other, "normalize_lines": normalize_lines},
+            "packs": packs}
 
 
 def commit_hash(root: str = ROOT) -> str:
@@ -87,7 +119,8 @@ def append_rows(path: str, step: str, measurement: dict, commit: str) -> int:
     fresh = not os.path.exists(path)
     code = measurement["code"]
     rows = [f"| {step} | {commit} | {p['domain']} | {p['lang']} | {p['flow_lines']} | {p['flow_nodes']} "
-            f"| {p['patterns']} | {p['regex']} | {code['interpreter_lines']} | {code['other_rule_lines']} |"
+            f"| {p['patterns']} | {p['regex']} | {code['interpreter_lines']} | {code['other_rule_lines']} "
+            f"| {p['rule_entries']} | {code['normalize_lines']} |"
             for p in measurement["packs"]]
     with open(path, "a", encoding="utf-8") as f:
         if fresh:
@@ -100,7 +133,7 @@ def append_rows(path: str, step: str, measurement: dict, commit: str) -> int:
 
 def main(argv: Optional[list] = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv:
+    if not argv or argv[0].startswith("-"):   # "--help" is not a step name
         print("usage: python -m voxstage.ledger <step> [--out FILE]")
         return 2
     step = argv[0]
