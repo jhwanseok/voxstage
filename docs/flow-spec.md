@@ -233,6 +233,32 @@ collect:
 A waiting form question is handled exactly like a waiting `ask` (commands, corrections, switches, side questions,
 keypad-only slots, `back`, park and resume, the re-prompt policy).
 
+## Identity gate (R13)
+
+Protected information is gated by tool, not by flow (decisions R13-1 to R13-3):
+
+```yaml
+# domains/<domain>/tools.yaml
+get_balance:     {requires: verified, params: [account_last4], ...}   # refused until the caller is checked
+verify_identity: {verifies: true, params: [account_last4, pin], ...}  # the check; exactly one when a tool is protected
+```
+
+- A `call` of a protected tool before the check calls nothing: the running flow is set aside (`meta["gated"]`) and
+  the domain's verification flow starts, with the slots it lists in `carry`. When the check passes, the stopped call
+  runs in the same turn, so one turn holds `verify_identity` and then the protected call. A pass holds for the rest
+  of the call (`meta["verified"]`, kept by `cancel`).
+- The verification flow (`role: verification`) has no triggers, buttons, interrupts or captures; it asks what the
+  check needs (asks for carried slots are skipped), calls the `verifies` tool and must not call a protected tool.
+  Which details are asked is content, so another sign-in method (phone number plus date of birth) is another flow
+  file and tool, not engine code (backlog D6). Its questions follow the `ask` rules.
+- A failed check empties the answers the verification flow took, so its questions are asked again, and the flow
+  goes on to its `on_error` node (wording that does not say which part was wrong). After `max_attempts` failures
+  (`rules/config.yaml` `verification: {max_attempts: 3, on_exceed: handoff}`, or the gated flow's own
+  `verification: {max_attempts: N}`) the call is locked: `verify.locked` and `HandOff("verification_failed")` (or
+  `EndCall`), and every later protected call gets the same reply without a call.
+- `prefill: {account_last4: customer.account_last4}` fills an empty slot from the caller's record when a flow
+  starts; words the caller said win.
+
 ## Node types
 
 | Type | Fields | Behaviour |
@@ -281,9 +307,10 @@ Expressions are parsed with Python's `ast` and walked by a small evaluator; they
 
 Unknown node types and keys; missing, unreachable or looping nodes (a loop must wait for the caller); a flow
 without an `end`; tools that do not exist and arguments that do not match the tool's parameters; names no `ask`
-fills; bad extractors; file name differing from the id. Korean and English flows are twins: the same node ids,
+fills; bad extractors; file name differing from the id; a protected tool called with no verification flow, two
+verification flows, or a verification flow that does not call the `verifies` tool or calls a protected one. Korean and English flows are twins: the same node ids,
 types, `next` links, tools and arguments; only texts and triggers differ (a test enforces it).
 
 ## Not yet
 
-Identity gate (R13).
+API failure and delay policy (R12), policy change (R14).
