@@ -40,7 +40,8 @@ class Fallback:
 
 WORDING_KEYS = ("fallback.miss", "fallback.exceed", "ask.invalid", "ask.keypad_only", "ask.exceed",
                 "flow.attribute_missing", "flow.no_flow", "confirm.declined", "command.cancelled", "command.agent",
-                "date.ambiguous", "readback", "correction.offer", "verify.locked")
+                "date.ambiguous", "readback", "correction.offer", "verify.locked",
+                "call.failed", "call.unconfirmed", "call.exceed")
 PLACEHOLDER_KEYS = ("readback", "correction.offer")   # the only wording with a `{value}` placeholder (R9)
 COMMANDS = ("cancel", "back", "agent")   # global commands (R8-4)
 
@@ -152,6 +153,7 @@ class DomainPack:
                 extra[key] = loader(path)
             extra["correction_policy"] = load_correction_policy(cfg_path)
             extra["verification"] = load_verification_policy(cfg_path)
+            extra["tool_policy"] = load_tool_policy(cfg_path)
         rb_path = os.path.join(domains_dir, domain, "readback_slots.yaml")
         if os.path.exists(rb_path):
             extra["readback"] = load_readback_slots(rb_path)
@@ -218,9 +220,9 @@ def load_fallback(path: str, wording: dict) -> Fallback:
     """Counts and the action come from the config; the words come from the registry (`fallback.miss`, `.exceed`)."""
     raw = _read(path)
     fb = raw.get("fallback") if isinstance(raw, dict) else None
-    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "switch", "correction", "verification"}:
+    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "switch", "correction", "verification", "tools"}:
         raise RuleError(f"{path}: needs a top-level 'fallback' mapping "
-                        f"(and optionally 'ask', 'switch', 'correction', 'verification')")
+                        f"(and optionally 'ask', 'switch', 'correction', 'verification', 'tools')")
     extra = set(fb) - {"max_misses", "on_exceed"}
     if extra:
         raise RuleError(f"{path}: unknown fallback keys {sorted(extra)} (wording lives in notices.yaml)")
@@ -364,6 +366,23 @@ def load_verification_policy(path: str) -> VerificationPolicy:
     if action not in ("handoff", "end_call"):
         raise RuleError(f"{path}: verification.on_exceed must be handoff or end_call")
     return VerificationPolicy(n, action)
+
+
+def load_tool_policy(path: str) -> ToolPolicy:
+    raw = _read(path)
+    t = raw.get("tools") if isinstance(raw, dict) else None
+    if t is None:
+        return ToolPolicy()
+    if not isinstance(t, dict) or set(t) - {"max_failures", "on_exceed", "timeout_ms"}:
+        raise RuleError(f"{path}: 'tools' takes max_failures, on_exceed and timeout_ms only")
+    n, ms = t.get("max_failures", 2), t.get("timeout_ms", 5000)
+    for name, value in (("max_failures", n), ("timeout_ms", ms)):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            raise RuleError(f"{path}: tools.{name} must be an integer >= 1")
+    action = t.get("on_exceed", "handoff")
+    if action not in ("handoff", "end_call"):
+        raise RuleError(f"{path}: tools.on_exceed must be handoff or end_call")
+    return ToolPolicy(n, action, ms)
 
 
 def load_sensitive_slots(path: str) -> frozenset:

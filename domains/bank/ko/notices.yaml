@@ -21,3 +21,6 @@ wording:
   readback: "{value}요."
   correction.offer: "{value} 맞으세요?"
   verify.locked: "본인 확인을 완료하지 못했습니다. 상담사에게 연결해 드릴게요."
+  call.failed: "지금은 처리할 수 없어요. 잠시 후 다시 시도해 주세요."
+  call.unconfirmed: "요청이 처리됐는지 지금 확인할 수 없어요. 다시 시도하지 마시고, 상담사에게 연결해 드릴게요."
+  call.exceed: "여전히 처리가 안 되고 있어요. 상담사에게 연결해 드릴게요."

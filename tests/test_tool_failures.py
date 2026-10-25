@@ -9,7 +9,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from voxstage.dialogue import EndCall, HandOff, step
-from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, ToolPolicy
+from voxstage.domain_pack import AskPolicy, DomainPack, Fallback, RuleError, ToolPolicy, load_tool_policy
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, load_flows
 from voxstage.rules.interpreter import GATED, TOOL_FAILURES, VERIFIED, FlowManager
@@ -266,6 +266,33 @@ class LoadTest(unittest.TestCase):
     def test_retry_on_a_risky_tool_fails_to_load(self):
         with tempfile.TemporaryDirectory() as tmp, self.assertRaises(ValueError):
             build(tmp, tools=TOOLS.replace("    risky: true\n", "    risky: true\n    retry: 1\n"))
+
+
+class ConfigTest(unittest.TestCase):
+    def test_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "config.yaml")
+            for body, want in (("fallback: {}", ToolPolicy()),
+                               ("tools: {max_failures: 3, on_exceed: end_call, timeout_ms: 2000}",
+                                ToolPolicy(3, "end_call", 2000))):
+                with open(path, "w") as f:
+                    f.write(body)
+                self.assertEqual(load_tool_policy(path), want)
+            for body in ("tools: {max_failures: 0}", "tools: {timeout_ms: fast}", "tools: {on_exceed: hangup}",
+                         "tools: {retries: 1}", "tools: 2"):
+                with open(path, "w") as f:
+                    f.write(body)
+                with self.subTest(body), self.assertRaises(RuleError):
+                    load_tool_policy(path)
+
+    def test_shipped_packs(self):
+        root = os.path.join(os.path.dirname(__file__), "..", "domains")
+        for d in ("bank", "shop", "telecom"):
+            for lang in ("en", "ko"):
+                pack = DomainPack.load(root, d, lang)
+                self.assertEqual(pack.tool_policy, ToolPolicy(2, "handoff", 5000))
+                for key in ("call.failed", "call.unconfirmed", "call.exceed"):
+                    self.assertIn(key, pack.wording)
 
 
 if __name__ == "__main__":

@@ -23,3 +23,10 @@ correction:
 verification:
   max_attempts: 3
   on_exceed: handoff
+
+# Tool failures (R12-4, R12-5): system errors (timeout, after the retry) over the call before a hand-off,
+# and how slow an answer may be before it counts as a timeout.
+tools:
+  max_failures: 2
+  on_exceed: handoff
+  timeout_ms: 5000

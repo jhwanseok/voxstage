@@ -22,3 +22,6 @@ wording:
   readback: "{value}."
   correction.offer: "Did you mean {value}?"
   verify.locked: "I couldn't verify your identity, so I'll connect you to an agent."
+  call.failed: "I can't do that right now. Please try again later."
+  call.unconfirmed: "I can't confirm whether that went through. Please don't try again; I'll connect you to an agent."
+  call.exceed: "It still isn't working, so I'll connect you to an agent."
