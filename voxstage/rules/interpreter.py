@@ -307,14 +307,15 @@ class FlowManager(DialogueManager):
             return self._answer_ask(flow, state, turn_input)
         if isinstance(turn_input, ButtonPress) and turn_input.button_id in self.buttons:
             flow = self.flows[self.buttons[turn_input.button_id]]
-            run = Run(self, flow, {}, {**state.meta, **FRESH}, trace={"flow": flow.id, "button": turn_input.button_id})
+            run = Run(self, flow, self._prefill(flow, {}, state.meta), {**state.meta, **FRESH},
+                      trace={"flow": flow.id, "button": turn_input.button_id})
             return self._run(run, state, flow.start)
         if isinstance(turn_input, Utterance) and self.flows:
             trigger, trace = self.matcher.match(turn_input.text)
             if trigger is not None:
                 flow = self.flows[trigger.id]
                 captured = self._capture(flow, turn_input, state.meta.get("now"))
-                run = Run(self, flow, captured, {**state.meta, **FRESH},
+                run = Run(self, flow, self._prefill(flow, captured, state.meta), {**state.meta, **FRESH},
                           trace={"flow": flow.id, "trigger": trace, "captured": dict(captured)})
                 return self._run(run, state, flow.start)
         if self.faq is not None:
@@ -384,10 +385,17 @@ class FlowManager(DialogueManager):
             parked = parked[-self.pack.max_parked:]
         carried = {slot: state.slots[slot] for slot in target.carry if slot in state.slots}
         captured = self._capture(target, turn_input, state.meta.get("now"))
-        run = Run(self, target, {**carried, **captured}, {**state.meta, **FRESH, PARKED: parked, ASK_MISSES: 0},
+        run = Run(self, target, self._prefill(target, {**carried, **captured}, state.meta),
+                  {**state.meta, **FRESH, PARKED: parked, ASK_MISSES: 0},
                   trace={"flow": target.id, "switch": {"from": flow.id, "to": target.id, "by": by}, **trace,
                          "carried": carried, "captured": captured})
         return self._run(run, state, target.start)
+
+    @staticmethod
+    def _prefill(flow: Flow, slots: dict, meta: dict) -> dict:
+        """Slots still empty when a flow starts take the caller's record (`prefill:`, R13); what was said wins."""
+        customer = meta.get("customer") or {}
+        return {**{slot: str(customer[attr]) for slot, attr in flow.prefill if attr in customer}, **slots}
 
     def _capture(self, flow: Flow, turn_input, now=None, later: bool = False, skip: Optional[str] = None) -> dict:
         """Slots the first utterance already contains ("How much is the plus plan" fills `plan`)."""

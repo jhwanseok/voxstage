@@ -186,6 +186,7 @@ class Flow:
     interrupts: Pattern | None = None   # words that may start this flow while another one runs (R6-4)
     carry: tuple = ()      # slots copied from the parked flow on a switch (R6-2)
     role: str | None = None   # "verification": the identity check run before a protected tool (R13)
+    prefill: tuple = ()   # of (slot, attribute): empty slots taken from `customer.<attribute>` at the start (R13)
 
 
 @dataclass(frozen=True)
@@ -435,13 +436,14 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
         raise FlowError(f"{path}: `role` can only be `{VERIFICATION}`")
     if role == VERIFICATION:   # no way for the caller to start it (R13)
         if not isinstance(raw, dict) or set(raw) & {"triggers", "buttons", "interrupts", "captures"} \
-                or not {"id", "start", "nodes"} <= set(raw) or set(raw) - {"id", "role", "start", "nodes", "carry"}:
-            raise FlowError(f"{path}: a verification flow has id, role, start and nodes (and optionally carry); "
+                or not {"id", "start", "nodes"} <= set(raw) or set(raw) - {"id", "role", "start", "nodes", "carry", "prefill"}:
+            raise FlowError(f"{path}: a verification flow has id, role, start and nodes (and optionally carry, prefill); "
                             f"no triggers, buttons, interrupts or captures")
     elif not isinstance(raw, dict) or not {"id", "triggers", "start", "nodes"} <= set(raw) \
-            or set(raw) - {"id", "triggers", "start", "nodes", "buttons", "captures", "interrupts", "carry"}:
+            or set(raw) - {"id", "triggers", "start", "nodes", "buttons", "captures", "interrupts", "carry",
+                           "prefill"}:
         raise FlowError(f"{path}: needs id, triggers, start and nodes "
-                        f"(and optionally buttons, captures, interrupts, carry)")
+                        f"(and optionally buttons, captures, interrupts, carry, prefill)")
     raw_captures = raw.get("captures") or {}
     if not isinstance(raw_captures, dict):
         raise FlowError(f"{path}: `captures` must map slot names to extractors")
@@ -499,8 +501,15 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
     unknown = sorted(set(carry) - names)
     if unknown:
         raise FlowError(f"{path}: carry {unknown}: not slots of this flow (an ask slot or a capture)")
+    prefill = raw.get("prefill") or {}
+    if not isinstance(prefill, dict) or not all(isinstance(v, str) and re.fullmatch(r"customer\.\w+", v)
+                                                for v in prefill.values()):
+        raise FlowError(f"{path}: `prefill` maps slot names to `customer.<attribute>`")
+    unknown = sorted(set(prefill) - names)
+    if unknown:
+        raise FlowError(f"{path}: prefill {unknown}: not slots of this flow (an ask slot or a capture)")
     flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons), tuple(captures),
-                interrupts, tuple(carry), role)
+                interrupts, tuple(carry), role, tuple((k, v.split(".", 1)[1]) for k, v in prefill.items()))
     _validate_graph(flow)
     _check_risky_calls(flow, risky)
     return flow

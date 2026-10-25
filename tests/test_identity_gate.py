@@ -8,8 +8,13 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from voxstage.dialogue import step
+from voxstage.domain_pack import AskPolicy, DomainPack, Fallback
+from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, gate_tools, load_flows
+from voxstage.rules.interpreter import FlowManager
 from voxstage.tools import FakeApiExecutor
+from voxstage.turn import Dtmf, Utterance
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "domains")
 
@@ -120,6 +125,58 @@ class VerificationFlowLoadTest(unittest.TestCase):
                                    "on_error: done}\n  done: {type: end}")
         with self.assertRaises(FlowError):
             self.load({"lookup": LOOKUP, "check_id": body})
+
+
+def build(tmp: str, flows: dict, tools: str = TOOLS, **pack_fields):
+    flows_dir, tools_path = write_pack(tmp, flows, tools)
+    pack = DomainPack("bank", "en", {}, (), Fallback("sorry", "bye"), tools_path, "", None,
+                      AskPolicy("not valid.", "keypad.", "giving up.", 2, "handoff"), frozenset({"pin"}),
+                      **pack_fields)
+    api = RecordingTools(FakeApiExecutor.from_yaml(tools_path))
+    return FlowManager(pack, api, load_flows(flows_dir, tools_path)), api
+
+
+def talk(m, *inputs, setup=None):
+    state, out = m.initial_state("s", setup), []
+    for i in inputs:
+        r = step(m, state, i)
+        state = r.state
+        out.append(r)
+    return out
+
+
+OPEN_TOOLS = """
+tools:
+  look: {params: [acct], rules: [{when: {acct: "1234"}, return: {value: 7}}], default: {error: not_found}}
+"""
+PREFILLED = LOOKUP.replace("start: ask_acct", "prefill: {acct: customer.acct}\n"
+                           "captures: {acct: {extractor: digits, length: 4, cue: [account]}}\nstart: ask_acct")
+
+
+class PrefillTest(unittest.TestCase):
+    def test_the_record_fills_an_empty_slot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, api = build(tmp, {"lookup": PREFILLED}, OPEN_TOOLS)
+            r, = talk(m, Utterance("my balance"), setup={"customer": {"acct": "1234"}})
+        self.assertEqual((r.state.slots, r.reply), ({"acct": "1234"}, "It is 7."))
+
+    def test_words_win_over_the_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, api = build(tmp, {"lookup": PREFILLED}, OPEN_TOOLS)
+            r, = talk(m, Utterance("balance of account 5678"), setup={"customer": {"acct": "1234"}})
+        self.assertEqual(r.state.slots, {"acct": "5678"})
+
+    def test_without_a_record_the_slot_is_asked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, api = build(tmp, {"lookup": PREFILLED}, OPEN_TOOLS)
+            r, = talk(m, Utterance("my balance"))
+        self.assertEqual((r.state.node_id, r.reply), ("ask_acct", "Account?"))
+
+    def test_bad_prefill(self):
+        for prefill in ("{acct: slots.acct}", "{nope: customer.acct}", "[acct]"):
+            with self.subTest(prefill), tempfile.TemporaryDirectory() as tmp, self.assertRaises(FlowError):
+                load_flows(*write_pack(tmp, {"lookup": LOOKUP.replace(
+                    "start: ask_acct", f"prefill: {prefill}\nstart: ask_acct")}, OPEN_TOOLS))
 
 
 if __name__ == "__main__":
