@@ -324,7 +324,7 @@ def _form(raw, ctx):
     return {"slots": tuple(slots), "say_when_ready": tuple(items), "next": ctx.need(raw, "next")}
 
 
-@register_node_type("call", edges=lambda d: [d["on_ok"], d["on_error"]])
+@register_node_type("call", edges=lambda d: [n for n in (d["on_ok"], d["on_error"]) if n is not None])
 def _call(raw, ctx):
     ctx.only(raw, {"tool", "args", "on_ok", "on_error"})
     tool = ctx.need(raw, "tool")
@@ -334,7 +334,7 @@ def _call(raw, ctx):
     if set(args) != set(ctx.tools[tool]):
         raise FlowError(f"{ctx.where}: tool `{tool}` takes {list(ctx.tools[tool])}, got {sorted(args)}")
     return {"tool": tool, "args": {k: ctx.template(str(v), f"args.{k}") for k, v in args.items()},
-            "on_ok": ctx.need(raw, "on_ok"), "on_error": ctx.need(raw, "on_error")}
+            "on_ok": ctx.need(raw, "on_ok"), "on_error": raw.get("on_error")}   # none: `call.failed`, end (R12-2)
 
 
 @register_node_type("branch", edges=lambda d: [n for _, n in d["cases"]] + [d["else"]])
@@ -410,6 +410,13 @@ def risky_tools(tools_path: str) -> frozenset:
     with open(tools_path, encoding="utf-8") as f:
         spec = yaml.safe_load(f)
     return frozenset(name for name, body in spec["tools"].items() if (body or {}).get("risky") is True)
+
+
+def retry_tools(tools_path: str) -> frozenset:
+    """Tools whose `timeout` is tried once more (`retry: 1`, R12-1)."""
+    with open(tools_path, encoding="utf-8") as f:
+        spec = yaml.safe_load(f)
+    return frozenset(name for name, body in spec["tools"].items() if (body or {}).get("retry") == 1)
 
 
 def gate_tools(tools_path: str) -> tuple:

@@ -15,12 +15,13 @@ from typing import Callable, Optional
 from .. import normalize
 from ..dialogue import DialogueManager, DMResult, EndCall, HandOff
 from ..domain_pack import DomainPack
-from ..tools import ToolExecutor
+from ..tools import ToolExecutor, ToolResult
 from ..turn import ButtonPress, Dtmf, Utterance
 from .expr import ExprError, MissingAttribute
 from .formatters import FORMATTERS, FormatError
 from .faq import FaqRuleManager
-from .flows import VERIFICATION, Flow, FlowError, Node, compile_template, gate_tools, load_flows, verification_flow
+from .flows import (VERIFICATION, Flow, FlowError, Node, compile_template, gate_tools, load_flows, retry_tools,
+                    risky_tools, verification_flow)
 from .matching import Matcher
 from .tokenize import Tokenizer, for_lang
 
@@ -38,8 +39,10 @@ GATED = "gated"             # the flow stopped at a protected call while the cal
 VERIFIED = "verified"       # the caller passed the identity check; holds for the call (R13-2)
 LOCKED = "verification_locked"   # too many failed checks: no protected call for the rest of the call (R13-2)
 FAILURES = "verify_failures"     # failed identity checks in this call
+TOOL_FAILURES = "tool_failures"  # system errors of tools in this call, after retries (R12-4)
+TIMEOUT = "timeout"              # the system error: retried, counted, unknown outcome for a risky tool (R12)
 RUNTIME = (ASK_MISSES, PARKED, ASKED, DATE_CHOICES, READBACK, CORRECTIONS, OFFER, FORM_SLOT, FORM_SAID, "result",
-           "faq_misses", GATED)   # VERIFIED, LOCKED and FAILURES belong to the call and survive `cancel`
+           "faq_misses", GATED)   # VERIFIED, LOCKED, FAILURES and TOOL_FAILURES belong to the call, kept by `cancel`
 FRESH = {ASKED: [], FORM_SAID: {}, FORM_SLOT: None}   # what a flow that starts begins with   # meta written while talking; `cancel` clears it
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
@@ -148,17 +151,16 @@ def run_call(run: Run, node: Node):
     if tool in manager.protected and not run.meta.get(VERIFIED):   # not before the check, in any flow (R13-1)
         return manager.gate(run, node)
     args = {k: t.render(run.env()) for k, t in node.data["args"].items()}
-    result = manager.tools.call(tool, args)
-    run.trace.setdefault("calls", []).append({"tool": tool, "args": args, "error": result.error})
+    result = manager.call_tool(run, tool, args)
     run.meta["result"] = dict(result.data) if result.ok else {"error": result.error}
     if tool == manager.verifier and run.flow.role == VERIFICATION:
         if result.ok:
             run.meta[VERIFIED] = True
-        else:
+        elif result.error != TIMEOUT:   # a system error says nothing about the caller (R12)
             locked = manager.failed_check(run, node)
             if locked is not None:
                 return locked
-    return node.data["on_ok"] if result.ok else node.data["on_error"]
+    return node.data["on_ok"] if result.ok else manager.tool_failed(run, node, result)
 
 
 @handler("branch")
@@ -289,6 +291,8 @@ class FlowManager(DialogueManager):
             FaqRuleManager(pack, self.tok) if pack.patterns and pack.fallback else None)
         self.protected, self.verifier = gate_tools(pack.tools_path) if pack.tools_path else (frozenset(), None)
         self.check = verification_flow(self.flows)
+        self.risky = risky_tools(pack.tools_path) if pack.tools_path else frozenset()
+        self.retry = retry_tools(pack.tools_path) if pack.tools_path else frozenset()
 
     # -- entry point --------------------------------------------------------------------------------
     def respond(self, state, turn_input):
@@ -540,6 +544,55 @@ class FlowManager(DialogueManager):
             return DMResult(policy.exceed_reply, new, (action,), {**run.trace, "escalated": policy.on_exceed})
         lead = policy.keypad_reply if spoken_at_keypad else policy.invalid_reply
         return DMResult(f"{lead} {node.data['prompt'].render(run.env())}", new, trace=run.trace)
+
+    # -- tool failures (R12) ------------------------------------------------------------------------------
+    def call_tool(self, run: Run, tool: str, args: dict) -> ToolResult:
+        """One call, and once more after a timeout when the tool declares `retry: 1`. An answer slower than
+        `timeout_ms` is a timeout (R12-1, R12-5)."""
+        policy = self.pack.tool_policy
+        for attempt in range(2 if tool in self.retry else 1):
+            result = self.tools.call(tool, args)
+            if result.delay_ms > policy.timeout_ms:
+                result = ToolResult(False, error=TIMEOUT, delay_ms=result.delay_ms)
+            record = {"tool": tool, "args": args, "error": result.error}
+            if result.delay_ms:
+                record["delay_ms"] = result.delay_ms
+            run.trace.setdefault("calls", []).append(record)
+            if result.error != TIMEOUT:
+                break
+            if attempt == 0 and tool in self.retry:
+                run.trace.setdefault("call_policy", []).append("retried")
+        return result
+
+    def tool_failed(self, run: Run, node: Node, result: ToolResult):
+        """Where a failed call goes: a risky timeout and the failure limit hand off; otherwise the flow's
+        `on_error`, or `call.failed` and the end (R12-2 to R12-4)."""
+        wording, policy = self.pack.wording, self.pack.tool_policy
+        if result.error == TIMEOUT:
+            if node.data["tool"] in self.risky:   # it may have gone through: a person must look (R12-3)
+                run.trace.setdefault("call_policy", []).append("unconfirmed")
+                run.out.append(wording.get("call.unconfirmed", "I can't confirm whether that went through. "
+                                                               "Please don't try again; let me connect you to an agent."))
+                run.actions.append(HandOff("outcome_unknown"))
+                return Done(node.id)
+            failures = int(run.meta.get(TOOL_FAILURES, 0)) + 1
+            run.meta[TOOL_FAILURES] = failures
+            if failures >= policy.max_failures:
+                run.trace.setdefault("call_policy", []).append("exceeded")
+                run.out.append(wording.get("call.exceed", "It still isn't working. Let me connect you to an agent."))
+                run.actions.append(HandOff("tool_failed") if policy.on_exceed == "handoff" else EndCall())
+                return Done(node.id)
+            if run.flow.role == VERIFICATION:   # not a failed check; the stopped flow is dropped
+                run.meta.pop(GATED, None)
+                return self._default_failure(run, node)
+        if node.data["on_error"] is None:
+            return self._default_failure(run, node)
+        return node.data["on_error"]
+
+    def _default_failure(self, run: Run, node: Node) -> Done:
+        run.trace.setdefault("call_policy", []).append("default wording")
+        run.out.append(self.pack.wording.get("call.failed", "I can't do that right now. Please try again later."))
+        return Done(node.id)
 
     # -- identity gate (R13) ------------------------------------------------------------------------------
     def gate(self, run: Run, node: Node):

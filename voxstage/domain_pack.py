@@ -63,6 +63,14 @@ class CorrectionPolicy:
 
 
 @dataclass(frozen=True)
+class ToolPolicy:
+    """Tool failures over a call before a hand-off, and how slow an answer may be (R12-4, R12-5)."""
+    max_failures: int = 2
+    on_exceed: str = "handoff"   # handoff | end_call
+    timeout_ms: int = 5000
+
+
+@dataclass(frozen=True)
 class VerificationPolicy:
     """How many failed identity checks lock the call, and what then happens (R13-2)."""
     max_attempts: int = 3
@@ -102,6 +110,7 @@ class DomainPack:
     confusions: dict = field(default_factory=dict)   # value -> its confusable partner, both ways (R9-2)
     correction_policy: Optional[CorrectionPolicy] = None
     verification: VerificationPolicy = field(default_factory=VerificationPolicy)
+    tool_policy: ToolPolicy = field(default_factory=ToolPolicy)
 
     def notice(self, notice_id: str) -> Notice:
         return next(n for n in self.notices if n.id == notice_id)
