@@ -18,12 +18,17 @@ Rule table format:
             return: {fee: 500}
           - when: {grade: outage}
             error: timeout               # simulate a failing API
+          - when: {grade: slow}
+            delay_ms: 8000               # a slow answer (R12-5)
+            return: {fee: 500}
         default:                         # optional; used when no rule matches
           error: not_found
       get_balance:
         requires: verified               # refused until the caller passed the check (R13-1)
       verify_identity:
         verifies: true                   # the check itself; exactly one when any tool is protected
+      get_order_status:
+        retry: 1                         # a timeout is tried once more (R12-1); never on a risky tool
 """
 
 from __future__ import annotations
@@ -39,6 +44,7 @@ class ToolResult:
     ok: bool
     data: dict = field(default_factory=dict)
     error: Optional[str] = None
+    delay_ms: int = 0   # how long the answer took (simulated, R12-5); the dialogue manager decides what is too slow
 
 
 class ToolExecutor:
@@ -79,9 +85,10 @@ class FakeApiExecutor(ToolExecutor):
 
 
 def _to_result(rule: dict) -> ToolResult:
+    delay = int(rule.get("delay_ms", 0))
     if "error" in rule:
-        return ToolResult(False, error=str(rule["error"]))
-    return ToolResult(True, data=dict(rule["return"]))
+        return ToolResult(False, error=str(rule["error"]), delay_ms=delay)
+    return ToolResult(True, data=dict(rule["return"]), delay_ms=delay)
 
 
 def _validate_spec(spec) -> dict:
@@ -90,7 +97,7 @@ def _validate_spec(spec) -> dict:
     out = {}
     for name, body in spec["tools"].items():
         body = body or {}
-        extra = set(body) - {"params", "rules", "default", "risky", "requires", "verifies"}
+        extra = set(body) - {"params", "rules", "default", "risky", "requires", "verifies", "retry"}
         if extra:
             raise ValueError(f"tool {name}: unknown keys {sorted(extra)}")
         rules = body.get("rules", [])
@@ -110,8 +117,13 @@ def _validate_spec(spec) -> dict:
             raise ValueError(f"tool {name}: 'verifies' must be true or false")
         if requires and verifies:
             raise ValueError(f"tool {name}: a tool cannot both require verification and verify the caller")
+        retry = body.get("retry", 0)
+        if retry not in (0, 1) or isinstance(retry, bool):
+            raise ValueError(f"tool {name}: 'retry' must be 0 or 1")
+        if retry and risky:   # a timed-out change may have gone through: never repeat it (R12-1)
+            raise ValueError(f"tool {name}: a risky tool cannot be retried")
         out[name] = {"params": list(body.get("params", [])), "rules": rules, "default": default, "risky": risky,
-                     "requires": requires, "verifies": verifies}
+                     "requires": requires, "verifies": verifies, "retry": retry}
     verifiers = [n for n, t in out.items() if t["verifies"]]
     if any(t["requires"] for t in out.values()) and len(verifiers) != 1:
         raise ValueError(f"protected tools need exactly one tool with 'verifies: true', found {verifiers}")
@@ -121,11 +133,14 @@ def _validate_spec(spec) -> dict:
 def _check_outcome(where: str, rule, *, allow_when: bool) -> None:
     if not isinstance(rule, dict):
         raise ValueError(f"{where}: must be a mapping")
-    allowed = {"return", "error"} | ({"when"} if allow_when else set())
+    allowed = {"return", "error", "delay_ms"} | ({"when"} if allow_when else set())
     extra = set(rule) - allowed
     if extra:
         raise ValueError(f"{where}: unknown keys {sorted(extra)}")
     if ("return" in rule) == ("error" in rule):
         raise ValueError(f"{where}: needs exactly one of 'return' or 'error'")
+    delay = rule.get("delay_ms", 0)
+    if not isinstance(delay, int) or isinstance(delay, bool) or delay < 0:
+        raise ValueError(f"{where}: 'delay_ms' must be an integer >= 0")
     if allow_when and not isinstance(rule.get("when"), dict):
         raise ValueError(f"{where}: 'when' must be a mapping")

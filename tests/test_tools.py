@@ -55,6 +55,18 @@ class FakeApiTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 FakeApiExecutor(bad)
 
+    def test_retry_and_delay_keys(self):   # R12-1, R12-5
+        api = FakeApiExecutor({"tools": {"look": {"params": [], "retry": 1, "rules": [
+            {"when": {"a": "1"}, "delay_ms": 8000, "return": {"v": 1}}], "default": {"error": "timeout"}}}})
+        self.assertEqual(api.tools["look"]["retry"], 1)
+        self.assertEqual(api.call("look", {"a": "1"}).delay_ms, 8000)
+        self.assertEqual(api.call("look", {"a": "2"}).delay_ms, 0)
+        for body in ({"retry": 2}, {"retry": True}, {"retry": 1, "risky": True},
+                     {"rules": [{"when": {}, "delay_ms": -1, "return": {}}]},
+                     {"default": {"delay_ms": "slow", "return": {}}}):
+            with self.subTest(body), self.assertRaises(ValueError):
+                FakeApiExecutor({"tools": {"t": {"params": [], **body}}})
+
     def test_is_a_tool_executor(self):
         self.assertIsInstance(self.api, ToolExecutor)
 
