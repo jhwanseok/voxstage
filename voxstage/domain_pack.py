@@ -63,6 +63,13 @@ class CorrectionPolicy:
 
 
 @dataclass(frozen=True)
+class VerificationPolicy:
+    """How many failed identity checks lock the call, and what then happens (R13-2)."""
+    max_attempts: int = 3
+    on_exceed: str = "handoff"   # handoff | end_call
+
+
+@dataclass(frozen=True)
 class AskPolicy:
     """What happens when the caller's answer to an `ask` is not usable (R3). Two re-prompts, then the action."""
     invalid_reply: str
@@ -94,6 +101,7 @@ class DomainPack:
     correction: Optional[Pattern] = None       # words that mark a correction (R9-2)
     confusions: dict = field(default_factory=dict)   # value -> its confusable partner, both ways (R9-2)
     correction_policy: Optional[CorrectionPolicy] = None
+    verification: VerificationPolicy = field(default_factory=VerificationPolicy)
 
     def notice(self, notice_id: str) -> Notice:
         return next(n for n in self.notices if n.id == notice_id)

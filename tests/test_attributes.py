@@ -198,7 +198,7 @@ class ShippedFlowsTest(unittest.TestCase):
         self.assertEqual(tools.records, [])
 
     def test_lookup_flows_speak_formatted_values(self):
-        r, _ = say("shop", "en", "where is my order", None, "1001")
+        r, _ = say("shop", "en", "where is my order", None, "1001", "12345")   # order, then the ZIP check (R13)
         self.assertIn("October 8, 2026", r.reply)
 
     @needs_kiwi
@@ -212,7 +212,7 @@ class ShippedFlowsTest(unittest.TestCase):
         self.assertEqual(tools.records[0]["args"], {"plan": "plus", "contract": "yearly"})
         r, _ = say("bank", "ko", "500 달러 이체하면 수수료가 얼마예요", {"grade": "basic"})
         self.assertIn("5달러", r.reply)
-        r, _ = say("shop", "ko", "제 주문 어디쯤 왔어요", None, "1001")
+        r, _ = say("shop", "ko", "제 주문 어디쯤 왔어요", None, "1001", "12345")
         self.assertIn("2026년 10월 8일", r.reply)
 
 

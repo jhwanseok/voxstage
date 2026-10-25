@@ -20,7 +20,7 @@ from ..turn import ButtonPress, Dtmf, Utterance
 from .expr import ExprError, MissingAttribute
 from .formatters import FORMATTERS, FormatError
 from .faq import FaqRuleManager
-from .flows import Flow, FlowError, Node, compile_template, load_flows
+from .flows import VERIFICATION, Flow, FlowError, Node, compile_template, gate_tools, load_flows, verification_flow
 from .matching import Matcher
 from .tokenize import Tokenizer, for_lang
 
@@ -34,8 +34,12 @@ OFFER = "offer"             # a confusion partner offered after a bare no: {slot
 FORM_SLOT = "form_slot"     # the slot a waiting form asks for (R10-3)
 FORM_SAID = "form_said"     # say_when_ready items already said, per form node (R10-3)
 DATE_CHOICES = "date_choices"   # the two readings of an ambiguous date, asked at the current ask (R11-2)
+GATED = "gated"             # the flow stopped at a protected call while the caller is checked (R13)
+VERIFIED = "verified"       # the caller passed the identity check; holds for the call (R13-2)
+LOCKED = "verification_locked"   # too many failed checks: no protected call for the rest of the call (R13-2)
+FAILURES = "verify_failures"     # failed identity checks in this call
 RUNTIME = (ASK_MISSES, PARKED, ASKED, DATE_CHOICES, READBACK, CORRECTIONS, OFFER, FORM_SLOT, FORM_SAID, "result",
-           "faq_misses")
+           "faq_misses", GATED)   # VERIFIED, LOCKED and FAILURES belong to the call and survive `cancel`
 FRESH = {ASKED: [], FORM_SAID: {}, FORM_SLOT: None}   # what a flow that starts begins with   # meta written while talking; `cancel` clears it
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
@@ -140,10 +144,20 @@ def run_confirm(run: Run, node: Node):
 
 @handler("call")
 def run_call(run: Run, node: Node):
+    manager, tool = run.manager, node.data["tool"]
+    if tool in manager.protected and not run.meta.get(VERIFIED):   # not before the check, in any flow (R13-1)
+        return manager.gate(run, node)
     args = {k: t.render(run.env()) for k, t in node.data["args"].items()}
-    result = run.manager.tools.call(node.data["tool"], args)
-    run.trace.setdefault("calls", []).append({"tool": node.data["tool"], "args": args, "error": result.error})
+    result = manager.tools.call(tool, args)
+    run.trace.setdefault("calls", []).append({"tool": tool, "args": args, "error": result.error})
     run.meta["result"] = dict(result.data) if result.ok else {"error": result.error}
+    if tool == manager.verifier and run.flow.role == VERIFICATION:
+        if result.ok:
+            run.meta[VERIFIED] = True
+        else:
+            locked = manager.failed_check(run, node)
+            if locked is not None:
+                return locked
     return node.data["on_ok"] if result.ok else node.data["on_error"]
 
 
@@ -273,6 +287,8 @@ class FlowManager(DialogueManager):
                          for slot, call in pack.readback.items()}
         self.faq = faq if faq is not None else (
             FaqRuleManager(pack, self.tok) if pack.patterns and pack.fallback else None)
+        self.protected, self.verifier = gate_tools(pack.tools_path) if pack.tools_path else (frozenset(), None)
+        self.check = verification_flow(self.flows)
 
     # -- entry point --------------------------------------------------------------------------------
     def respond(self, state, turn_input):
@@ -525,6 +541,48 @@ class FlowManager(DialogueManager):
         lead = policy.keypad_reply if spoken_at_keypad else policy.invalid_reply
         return DMResult(f"{lead} {node.data['prompt'].render(run.env())}", new, trace=run.trace)
 
+    # -- identity gate (R13) ------------------------------------------------------------------------------
+    def gate(self, run: Run, node: Node):
+        """A protected call before the check: keep the running flow aside and run the verification flow, or, when
+        the call is locked, refuse and hand off. Nothing is called (R13-1, R13-2)."""
+        if run.meta.get(LOCKED) or self.check is None:
+            run.trace["gate"] = {"tool": node.data["tool"], "result": "locked"}
+            return self._lock(run, node)
+        run.meta[GATED] = {"flow": run.flow.id, "node": node.id, "slots": dict(run.slots),
+                           "asked": list(run.meta.get(ASKED, ())), "form_slot": run.meta.get(FORM_SLOT),
+                           "form_said": dict(run.meta.get(FORM_SAID) or {})}
+        carried = {slot: run.slots[slot] for slot in self.check.carry if slot in run.slots}
+        run.trace["gate"] = {"tool": node.data["tool"], "flow": run.flow.id}
+        run.flow, run.slots = self.check, self._prefill(self.check, carried, run.meta)
+        run.meta.update(FRESH)
+        return self.check.start
+
+    def failed_check(self, run: Run, node: Node):
+        """A failed check: count it; at the limit lock the call, else empty the answers so they are asked again."""
+        failures = int(run.meta.get(FAILURES, 0)) + 1
+        run.meta[FAILURES] = failures
+        gated = run.meta.get(GATED)
+        own = self.flows[gated["flow"]].max_attempts if gated and gated["flow"] in self.flows else None
+        limit = own if own is not None else self.pack.verification.max_attempts
+        run.trace["verification"] = {"failures": failures, "limit": limit}
+        if failures >= limit:
+            run.meta[LOCKED] = True
+            run.meta.pop(GATED, None)
+            run.trace["verification"]["result"] = "locked"
+            return self._lock(run, node)
+        for entry in run.meta.get(ASKED, ()):   # the caller enters the details again; nothing says which was wrong
+            asked = run.flow.nodes[entry.partition("#")[0]]
+            run.slots.pop(entry.partition("#")[2] or asked.data["slot"], None)
+        run.meta[ASKED] = []
+        return None
+
+    def _lock(self, run: Run, node: Node) -> Done:
+        run.out.append(self.pack.wording.get("verify.locked", "I couldn't verify your identity. "
+                                                                 "Let me connect you to an agent."))
+        exceed = self.pack.verification.on_exceed
+        run.actions.append(HandOff("verification_failed") if exceed == "handoff" else EndCall())
+        return Done(node.id)
+
     # -- corrections (R9) ---------------------------------------------------------------------------------
     def _correction(self, flow: Flow, state, turn_input) -> Optional[DMResult]:
         """"No, I said thirty": the slot read back most recently takes the number that differs from its value."""
@@ -619,6 +677,14 @@ class FlowManager(DialogueManager):
                 return DMResult(self.pack.missing_reply, new, (HandOff("missing_attribute"),), run.trace)
             except ExprError as exc:
                 raise FlowRuntimeError(f"{run.flow.path}: node {node_id}: {exc}") from exc
+            if isinstance(outcome, Done) and run.flow.role == VERIFICATION and not run.actions \
+                    and run.meta.get(VERIFIED) and run.meta.get(GATED):   # checked: the stopped call goes on (R13)
+                gated = run.meta.pop(GATED)
+                run.flow, run.slots = self.flows[gated["flow"]], dict(gated["slots"])
+                run.meta.update({ASKED: gated["asked"], FORM_SLOT: gated["form_slot"], FORM_SAID: gated["form_said"]})
+                run.trace["resumed_after_check"] = {"flow": gated["flow"], "node": gated["node"]}
+                node_id = gated["node"]
+                continue
             if isinstance(outcome, (Wait, Done)):
                 self._read_back(run, state.slots if state.flow_id == run.flow.id else {})
             if isinstance(outcome, Done) and run.meta.get(PARKED):

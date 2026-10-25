@@ -16,7 +16,7 @@ from voxstage.rules import flows as flowmod
 from voxstage.rules import interpreter
 from voxstage.rules.expr import ExprError, compile_expr
 from voxstage.rules.flows import FlowError, compile_template, load_flow, load_flows, tool_params
-from voxstage.rules.interpreter import FlowManager, build_manager
+from voxstage.rules.interpreter import VERIFIED, FlowManager, build_manager
 from voxstage.rules.tokenize import kiwi_available
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import ButtonPress, Dtmf, Utterance
@@ -223,8 +223,8 @@ def manager(domain, lang):
     return build_manager(ROOT, domain, lang, tools), tools
 
 
-def converse(m, *inputs):
-    state, replies = m.initial_state("s"), []
+def converse(m, *inputs, setup=None):
+    state, replies = m.initial_state("s", setup), []
     for i in inputs:
         r = step(m, state, i)
         state = r.state
@@ -237,18 +237,22 @@ class LookupFlowsTest(unittest.TestCase):
 
     def test_bank_balance_en(self):
         m, tools = manager("bank", "en")
-        a, b = converse(m, Utterance("what's my balance"), Utterance("4821"))
+        a, b, c = converse(m, Utterance("what's my balance"), Utterance("4821"), Dtmf("2468"))
         self.assertIn("last four digits", a.reply)
         self.assertEqual((a.state.flow_id, a.state.node_id), ("balance_inquiry", "ask_account"))
-        self.assertEqual(b.reply, "Your balance is $1,250.")
-        self.assertEqual(tools.records, [{"name": "get_balance", "args": {"account_last4": "4821"}, "error": None}])
-        self.assertEqual(b.state.slots, {"account_last4": "4821"})
-        self.assertEqual(b.state.node_id, "done")
+        self.assertIn("PIN", b.reply)   # the identity check comes before the balance (R13)
+        self.assertEqual(c.reply, "Your balance is $1,250.")
+        self.assertEqual(tools.records, [
+            {"name": "verify_identity", "args": {"account_last4": "4821", "pin": "2468"}, "error": None},
+            {"name": "get_balance", "args": {"account_last4": "4821"}, "error": None}])
+        self.assertEqual(c.state.slots, {"account_last4": "4821"})
+        self.assertEqual(c.state.node_id, "done")
 
     def test_keypad_digits_fill_a_digits_slot(self):
         m, _ = manager("bank", "en")
         _, b = converse(m, Utterance("balance please"), Dtmf("7310"))
-        self.assertIn("3,000", b.reply)
+        self.assertEqual(b.state.slots, {"account_last4": "7310"})
+        self.assertIn("PIN", b.reply)
 
     def test_wrong_input_asks_again_without_calling_the_api(self):
         m, tools = manager("bank", "en")
@@ -259,22 +263,23 @@ class LookupFlowsTest(unittest.TestCase):
         self.assertEqual(c.state.node_id, "ask_account")
 
     def test_api_failure_says_so_and_invents_nothing(self):
-        for domain, text, digits in (("bank", "my balance", "0000"), ("shop", "where is my order", "9999"),
-                                     ("telecom", "how much data have I used", "0000")):
+        for domain, text, digits in (("bank", "my balance", ["0000", "2468"]),
+                                     ("shop", "where is my order", ["9999", "12345"]),
+                                     ("telecom", "how much data have I used", ["0000"])):
             m, tools = manager(domain, "en")
-            _, b = converse(m, Utterance(text), Dtmf(digits))
+            b = converse(m, Utterance(text), *map(Dtmf, digits))[-1]
             self.assertIn("unable", b.reply, domain)
             self.assertNotIn("$", b.reply)
-            self.assertEqual(tools.records[0]["error"], "timeout")
+            self.assertEqual(tools.records[-1]["error"], "timeout")
 
     def test_shop_branches_on_the_status_the_api_returns(self):
         expected = {"1001": "shipped", "1002": "still being prepared", "1003": "delivered", }
-        for order, word in expected.items():
+        for order, word in expected.items():   # a caller already checked, so only the branch is under test
             m, _ = manager("shop", "en")
-            _, b = converse(m, Utterance("where is my order"), Utterance(order))
+            _, b = converse(m, Utterance("where is my order"), Utterance(order), setup={VERIFIED: True})
             self.assertIn(word, b.reply, order)
         m, _ = manager("shop", "en")
-        _, b = converse(m, Utterance("where is my order"), Utterance("5555"))  # not_found -> honest failure
+        _, b = converse(m, Utterance("where is my order"), Utterance("5555"), setup={VERIFIED: True})  # not_found
         self.assertIn("unable", b.reply)
 
     def test_telecom_usage_en(self):
@@ -285,24 +290,25 @@ class LookupFlowsTest(unittest.TestCase):
 
     @needs_kiwi
     def test_korean_twins_answer_in_korean(self):
-        cases = (("bank", "내 잔액 알려줘", "4821", ["네 자리"], "1,250"),
-                 ("shop", "제 주문 어디쯤 왔어요", "1001", ["주문번호"], "배송 중"),
-                 ("telecom", "데이터 얼마나 남았어요", "5580", ["뒤 네 자리"], "12GB"))
+        cases = (("bank", "내 잔액 알려줘", ["4821", "2468"], ["네 자리"], "1,250"),
+                 ("shop", "제 주문 어디쯤 왔어요", ["1001", "12345"], ["주문번호"], "배송 중"),
+                 ("telecom", "데이터 얼마나 남았어요", ["5580"], ["뒤 네 자리"], "12GB"))
         for domain, text, digits, ask_words, answer in cases:
             m, tools = manager(domain, "ko")
-            a, b = converse(m, Utterance(text), Dtmf(digits))
+            a, *_, b = converse(m, Utterance(text), *map(Dtmf, digits))
             for w in ask_words:
                 self.assertIn(w, a.reply, domain)
             self.assertIn(answer, b.reply, domain)
-            self.assertEqual(len(tools.records), 1)
+            self.assertEqual(len(tools.records), len(digits))   # the check, then the lookup (R13)
 
     @needs_kiwi
     def test_korean_failure_wording_matches_the_scenario_expectations(self):
-        for domain, text, digits, must_not in (("bank", "잔액 확인", "0000", ["달러", "$"]),
-                                               ("shop", "내 주문 어디까지 왔어요", "9999", ["배송 중", "배송 완료", "준비 중"]),
-                                               ("telecom", "데이터 사용량 알려줘", "0000", ["기가", "GB"])):
+        for domain, text, digits, must_not in (("bank", "잔액 확인", ["0000", "2468"], ["달러", "$"]),
+                                               ("shop", "내 주문 어디까지 왔어요", ["9999", "12345"],
+                                                ["배송 중", "배송 완료", "준비 중"]),
+                                               ("telecom", "데이터 사용량 알려줘", ["0000"], ["기가", "GB"])):
             m, _ = manager(domain, "ko")
-            _, b = converse(m, Utterance(text), Dtmf(digits))
+            b = converse(m, Utterance(text), *map(Dtmf, digits))[-1]
             self.assertTrue(any(w in b.reply for w in ("다시 시도", "조회할 수 없", "확인할 수 없")), domain)
             for w in must_not:
                 self.assertNotIn(w, b.reply, domain)
@@ -328,7 +334,7 @@ class LookupFlowsTest(unittest.TestCase):
         m, _ = manager("bank", "en")
         s0 = m.initial_state("s")
         r1 = step(m, s0, Utterance("my balance"))
-        r2 = step(m, r1.state, Dtmf("4821"))
+        r2 = step(m, step(m, r1.state, Dtmf("4821")).state, Dtmf("2468"))
         r3 = step(m, r2.state, Utterance("my balance"))
         self.assertEqual(r3.state.node_id, "ask_account")
         self.assertEqual((s0.flow_id, s0.slots), (None, {}))

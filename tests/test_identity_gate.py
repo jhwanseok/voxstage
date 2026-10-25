@@ -8,11 +8,11 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from voxstage.dialogue import step
+from voxstage.dialogue import HandOff, step
 from voxstage.domain_pack import AskPolicy, DomainPack, Fallback
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, gate_tools, load_flows
-from voxstage.rules.interpreter import FlowManager
+from voxstage.rules.interpreter import GATED, LOCKED, RUNTIME, VERIFIED, FlowManager, build_manager
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import Dtmf, Utterance
 
@@ -177,6 +177,101 @@ class PrefillTest(unittest.TestCase):
             with self.subTest(prefill), tempfile.TemporaryDirectory() as tmp, self.assertRaises(FlowError):
                 load_flows(*write_pack(tmp, {"lookup": LOOKUP.replace(
                     "start: ask_acct", f"prefill: {prefill}\nstart: ask_acct")}, OPEN_TOOLS))
+
+
+OTHER = """
+id: other
+triggers: {any_of: [peek]}
+start: call
+nodes:
+  call: {type: call, tool: look, args: {acct: "1234"}, on_ok: say, on_error: done}
+  say: {type: say, text: "Peeked {result.value}.", next: done}
+  done: {type: end}
+"""
+
+
+def calls(api):
+    return [(c["name"], c["error"]) for c in api.records]
+
+
+class GateTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.m, self.api = build(self.tmp.name, {"lookup": LOOKUP, "check_id": CHECK, "other": OTHER})
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_no_protected_call_before_the_check(self):
+        a, b = talk(self.m, Utterance("my balance"), Dtmf("1234"))
+        self.assertEqual(calls(self.api), [])
+        self.assertEqual((b.reply, b.state.flow_id, b.state.node_id), ("Your PIN?", "check_id", "ask_pin"))
+        self.assertEqual(b.trace["gate"], {"tool": "look", "flow": "lookup"})
+        self.assertEqual(b.state.slots, {"acct": "1234"})   # carried into the check
+
+    def test_from_any_flow(self):
+        r, = talk(self.m, Utterance("peek"))
+        self.assertEqual((calls(self.api), r.state.flow_id), ([], "check_id"))
+        self.assertEqual(r.reply, "Account?")   # nothing to carry: the check asks for the account too
+
+    def test_a_pass_runs_the_stopped_call_in_the_same_turn(self):
+        *_, c = talk(self.m, Utterance("my balance"), Dtmf("1234"), Dtmf("2468"))
+        self.assertEqual(calls(self.api), [("check", None), ("look", None)])
+        self.assertEqual((c.reply, c.state.flow_id, c.state.node_id), ("It is 7.", "lookup", "done"))
+        self.assertTrue(c.state.meta[VERIFIED])
+        self.assertNotIn(GATED, c.state.meta)
+
+    def test_a_pass_holds_for_the_call(self):
+        *_, d = talk(self.m, Utterance("my balance"), Dtmf("1234"), Dtmf("2468"), Utterance("peek"))
+        self.assertEqual((d.reply, calls(self.api)[-1]), ("Peeked 7.", ("look", None)))
+
+    def test_wrong_details_are_asked_again_without_saying_which(self):
+        *_, c = talk(self.m, Utterance("my balance"), Dtmf("1234"), Dtmf("1111"))
+        self.assertEqual(calls(self.api), [("check", "invalid_credentials")])
+        self.assertEqual(c.reply, "That doesn't match. Please try again. Your PIN?")
+        self.assertEqual((c.state.node_id, c.state.slots), ("ask_pin", {"acct": "1234"}))
+        self.assertNotIn("7", c.reply)
+
+    def test_every_answer_of_the_check_is_asked_again(self):
+        *_, c = talk(self.m, Utterance("peek"), Dtmf("1234"), Dtmf("1111"))
+        self.assertEqual((c.state.node_id, c.state.slots), ("ask_acct", {}))
+        self.assertTrue(c.reply.endswith("Account?"))
+
+    def test_lockout_at_the_limit(self):
+        out = talk(self.m, Utterance("my balance"), Dtmf("1234"), Dtmf("1111"), Dtmf("2222"), Dtmf("3333"))
+        self.assertEqual(out[3].actions, ())
+        last = out[4]
+        self.assertEqual(last.actions, (HandOff("verification_failed"),))
+        self.assertIn("couldn't verify", last.reply)
+        self.assertTrue(last.state.meta[LOCKED])
+        self.assertEqual(len(calls(self.api)), 3)
+        state = last.state
+        for text in ("peek",):   # later protected calls are refused too
+            r = step(self.m, state, Utterance(text))
+            self.assertEqual(r.actions, (HandOff("verification_failed"),))
+        self.assertEqual(len(calls(self.api)), 3)
+
+    def test_runtime_keys(self):
+        self.assertIn(GATED, RUNTIME)
+        self.assertNotIn(VERIFIED, RUNTIME)
+        self.assertNotIn(LOCKED, RUNTIME)
+
+
+class ShippedGateTest(unittest.TestCase):
+    def test_cancel_keeps_the_pass(self):
+        api = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, "bank", "tools.yaml")))
+        m = build_manager(ROOT, "bank", "en", api)
+        *_, r = talk(m, Utterance("my balance"), Dtmf("4821"), Dtmf("2468"), Utterance("cancel"),
+                     Utterance("my balance"), Dtmf("4821"))
+        self.assertIn("1,250", r.reply)
+        self.assertEqual([c["name"] for c in api.records], ["verify_identity", "get_balance", "get_balance"])
+
+    def test_cancel_at_the_check_drops_the_stopped_flow(self):
+        api = RecordingTools(FakeApiExecutor.from_yaml(os.path.join(ROOT, "bank", "tools.yaml")))
+        m = build_manager(ROOT, "bank", "en", api)
+        *_, r = talk(m, Utterance("my balance"), Dtmf("4821"), Utterance("cancel"))
+        self.assertNotIn(GATED, r.state.meta)
+        self.assertEqual(api.records, [])
 
 
 if __name__ == "__main__":

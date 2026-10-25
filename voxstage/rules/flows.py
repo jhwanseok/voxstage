@@ -187,6 +187,7 @@ class Flow:
     carry: tuple = ()      # slots copied from the parked flow on a switch (R6-2)
     role: str | None = None   # "verification": the identity check run before a protected tool (R13)
     prefill: tuple = ()   # of (slot, attribute): empty slots taken from `customer.<attribute>` at the start (R13)
+    max_attempts: int | None = None   # the flow's own limit of failed identity checks (R13-2); None: the config's
 
 
 @dataclass(frozen=True)
