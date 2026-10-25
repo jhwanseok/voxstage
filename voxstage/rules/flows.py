@@ -185,6 +185,7 @@ class Flow:
     captures: tuple = ()   # of (slot, extractor spec): slots read from the words that started the flow
     interrupts: Pattern | None = None   # words that may start this flow while another one runs (R6-4)
     carry: tuple = ()      # slots copied from the parked flow on a switch (R6-2)
+    role: str | None = None   # "verification": the identity check run before a protected tool (R13)
 
 
 @dataclass(frozen=True)
@@ -419,6 +420,9 @@ def gate_tools(tools_path: str) -> tuple:
     return protected, verifier
 
 
+VERIFICATION = "verification"   # the one flow role (R13): started by the gate, never by the caller
+
+
 def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notices: tuple = (),
               risky: frozenset = frozenset()) -> Flow:
     with open(path, encoding="utf-8") as f:
@@ -426,7 +430,15 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
             raw = yaml.safe_load(f)
         except yaml.YAMLError as exc:
             raise FlowError(f"{path}: invalid YAML ({exc})") from exc
-    if not isinstance(raw, dict) or not {"id", "triggers", "start", "nodes"} <= set(raw) \
+    role = raw.get("role") if isinstance(raw, dict) else None
+    if role is not None and role != VERIFICATION:
+        raise FlowError(f"{path}: `role` can only be `{VERIFICATION}`")
+    if role == VERIFICATION:   # no way for the caller to start it (R13)
+        if not isinstance(raw, dict) or set(raw) & {"triggers", "buttons", "interrupts", "captures"} \
+                or not {"id", "start", "nodes"} <= set(raw) or set(raw) - {"id", "role", "start", "nodes", "carry"}:
+            raise FlowError(f"{path}: a verification flow has id, role, start and nodes (and optionally carry); "
+                            f"no triggers, buttons, interrupts or captures")
+    elif not isinstance(raw, dict) or not {"id", "triggers", "start", "nodes"} <= set(raw) \
             or set(raw) - {"id", "triggers", "start", "nodes", "buttons", "captures", "interrupts", "carry"}:
         raise FlowError(f"{path}: needs id, triggers, start and nodes "
                         f"(and optionally buttons, captures, interrupts, carry)")
@@ -470,7 +482,7 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
         ctx = CompileCtx(path, flow_id, node_id, names, tools, sensitive, notices)
         nodes[node_id] = Node(node_id, body["type"], NODE_TYPES[body["type"]].compile(body, ctx))
     try:
-        triggers = parse_pattern(path, {"id": flow_id, **(raw["triggers"] or {})})
+        triggers = None if role else parse_pattern(path, {"id": flow_id, **(raw["triggers"] or {})})
     except ValueError as exc:
         raise FlowError(str(exc)) from exc
     interrupts = None
@@ -488,7 +500,7 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
     if unknown:
         raise FlowError(f"{path}: carry {unknown}: not slots of this flow (an ask slot or a capture)")
     flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons), tuple(captures),
-                interrupts, tuple(carry))
+                interrupts, tuple(carry), role)
     _validate_graph(flow)
     _check_risky_calls(flow, risky)
     return flow
@@ -558,4 +570,27 @@ def load_flows(flows_dir: str, tools_path: str, sensitive: frozenset = frozenset
             if b in owner:
                 raise FlowError(f"{path}: button `{b}` already starts flow `{owner[b]}`")
             owner[b] = flow.id
+    _check_gate(flows, flows_dir, *gate_tools(tools_path))
     return flows
+
+
+def verification_flow(flows: dict):
+    return next((f for f in flows.values() if f.role == VERIFICATION), None)
+
+
+def _check_gate(flows: dict, flows_dir: str, protected: frozenset, verifier) -> None:
+    """One verification flow when a flow calls a protected tool; it calls the verifying tool and no protected one (R13)."""
+    checks = [f for f in flows.values() if f.role == VERIFICATION]
+    if len(checks) > 1:
+        raise FlowError(f"{flows_dir}: more than one verification flow: {sorted(f.id for f in checks)}")
+    used = {n.data["tool"] for f in flows.values() for n in f.nodes.values() if n.type == "call"} & protected
+    if not checks:
+        if used:
+            raise FlowError(f"{flows_dir}: tools {sorted(used)} require verification, but no flow has "
+                            f"`role: {VERIFICATION}`")
+        return
+    calls = {n.data["tool"] for n in checks[0].nodes.values() if n.type == "call"}
+    if verifier is None or verifier not in calls:
+        raise FlowError(f"{checks[0].path}: a verification flow must call the tool with `verifies: true`")
+    if calls & protected:
+        raise FlowError(f"{checks[0].path}: a verification flow cannot call a protected tool {sorted(calls & protected)}")

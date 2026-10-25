@@ -265,7 +265,7 @@ class FlowManager(DialogueManager):
                     raise FlowError(f"{flow.path}: node {node.id}: no handler registered for `{node.type}`")
                 if node.type == "confirm" and pack.confirm_words is None:
                     raise FlowError(f"{flow.path}: node {node.id}: a confirm node needs rules/confirm.yaml in the pack")
-        self.matcher = Matcher([f.triggers for f in self.flows.values()], self.tok)
+        self.matcher = Matcher([f.triggers for f in self.flows.values() if f.triggers is not None], self.tok)
         self.buttons = {b: f.id for f in self.flows.values() for b in f.buttons}
         self.commands = Matcher(pack.commands, self.tok) if pack.commands else None
         self.readback = {slot: compile_template("{value | " + call + "}", f"readback_slots.yaml: {slot}",

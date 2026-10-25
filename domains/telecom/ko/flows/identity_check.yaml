@@ -1,0 +1,12 @@
+# 보호된 도구 앞에서 게이트가 실행하는 본인 확인 (R13). 발신자가 직접 시작할 수 없다.
+# 계정은 게이트에 걸린 흐름에서 가져오고(carry), 확인에 실패하면 PIN을 다시 묻는다.
+id: identity_check
+role: verification
+carry: [account_last4]
+start: ask_account
+nodes:
+  ask_account: {type: ask, slot: account_last4, prompt: "계정 번호 끝 네 자리를 눌러 주세요.", extractor: digits, length: 4, next: ask_pin}
+  ask_pin: {type: ask, slot: pin, prompt: "본인 확인을 위해 비밀번호(PIN) 네 자리를 눌러 주세요.", extractor: digits, length: 4, next: check}
+  check: {type: call, tool: verify_identity, args: {account_last4: "{account_last4}", pin: "{pin}"}, on_ok: done, on_error: say_wrong}
+  say_wrong: {type: say, text: "입력하신 정보가 일치하지 않습니다. 다시 입력해 주세요.", next: ask_account}
+  done: {type: end}

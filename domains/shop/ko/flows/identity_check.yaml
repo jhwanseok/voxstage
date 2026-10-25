@@ -1,0 +1,12 @@
+# 보호된 도구 앞에서 게이트가 실행하는 본인 확인 (R13). 발신자가 직접 시작할 수 없다.
+# 주문은 게이트에 걸린 흐름에서 가져오고(carry), 확인에 실패하면 우편번호를 다시 묻는다.
+id: identity_check
+role: verification
+carry: [order_id]
+start: ask_order
+nodes:
+  ask_order: {type: ask, slot: order_id, prompt: "주문번호를 입력해 주세요.", extractor: digits, length: 4, next: ask_zip}
+  ask_zip: {type: ask, slot: zip_code, prompt: "본인 확인을 위해 배송지 우편번호 다섯 자리를 눌러 주세요.", extractor: digits, length: 5, next: check}
+  check: {type: call, tool: verify_identity, args: {order_id: "{order_id}", zip_code: "{zip_code}"}, on_ok: done, on_error: say_wrong}
+  say_wrong: {type: say, text: "입력하신 정보가 일치하지 않습니다. 다시 입력해 주세요.", next: ask_order}
+  done: {type: end}

@@ -1,0 +1,12 @@
+# Identity check run by the gate before a protected tool (R13); never started by the caller.
+# The order comes from the gated flow when it has one (carry); after a failed check the ZIP code is asked again.
+id: identity_check
+role: verification
+carry: [order_id]
+start: ask_order
+nodes:
+  ask_order: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: ask_zip}
+  ask_zip: {type: ask, slot: zip_code, prompt: "To verify your identity, please enter the five-digit ZIP code of the delivery address.", extractor: digits, length: 5, next: check}
+  check: {type: call, tool: verify_identity, args: {order_id: "{order_id}", zip_code: "{zip_code}"}, on_ok: done, on_error: say_wrong}
+  say_wrong: {type: say, text: "The details you entered don't match. Please try again.", next: ask_order}
+  done: {type: end}

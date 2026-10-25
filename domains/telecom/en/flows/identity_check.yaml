@@ -1,0 +1,12 @@
+# Identity check run by the gate before a protected tool (R13); never started by the caller.
+# The account comes from the gated flow when it has one (carry); after a failed check the PIN is asked again.
+id: identity_check
+role: verification
+carry: [account_last4]
+start: ask_account
+nodes:
+  ask_account: {type: ask, slot: account_last4, prompt: "Please enter the last four digits of your account number.", extractor: digits, length: 4, next: ask_pin}
+  ask_pin: {type: ask, slot: pin, prompt: "To verify your identity, please enter your four-digit PIN.", extractor: digits, length: 4, next: check}
+  check: {type: call, tool: verify_identity, args: {account_last4: "{account_last4}", pin: "{pin}"}, on_ok: done, on_error: say_wrong}
+  say_wrong: {type: say, text: "The details you entered don't match. Please try again.", next: ask_account}
+  done: {type: end}
