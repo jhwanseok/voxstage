@@ -82,3 +82,9 @@ One row per domain and language each time a step is measured. Every rule counts 
 | R10 | 353959f | shop | ko | 101 | 45 | 8 | 0 | 1179 | 229 | - | - |
 | R10 | 353959f | telecom | en | 76 | 38 | 8 | 0 | 1179 | 229 | - | - |
 | R10 | 353959f | telecom | ko | 76 | 38 | 8 | 0 | 1179 | 229 | - | - |
+| R13 | 6bf2f46 | bank | en | 82 | 39 | 8 | 0 | 1301 | 229 | 42 | 487 |
+| R13 | 6bf2f46 | bank | ko | 82 | 39 | 8 | 0 | 1301 | 229 | 41 | 487 |
+| R13 | 6bf2f46 | shop | en | 112 | 50 | 8 | 0 | 1301 | 229 | 43 | 487 |
+| R13 | 6bf2f46 | shop | ko | 112 | 50 | 8 | 0 | 1301 | 229 | 42 | 487 |
+| R13 | 6bf2f46 | telecom | en | 96 | 48 | 8 | 0 | 1301 | 229 | 49 | 487 |
+| R13 | 6bf2f46 | telecom | ko | 96 | 48 | 8 | 0 | 1301 | 229 | 48 | 487 |
