@@ -1,0 +1,12 @@
+# 조회 플로우: 계정은 고객 기록에서(없으면 묻고), 청구 API를 호출해 금액과 납부일을 말한다 (R13).
+# get_bill은 보호된 도구라 본인 확인이 먼저 실행된다. 영어 쌍둥이와 노드 구조가 같다.
+id: bill_inquiry
+triggers: {all_of: [[요금, 청구], [이번, 나온, 청구된]], any_of: [얼마, 금액, 알려, 확인], none_of: [어떻, 언제, 납부, 변경, 바꾸, 청구일, 결제일]}
+prefill: {account_last4: customer.account_last4}
+start: ask_account
+nodes:
+  ask_account: {type: ask, slot: account_last4, prompt: "계정 번호 끝 네 자리를 눌러 주세요.", extractor: digits, length: 4, next: lookup}
+  lookup: {type: call, tool: get_bill, args: {account_last4: "{account_last4}"}, on_ok: say_bill, on_error: say_fail}
+  say_bill: {type: say, text: "이번 달 요금은 {result.amount_due | money(result.currency)}이고, 납부일은 {result.due_date | date}입니다.", next: done}
+  say_fail: {type: say, text: "지금은 요금을 조회할 수 없어요. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

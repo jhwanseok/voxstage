@@ -2,6 +2,7 @@
 id: balance_inquiry
 buttons: [menu_balance]
 triggers: {any_of: [잔액, 잔고], none_of: [수수료]}
+prefill: {account_last4: customer.account_last4}
 start: ask_account
 nodes:
   ask_account: {type: ask, slot: account_last4, prompt: "어느 계좌인가요? 계좌번호 뒤 네 자리를 입력해 주세요.", extractor: digits, length: 4, next: lookup}

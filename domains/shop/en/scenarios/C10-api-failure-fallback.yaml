@@ -10,7 +10,12 @@ turns:
       flow: order_status
   - user: {kind: dtmf, digits: "9999"}
     expect:
+      tool_calls: []   # the identity check comes before the lookup (decision R13-3)
+      reply_contains_any: [ZIP code]
+  - user: {kind: dtmf, digits: "12345"}
+    expect:
       tool_calls:
+        - {name: verify_identity, args: {order_id: "9999", zip_code: "12345"}}
         - {name: get_order_status, args: {order_id: "9999"}, error: timeout}
       reply_contains_any: [try again, unable, couldn't]
       reply_not_contains: [shipped, delivered, processing]

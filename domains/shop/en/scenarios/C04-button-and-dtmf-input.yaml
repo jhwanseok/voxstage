@@ -12,6 +12,11 @@ turns:
   - user: {kind: dtmf, digits: "1001"}
     expect:
       slots: {order_id: "1001"}
+      tool_calls: []   # the identity check comes before the lookup (decision R13-3)
+      reply_contains_any: [ZIP code]
+  - user: {kind: dtmf, digits: "12345"}
+    expect:
       tool_calls:
+        - {name: verify_identity, args: {order_id: "1001", zip_code: "12345"}}
         - {name: get_order_status, args: {order_id: "1001"}}
       reply_contains_any: [shipped, October 8, "10/08"]

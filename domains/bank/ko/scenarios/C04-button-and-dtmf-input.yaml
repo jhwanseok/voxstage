@@ -12,6 +12,11 @@ turns:
   - user: {kind: dtmf, digits: "4821"}
     expect:
       slots: {account_last4: "4821"}
+      tool_calls: []   # the identity check comes before the lookup (decision R13-3)
+      reply_contains_any: [비밀번호, PIN]
+  - user: {kind: dtmf, digits: "2468"}
+    expect:
       tool_calls:
+        - {name: verify_identity, args: {account_last4: "4821", pin: "2468"}}
         - {name: get_balance, args: {account_last4: "4821"}}
       reply_contains_any: [잔액, "1,250", 천이백오십]

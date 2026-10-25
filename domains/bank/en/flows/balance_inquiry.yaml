@@ -2,6 +2,7 @@
 id: balance_inquiry
 buttons: [menu_balance]
 triggers: {any_of: [balance], none_of: [fee, fees]}
+prefill: {account_last4: customer.account_last4}
 start: ask_account
 nodes:
   ask_account: {type: ask, slot: account_last4, prompt: "Which account? Please enter the last four digits of the account number.", extractor: digits, length: 4, next: lookup}

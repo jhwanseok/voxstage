@@ -1,0 +1,12 @@
+# Lookup flow: the account from the caller's record (or asked), the bill API, the amount and due date (R13).
+# get_bill is protected, so the identity check runs before it.
+id: bill_inquiry
+triggers: {all_of: [[bill]], any_of: [current, much, amount, owe, total, latest], none_of: [when, pay, due, date, day, change, move]}
+prefill: {account_last4: customer.account_last4}
+start: ask_account
+nodes:
+  ask_account: {type: ask, slot: account_last4, prompt: "Please enter the last four digits of your account number.", extractor: digits, length: 4, next: lookup}
+  lookup: {type: call, tool: get_bill, args: {account_last4: "{account_last4}"}, on_ok: say_bill, on_error: say_fail}
+  say_bill: {type: say, text: "Your current bill is {result.amount_due | money(result.currency)}, due on {result.due_date | date}.", next: done}
+  say_fail: {type: say, text: "I'm unable to look up your bill right now. Please try again later.", next: done}
+  done: {type: end}

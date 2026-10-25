@@ -2,6 +2,7 @@
 id: order_status
 buttons: [menu_track]
 triggers: {all_of: [[order, package, parcel], [my]], any_of: [where, status, arrive, track, tracking], none_of: [how, cancel, return, change]}
+prefill: {order_id: customer.order_id}
 start: ask_order
 nodes:
   ask_order: {type: ask, slot: order_id, prompt: "What is your order number?", extractor: digits, length: 4, next: lookup}
