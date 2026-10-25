@@ -72,7 +72,7 @@ Decided by: jhwanseok. Nothing in this sheet is a decision until the Answer colu
 | R11-6 | Dates meant as past ("the transfer I sent on the 15th", "지난주 화요일") are read as the nearest future date or not at all. | leave it; backlog item. | Decided 2026-10-25 (A, as recommended): no change; a finding. Backlog D5: when a flow takes past dates (a transaction lookup), add cases for it and a per-slot direction (`past` / `future`) with past words (지난, 어제, last, yesterday). |
 | R12-1 | Retry count and whether the caller is told. | retry once silently, then tell. |  |
 | R12-2 | Fallback wording: generic or per tool. | per-tool wording with a generic default. |  |
-| R13-1 | Granularity: per flow, per node, or per tool. | per tool, because that is where leakage happens. |  |
+| R13-1 | Granularity: per flow, per node, or per tool. | per tool, because that is where leakage happens. | Decided 2026-10-25 (A, as recommended): a tool in `tools.yaml` may declare `requires: verified`; the engine refuses such a call before verification in any flow and runs the verification steps first, so a new flow that uses a protected tool is protected without extra lines. |
 | R13-2 | Lockout rule and what is said. | three failed attempts, then lock and hand off, with neutral wording that does not reveal which part was wrong. |  |
 | R14-1 | Whether to include the hard-coded variant as a deliberate counter-example. | yes, it is the point. |  |
 | R14-2 | Which change to simulate beyond the shipped v1 to v2 pairs. | one threshold change (a fee amount) to show how many rules a different kind of change touches. |  |
