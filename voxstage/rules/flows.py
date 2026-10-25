@@ -409,6 +409,16 @@ def risky_tools(tools_path: str) -> frozenset:
     return frozenset(name for name, body in spec["tools"].items() if (body or {}).get("risky") is True)
 
 
+def gate_tools(tools_path: str) -> tuple:
+    """(protected tools, the verifying tool or None): `requires: verified` and `verifies: true` (R13-1)."""
+    with open(tools_path, encoding="utf-8") as f:
+        spec = yaml.safe_load(f)
+    bodies = {name: body or {} for name, body in spec["tools"].items()}
+    protected = frozenset(n for n, b in bodies.items() if b.get("requires") == "verified")
+    verifier = next((n for n, b in bodies.items() if b.get("verifies") is True), None)
+    return protected, verifier
+
+
 def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notices: tuple = (),
               risky: frozenset = frozenset()) -> Flow:
     with open(path, encoding="utf-8") as f:

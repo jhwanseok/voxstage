@@ -2,6 +2,7 @@
 # Language-independent, so it is shared by every language of the domain.
 tools:
   get_order_status:
+    requires: verified          # caller must pass verify_identity first (R13-1)
     params: [order_id]
     rules:
       - when: {order_id: "9999"}
@@ -48,9 +49,12 @@ tools:
     default:
       return: {reference: RT1001}
   verify_identity:
+    verifies: true
     params: [order_id, zip_code]
     rules:
       - when: {order_id: "1001", zip_code: "12345"}
         return: {verified: true}
+      - when: {order_id: "9999", zip_code: "12345"}
+        return: {verified: true}   # passes, so the C10 timeout comes after the check (R13-3)
     default:
       error: invalid_credentials

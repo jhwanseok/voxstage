@@ -2,6 +2,7 @@
 # Language-independent, so it is shared by every language of the domain.
 tools:
   get_balance:
+    requires: verified          # caller must pass verify_identity first (R13-1)
     params: [account_last4]
     rules:
       - when: {account_last4: "0000"}
@@ -34,9 +35,12 @@ tools:
     default:
       return: {reference: TS1001}
   verify_identity:
+    verifies: true
     params: [account_last4, pin]
     rules:
       - when: {account_last4: "4821", pin: "2468"}
         return: {verified: true}
+      - when: {account_last4: "0000", pin: "2468"}
+        return: {verified: true}   # passes, so the C10 timeout comes after the check (R13-3)
     default:
       error: invalid_credentials

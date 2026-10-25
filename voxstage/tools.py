@@ -20,6 +20,10 @@ Rule table format:
             error: timeout               # simulate a failing API
         default:                         # optional; used when no rule matches
           error: not_found
+      get_balance:
+        requires: verified               # refused until the caller passed the check (R13-1)
+      verify_identity:
+        verifies: true                   # the check itself; exactly one when any tool is protected
 """
 
 from __future__ import annotations
@@ -86,7 +90,7 @@ def _validate_spec(spec) -> dict:
     out = {}
     for name, body in spec["tools"].items():
         body = body or {}
-        extra = set(body) - {"params", "rules", "default", "risky"}
+        extra = set(body) - {"params", "rules", "default", "risky", "requires", "verifies"}
         if extra:
             raise ValueError(f"tool {name}: unknown keys {sorted(extra)}")
         rules = body.get("rules", [])
@@ -98,7 +102,19 @@ def _validate_spec(spec) -> dict:
         risky = body.get("risky", False)
         if not isinstance(risky, bool):
             raise ValueError(f"tool {name}: 'risky' must be true or false")
-        out[name] = {"params": list(body.get("params", [])), "rules": rules, "default": default, "risky": risky}
+        requires = body.get("requires")
+        if requires not in (None, "verified"):
+            raise ValueError(f"tool {name}: 'requires' can only be 'verified'")
+        verifies = body.get("verifies", False)
+        if not isinstance(verifies, bool):
+            raise ValueError(f"tool {name}: 'verifies' must be true or false")
+        if requires and verifies:
+            raise ValueError(f"tool {name}: a tool cannot both require verification and verify the caller")
+        out[name] = {"params": list(body.get("params", [])), "rules": rules, "default": default, "risky": risky,
+                     "requires": requires, "verifies": verifies}
+    verifiers = [n for n, t in out.items() if t["verifies"]]
+    if any(t["requires"] for t in out.values()) and len(verifiers) != 1:
+        raise ValueError(f"protected tools need exactly one tool with 'verifies: true', found {verifiers}")
     return out
 
 

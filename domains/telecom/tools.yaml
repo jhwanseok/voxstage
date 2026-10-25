@@ -20,6 +20,7 @@ tools:
     default:
       error: not_found
   get_bill:
+    requires: verified          # caller must pass verify_identity first (R13-1)
     params: [account_last4]
     rules:
       - when: {account_last4: "5580"}
@@ -45,6 +46,7 @@ tools:
     default:
       return: {status: added}
   verify_identity:
+    verifies: true
     params: [account_last4, pin]
     rules:
       - when: {account_last4: "5580", pin: "1357"}
