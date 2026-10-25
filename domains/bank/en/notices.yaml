@@ -20,3 +20,4 @@ wording:
   date.ambiguous: "Which date do you mean?"
   readback: "{value}."
   correction.offer: "Did you mean {value}?"
+  verify.locked: "I couldn't verify your identity, so I'll connect you to an agent."

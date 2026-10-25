@@ -442,9 +442,9 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
                             f"no triggers, buttons, interrupts or captures")
     elif not isinstance(raw, dict) or not {"id", "triggers", "start", "nodes"} <= set(raw) \
             or set(raw) - {"id", "triggers", "start", "nodes", "buttons", "captures", "interrupts", "carry",
-                           "prefill"}:
+                           "prefill", "verification"}:
         raise FlowError(f"{path}: needs id, triggers, start and nodes "
-                        f"(and optionally buttons, captures, interrupts, carry, prefill)")
+                        f"(and optionally buttons, captures, interrupts, carry, prefill, verification)")
     raw_captures = raw.get("captures") or {}
     if not isinstance(raw_captures, dict):
         raise FlowError(f"{path}: `captures` must map slot names to extractors")
@@ -509,8 +509,14 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
     unknown = sorted(set(prefill) - names)
     if unknown:
         raise FlowError(f"{path}: prefill {unknown}: not slots of this flow (an ask slot or a capture)")
+    own = raw.get("verification")   # this flow's limit of failed identity checks (R13-2)
+    if own is not None and (not isinstance(own, dict) or set(own) != {"max_attempts"}
+                            or not isinstance(own["max_attempts"], int) or isinstance(own["max_attempts"], bool)
+                            or own["max_attempts"] < 1):
+        raise FlowError(f"{path}: `verification` is {{max_attempts: N}} with N >= 1")
     flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons), tuple(captures),
-                interrupts, tuple(carry), role, tuple((k, v.split(".", 1)[1]) for k, v in prefill.items()))
+                interrupts, tuple(carry), role, tuple((k, v.split(".", 1)[1]) for k, v in prefill.items()),
+                own["max_attempts"] if own else None)
     _validate_graph(flow)
     _check_risky_calls(flow, risky)
     return flow

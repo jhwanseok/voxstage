@@ -40,7 +40,7 @@ class Fallback:
 
 WORDING_KEYS = ("fallback.miss", "fallback.exceed", "ask.invalid", "ask.keypad_only", "ask.exceed",
                 "flow.attribute_missing", "flow.no_flow", "confirm.declined", "command.cancelled", "command.agent",
-                "date.ambiguous", "readback", "correction.offer")
+                "date.ambiguous", "readback", "correction.offer", "verify.locked")
 PLACEHOLDER_KEYS = ("readback", "correction.offer")   # the only wording with a `{value}` placeholder (R9)
 COMMANDS = ("cancel", "back", "agent")   # global commands (R8-4)
 
@@ -142,6 +142,7 @@ class DomainPack:
                     raise RuleError(f"{path}: missing (R9 correction words and confusion pairs)")
                 extra[key] = loader(path)
             extra["correction_policy"] = load_correction_policy(cfg_path)
+            extra["verification"] = load_verification_policy(cfg_path)
         rb_path = os.path.join(domains_dir, domain, "readback_slots.yaml")
         if os.path.exists(rb_path):
             extra["readback"] = load_readback_slots(rb_path)
@@ -208,8 +209,9 @@ def load_fallback(path: str, wording: dict) -> Fallback:
     """Counts and the action come from the config; the words come from the registry (`fallback.miss`, `.exceed`)."""
     raw = _read(path)
     fb = raw.get("fallback") if isinstance(raw, dict) else None
-    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "switch", "correction"}:
-        raise RuleError(f"{path}: needs a top-level 'fallback' mapping (and optionally 'ask', 'switch', 'correction')")
+    if not isinstance(fb, dict) or not set(raw) <= {"fallback", "ask", "switch", "correction", "verification"}:
+        raise RuleError(f"{path}: needs a top-level 'fallback' mapping "
+                        f"(and optionally 'ask', 'switch', 'correction', 'verification')")
     extra = set(fb) - {"max_misses", "on_exceed"}
     if extra:
         raise RuleError(f"{path}: unknown fallback keys {sorted(extra)} (wording lives in notices.yaml)")
@@ -337,6 +339,22 @@ def load_correction_policy(path: str) -> CorrectionPolicy:
     if action not in ("handoff", "end_call"):
         raise RuleError(f"{path}: correction.on_exceed must be handoff or end_call")
     return CorrectionPolicy(n, action)
+
+
+def load_verification_policy(path: str) -> VerificationPolicy:
+    raw = _read(path)
+    v = raw.get("verification") if isinstance(raw, dict) else None
+    if v is None:
+        return VerificationPolicy()
+    if not isinstance(v, dict) or set(v) - {"max_attempts", "on_exceed"}:
+        raise RuleError(f"{path}: 'verification' takes max_attempts and on_exceed only")
+    n = v.get("max_attempts", 3)
+    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+        raise RuleError(f"{path}: verification.max_attempts must be an integer >= 1")
+    action = v.get("on_exceed", "handoff")
+    if action not in ("handoff", "end_call"):
+        raise RuleError(f"{path}: verification.on_exceed must be handoff or end_call")
+    return VerificationPolicy(n, action)
 
 
 def load_sensitive_slots(path: str) -> frozenset:

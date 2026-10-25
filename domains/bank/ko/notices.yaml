@@ -20,3 +20,4 @@ wording:
   date.ambiguous: "어느 날짜를 말씀하신 건가요?"
   readback: "{value}요."
   correction.offer: "{value} 맞으세요?"
+  verify.locked: "본인 확인을 완료하지 못했습니다. 상담사에게 연결해 드릴게요."

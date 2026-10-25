@@ -9,7 +9,8 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from voxstage.dialogue import HandOff, step
-from voxstage.domain_pack import AskPolicy, DomainPack, Fallback
+from voxstage.domain_pack import (AskPolicy, DomainPack, Fallback, RuleError, VerificationPolicy,
+                                  load_verification_policy)
 from voxstage.evaluate import RecordingTools
 from voxstage.rules.flows import FlowError, gate_tools, load_flows
 from voxstage.rules.interpreter import GATED, LOCKED, RUNTIME, VERIFIED, FlowManager, build_manager
@@ -255,6 +256,54 @@ class GateTest(unittest.TestCase):
         self.assertIn(GATED, RUNTIME)
         self.assertNotIn(VERIFIED, RUNTIME)
         self.assertNotIn(LOCKED, RUNTIME)
+
+
+class LimitTest(unittest.TestCase):
+    def wrong(self, flows, n, **pack_fields):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, api = build(tmp, flows, **pack_fields)
+            return talk(m, Utterance("my balance"), Dtmf("1234"), *[Dtmf("1111")] * n)
+
+    def test_the_config_default(self):
+        out = self.wrong({"lookup": LOOKUP, "check_id": CHECK}, 2, verification=VerificationPolicy(2, "end_call"))
+        self.assertEqual(out[-2].actions, ())
+        self.assertEqual(len(out[-1].actions), 1)
+        self.assertEqual(type(out[-1].actions[0]).__name__, "EndCall")
+
+    def test_a_flow_sets_its_own_limit(self):
+        own = LOOKUP.replace("start: ask_acct", "verification: {max_attempts: 1}\nstart: ask_acct")
+        out = self.wrong({"lookup": own, "check_id": CHECK}, 1)   # the config default is 3
+        self.assertEqual(out[-1].actions, (HandOff("verification_failed"),))
+        out = self.wrong({"lookup": LOOKUP, "check_id": CHECK}, 1)
+        self.assertEqual(out[-1].actions, ())
+
+    def test_bad_flow_limit(self):
+        for own in ("{max_attempts: 0}", "{max_attempts: two}", "{tries: 2}", "3"):
+            with self.subTest(own), tempfile.TemporaryDirectory() as tmp, self.assertRaises(FlowError):
+                load_flows(*write_pack(tmp, {"check_id": CHECK, "lookup": LOOKUP.replace(
+                    "start: ask_acct", f"verification: {own}\nstart: ask_acct")}))
+
+    def test_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "config.yaml")
+            for body, want in (("fallback: {}", VerificationPolicy()),
+                               ("verification: {max_attempts: 5, on_exceed: end_call}", VerificationPolicy(5, "end_call"))):
+                with open(path, "w") as f:
+                    f.write(body)
+                self.assertEqual(load_verification_policy(path), want)
+            for body in ("verification: {max_attempts: 0}", "verification: {on_exceed: hangup}",
+                         "verification: {tries: 3}", "verification: 3"):
+                with open(path, "w") as f:
+                    f.write(body)
+                with self.subTest(body), self.assertRaises(RuleError):
+                    load_verification_policy(path)
+
+    def test_shipped_packs(self):
+        for d in ("bank", "shop", "telecom"):
+            for lang in ("en", "ko"):
+                pack = DomainPack.load(ROOT, d, lang)
+                self.assertEqual(pack.verification, VerificationPolicy(3, "handoff"))
+                self.assertIn("verify.locked", pack.wording)
 
 
 class ShippedGateTest(unittest.TestCase):

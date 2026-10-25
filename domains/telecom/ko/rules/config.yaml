@@ -17,3 +17,9 @@ switch:
 correction:
   max_corrections: 2
   on_exceed: handoff
+
+# Failed identity checks before the call is locked and handed off (R13-2); a flow may set its own
+# `verification: {max_attempts: N}`.
+verification:
+  max_attempts: 3
+  on_exceed: handoff
