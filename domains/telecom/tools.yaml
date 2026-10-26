@@ -2,6 +2,7 @@
 # Language-independent, so it is shared by every language of the domain.
 tools:
   get_data_usage:
+    retry: 1                    # a timeout is tried once more (R12-1)
     params: [line_last4]
     rules:
       - when: {line_last4: "0000"}
@@ -11,6 +12,7 @@ tools:
     default:
       error: not_found
   get_plan_price:
+    retry: 1                    # a timeout is tried once more (R12-1)
     params: [plan, contract]
     rules:
       - when: {plan: plus, contract: yearly}
@@ -20,6 +22,7 @@ tools:
     default:
       error: not_found
   get_bill:
+    retry: 1                    # a timeout is tried once more (R12-1)
     requires: verified          # caller must pass verify_identity first (R13-1)
     params: [account_last4]
     rules:

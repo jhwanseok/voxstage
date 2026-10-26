@@ -2,6 +2,7 @@
 # Language-independent, so it is shared by every language of the domain.
 tools:
   get_order_status:
+    retry: 1                    # a timeout is tried once more (R12-1)
     requires: verified          # caller must pass verify_identity first (R13-1)
     params: [order_id]
     rules:
@@ -16,6 +17,7 @@ tools:
     default:
       error: not_found
   get_shipping_fee:
+    retry: 1                    # a timeout is tried once more (R12-1)
     params: [tier]
     rules:
       - when: {tier: gold}

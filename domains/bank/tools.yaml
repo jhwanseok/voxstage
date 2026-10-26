@@ -2,6 +2,7 @@
 # Language-independent, so it is shared by every language of the domain.
 tools:
   get_balance:
+    retry: 1                    # a timeout is tried once more (R12-1)
     requires: verified          # caller must pass verify_identity first (R13-1)
     params: [account_last4]
     rules:
@@ -14,6 +15,7 @@ tools:
     default:
       error: not_found
   get_transfer_fee:
+    retry: 1                    # a timeout is tried once more (R12-1)
     params: [amount, grade]
     rules:
       - when: {grade: gold}
