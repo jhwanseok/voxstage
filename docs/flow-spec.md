@@ -259,6 +259,31 @@ verify_identity: {verifies: true, params: [account_last4, pin], ...}  # the chec
 - `prefill: {account_last4: customer.account_last4}` fills an empty slot from the caller's record when a flow
   starts; words the caller said win.
 
+## Tool failures and delays (R12)
+
+A failed tool never makes the bot invent an answer (decisions R12-1 to R12-5):
+
+```yaml
+# domains/<domain>/tools.yaml
+get_balance:
+  retry: 1                       # a timeout is tried once more, silently; never on a risky tool
+  rules:
+    - {when: {account_last4: "0001"}, delay_ms: 8000, return: {...}}   # a slow answer (simulated)
+# rules/config.yaml
+tools: {max_failures: 2, on_exceed: handoff, timeout_ms: 5000}
+```
+
+- An answer slower than `timeout_ms` is a `timeout`; its data is not used.
+- A `timeout` of a tool with `retry: 1` is called once more; both calls are recorded. Other errors (not_found,
+  invalid_credentials) are never retried.
+- A `timeout` of a risky tool may have done the change, so the bot says `call.unconfirmed` and hands off
+  (`HandOff("outcome_unknown")`); a clear refusal of a risky tool goes to the flow's `on_error`.
+- Timeouts that remain count over the call; at `max_failures` the bot says `call.exceed` and hands off
+  (`HandOff("tool_failed")`, or `EndCall`). Errors caused by what the caller gave are not counted.
+- `on_error` is optional: without it a failed call says `call.failed` and the flow ends.
+- A timeout of the verifying tool (R13) is not a failed check: the bot says `call.failed` and the stopped flow is
+  dropped.
+
 ## Node types
 
 | Type | Fields | Behaviour |
@@ -267,7 +292,7 @@ verify_identity: {verifies: true, params: [account_last4, pin], ...}  # the chec
 | `ask` | `slot`, `prompt`, `extractor`, `length` (digits only), `choices` (choice only), optional `interruptible` (default true), `next` | Adds the prompt and waits. The next turn's input fills the slot; if it contains no value, the prompt is asked again (see the re-prompt policy above). |
 | `form` | `slots`, optional `say_when_ready`, `next` | Asks the first empty slot and waits; says ready parts once; then `next` (see above). |
 | `confirm` | `prompt`, `on_yes`, `on_no` | Asks yes or no and waits; required before a risky tool (see above). |
-| `call` | `tool`, `args`, `on_ok`, `on_error` | Calls the tool through the tool port. The result is `result` (`{error: code}` on failure). |
+| `call` | `tool`, `args`, `on_ok`, optional `on_error` | Calls the tool through the tool port. The result is `result` (`{error: code}` on failure); failures follow R12. |
 | `branch` | `cases: [{when, next}]`, `else` | First case whose expression is true; otherwise `else`. |
 | `notices` | optional `ids`, `next` | Says the applicable registry notices in priority order. |
 | `goto` | `next` | Jumps. |
@@ -313,4 +338,4 @@ types, `next` links, tools and arguments; only texts and triggers differ (a test
 
 ## Not yet
 
-API failure and delay policy (R12), policy change (R14).
+Policy change (R14).
