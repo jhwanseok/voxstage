@@ -1,0 +1,21 @@
+id: shop.C13.008
+lang: ko
+domain: shop
+capability: C13
+title: "주문번호를 묻는 중에 정책 질문이 들어오고 반품이 이어진다"
+tags: [interaction, R14xR7]
+setup:
+  policy: {version: v1, free_shipping_threshold: "50"}
+turns:
+  - user: {kind: utterance, text: 노트북 반품하려고 하는데요}
+    expect:
+      flow: return_request
+      reply_contains_any: [주문번호]
+  - user: {kind: utterance, text: 얼마 이상 사야 배송비 안 내요}
+    expect:
+      flow: return_request
+      reply_contains_any: ["50달러", 오십 달러]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      flow: return_request
+      slots: {order_id: "1001", item: laptop}

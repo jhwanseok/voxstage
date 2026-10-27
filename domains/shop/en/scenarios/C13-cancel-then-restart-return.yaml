@@ -1,0 +1,24 @@
+id: shop.C13.005
+lang: en
+domain: shop
+capability: C13
+title: "A return is cancelled at the confirmation and the next return starts from the beginning"
+tags: [interaction, R8xR10]
+turns:
+  - user: {kind: utterance, text: I want to return a laptop}
+    expect:
+      flow: return_request
+      reply_contains_any: [order number]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      slots: {order_id: "1001", item: laptop}
+      reply_contains_any: ["1001"]
+  - user: {kind: utterance, text: Never mind}
+    expect:
+      flow: main_menu
+      tool_calls: []
+  - user: {kind: utterance, text: I want to return a blue jacket}
+    expect:
+      flow: return_request
+      slots: {item: blue jacket}
+      reply_contains_any: [order number]

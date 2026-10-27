@@ -1,0 +1,24 @@
+id: telecom.C13.007
+lang: ko
+domain: telecom
+capability: C13
+title: "확인 질문에서 아니요라고 하면서 요금제 크기를 정정한다"
+tags: [interaction, R7bxR9]
+turns:
+  - user:
+      kind: utterance
+      text: 십사 기가 요금제로 할게요
+      asr_text: 사십 기가 요금제로 할게요   # 모의 인식 오류 (직접 작성)
+    expect:
+      flow: data_plan
+      slots: {plan_gb: "40"}
+      reply_contains_any: [사십, "40"]
+  - user: {kind: utterance, text: 아니요 사십 말고 십사요}
+    expect:
+      slots: {plan_gb: "14"}
+      tool_calls: []
+      reply_contains_any: [십사, "14"]
+  - user: {kind: utterance, text: 네}
+    expect:
+      tool_calls:
+        - {name: set_data_plan, args: {plan_gb: "14"}}

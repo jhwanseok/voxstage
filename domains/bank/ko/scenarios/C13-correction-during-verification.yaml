@@ -1,0 +1,27 @@
+id: bank.C13.003
+lang: ko
+domain: bank
+capability: C13
+title: "비밀번호를 묻는 중에 계좌 끝자리를 정정한다"
+tags: [interaction, R13xR9]
+turns:
+  - user: {kind: utterance, text: 잔액 알려 주세요}
+    expect:
+      flow: balance_inquiry
+      reply_contains_any: [네 자리]
+  - user: {kind: dtmf, digits: "4812"}
+    expect:
+      slots: {account_last4: "4812"}
+      tool_calls: []
+      reply_contains_any: [비밀번호, PIN]
+  - user: {kind: utterance, text: 아니요 죄송한데 계좌는 4821이에요}
+    expect:
+      slots: {account_last4: "4821"}
+      tool_calls: []
+      reply_contains_any: [비밀번호, PIN]
+  - user: {kind: dtmf, digits: "2468"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {account_last4: "4821", pin: "2468"}}
+        - {name: get_balance, args: {account_last4: "4821"}}
+      reply_contains_any: [잔액, "1,250"]

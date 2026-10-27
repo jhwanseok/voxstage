@@ -40,6 +40,7 @@ load time with the file name.
 | C10 | External API failure or delay fallback | |
 | C11 | Block information before identity check | |
 | C12 | Policy-change impact | measured by regressions after a change |
+| C13 | Interaction of two features | a pair of earlier capabilities in one conversation (R15) |
 
 ## FAQ entry
 

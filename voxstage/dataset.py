@@ -36,6 +36,7 @@ CAPABILITIES = {
     "C10": "External API failure or delay fallback",
     "C11": "Block information before identity check",
     "C12": "Policy-change impact",
+    "C13": "Interaction of two features",
 }
 
 INPUT_KINDS = {

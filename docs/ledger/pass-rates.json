@@ -1,0 +1,50 @@
+{
+ "R0": {
+  "commit": "0abd454",
+  "en": [
+   0,
+   234
+  ],
+  "manager": "null",
+  "ko": [
+   0,
+   240
+  ]
+ },
+ "R1": {
+  "commit": "44dc1ee",
+  "en": [
+   100,
+   234
+  ],
+  "manager": "voxstage.rules.faq:default_factory",
+  "ko": [
+   99,
+   240
+  ]
+ },
+ "R2": {
+  "commit": "3dfa5fa",
+  "en": [
+   97,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   95,
+   240
+  ]
+ },
+ "R3": {
+  "commit": "b7a5eba",
+  "en": [
+   103,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   101,
+   240
+  ]
+ }
+}
