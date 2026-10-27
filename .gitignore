@@ -220,3 +220,7 @@ __marimo__/
 # voxstage
 runs/
 data/audio/
+
+# studio
+studio/exports/
+studio/**/node_modules/

@@ -28,6 +28,8 @@ reading an analysis, the record says that, and the decider may add their own wor
 | [0009](0009-faq-rule-manager.md) | FAQ rule manager: word groups, held-out text, configurable N-miss escalation | accepted |
 | [0010](0010-flow-interpreter.md) | Flow interpreter: state-machine map, small expression language, handler registry, load-time validation | accepted |
 | [0011](0011-korean-tokenisation.md) | Korean rule matching uses the Kiwi morphological analyzer as an optional dependency | accepted |
+| [0012](0012-studio-management-console.md) | Studio: a management console in the same repository, outside the engine core | accepted |
+| [0013](0013-studio-database-source-of-truth.md) | Studio: the database is the source of truth; publishing exports the YAML the engine loads | accepted |
 
 ## Template
 
