@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Pretendard", "Noto Sans KR", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-ink: #0f172a;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-500: #5b5bf0;
+  --color-brand-600: #4747d6;
+  --color-brand-700: #3a3ab3;
+}
+
+.mock-root { font-family: var(--font-sans); color: var(--color-ink); background: #f6f7fb; min-height: 100vh; }
+.mock-root * { box-sizing: border-box; }
+/* React Flow inside the mock: keep its own handles quiet */
+.mock-root .react-flow__handle { width: 9px; height: 9px; background: #94a3b8; border: 2px solid #fff; }
+.mock-root .react-flow__edge-text { font-size: 12px; font-weight: 600; }

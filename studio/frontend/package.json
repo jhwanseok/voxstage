@@ -10,10 +10,13 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.4",
+    "@tailwindcss/vite": "^4.3.3",
     "@xyflow/react": "^12.4.0",
+    "lucide-react": "^1.62.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.0.0"
+    "react-router-dom": "^7.0.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",

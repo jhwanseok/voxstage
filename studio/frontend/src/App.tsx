@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { ApiError, api, type Bot, type Publication, type Report } from "./api";
 import { ShellContext, useFetch, useShell } from "./hooks";
@@ -9,6 +9,12 @@ import Flows from "./pages/Flows";
 import History from "./pages/History";
 import Tools from "./pages/Tools";
 import Validation from "./pages/Validation";
+
+// Design mockups (static data): /mock/home, /mock/faq, /mock/flow. Loaded lazily so the main app keeps its own CSS.
+const MockLayout = lazy(() => import("./mock/MockLayout"));
+const MockHome = lazy(() => import("./mock/Home"));
+const MockFaq = lazy(() => import("./mock/Faq"));
+const MockFlow = lazy(() => import("./mock/Flow"));
 
 export function StatusBadge({ bot }: { bot: Bot }) {
   if (!bot.validated) return <span className="badge warn">not validated</span>;
@@ -105,6 +111,13 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Bots />} />
         <Route path="/b/:bot/*" element={<BotShell />} />
+        <Route path="/mock" element={<Suspense fallback={null}><MockLayout /></Suspense>}>
+          <Route index element={<Navigate to="home" replace />} />
+          <Route path="home" element={<Suspense fallback={null}><MockHome /></Suspense>} />
+          <Route path="faq" element={<Suspense fallback={null}><MockFaq /></Suspense>} />
+          <Route path="flow" element={<Suspense fallback={null}><MockFlow /></Suspense>} />
+          <Route path="*" element={<Navigate to="home" replace />} />
+        </Route>
       </Routes>
     </ShellContext.Provider>
   );
