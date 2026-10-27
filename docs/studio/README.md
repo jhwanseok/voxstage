@@ -52,14 +52,15 @@ Studio items ST1 to ST3 are in [queue.md](../plan/queue.md), section "Studio tra
   sibling" when creating a bot; neither blocks anything.
 - **Shared assets:** a change to a tool affects every bot of the domain. Validation of each bot goes stale on a shared
   change and the editor says which bots are affected; published bots are not changed until they are published again.
-- **Publish unit (proposed change to decision 1):** the bot. A domain-wide publish would force a Korean bot to wait for
+- **Publish unit (decision 1, changed):** the bot. A domain-wide publish would force a Korean bot to wait for
   the English one.
 
 ## Open decisions (recommendation first; asked one at a time)
 
-1. **Publish unit.** First decided 2026-10-27 as "a whole domain, all languages" ("도메인전체로하자"). **Under revision**
-   after decision 2: with a bot per language the unit becomes the bot (domain x language); waiting for the owner's
-   answer (see "Bots").
+1. **Publish unit.** DECIDED 2026-10-27: the bot (domain x language). First chosen as "a whole domain, all languages"
+   ("도메인전체로하자"); changed after decision 2 because a bot has one language. Owner's words: "응 같은도메인도 언어다르면
+   분리해주고, 도메인별로 봇단위를 분리해줘". Same domain with another language is a separate bot (`bank-ko`, `bank-en`);
+   another domain is a separate bot.
 2. **Language.** DECIDED 2026-10-27 ("봇별로 언어를 설정하게하자"): each bot has one language and its content is edited
    in that language only; no screen edits an English and a Korean flow together. Consequences: see "Bots".
 3. **Rollback semantics.** Rollback makes a new publication and resets the draft (recommended), or only loads the old

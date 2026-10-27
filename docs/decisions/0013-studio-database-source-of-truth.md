@@ -33,8 +33,8 @@ We will build option 2, and keep option 3 possible for later.
 - Rolling back creates a new publication from an old snapshot; history is never rewritten.
 - Content is organised in **bots**: one domain in one language (`bank-en`). A bot has its own draft, validation and
   publications; language-free assets (`tools.yaml`, slot lists) belong to the domain and are exported with every bot.
-  The unit of validation and publication is proposed to be the bot (the owner first chose the whole domain, then chose
-  one language per bot; the change is awaiting confirmation). The loader has no cross-language references; the English /
+  The unit of validation and publication is the bot (the owner first chose the whole domain, then one language per bot,
+  and confirmed the bot as the unit on 2026-10-27). The loader has no cross-language references; the English /
   Korean twin rule is an engine test, and the studio reports it only as an optional warning.
 
 ## Rationale
@@ -76,4 +76,4 @@ See [docs/studio/README.md](../studio/README.md), "Open decisions".
 
 ## Decider's note
 
-"도메인전체로하자" (publish unit: a whole domain, all languages; 2026-10-27), then "봇별로 언어를 설정하게하자" (a language per bot; 2026-10-27), which moves the unit to the bot, pending confirmation.
+"도메인전체로하자" (publish unit: a whole domain, all languages; 2026-10-27), then "봇별로 언어를 설정하게하자" (a language per bot; 2026-10-27), and finally "응 같은도메인도 언어다르면 분리해주고, 도메인별로 봇단위를 분리해줘" (a bot is domain x language and is the publish unit; 2026-10-27).
