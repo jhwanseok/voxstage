@@ -35,10 +35,10 @@ export default function MockLayout() {
         {!home && (
           <button className="mx-3 mb-2 flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left hover:bg-slate-50">
             <span><span className="block text-[11px] text-slate-500">상담봇</span><span className="text-sm font-semibold">은행 상담봇 · 한국어</span></span>
-            <ChevronsUpDown size={15} className="text-slate-400" />
+            <ChevronsUpDown size={15} className="text-slate-500" />
           </button>
         )}
-        <nav className="mt-1 flex flex-col gap-0.5 px-3">
+        <nav aria-label="주요 메뉴" className="mt-1 flex flex-col gap-0.5 px-3">
           {MENU.map(({ to, label, icon: Icon }) => {
             const active = pathname === to;
             return (

@@ -36,11 +36,20 @@ export default function Faq() {
   const row = ROWS.find((r) => r.id === sel)!;
   return (
     <div className="flex">
+      <nav aria-label="질문 보기 기준" className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-52 shrink-0 border-r border-slate-200 bg-white p-4 xl:block">
+        <div className="mb-2 px-2 text-xs font-semibold text-slate-500">보기 기준</div>
+        {[["전체", 7, true], ["게시된 질문", 4, false], ["고친 질문", 3, false], ["확인이 필요한 질문", 1, false]].map(([l, n, on]) => (
+          <button key={String(l)} className={`mb-0.5 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${on ? "bg-brand-50 font-semibold text-brand-700" : "text-slate-600 hover:bg-slate-100"}`}>
+            <span>{l}</span><span className="num text-xs text-slate-500">{n}</span>
+          </button>
+        ))}
+        <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">질문마다 알아듣는 조건과 예문을 함께 확인해 보세요. 예문이 3개보다 적으면 확인이 필요해요.</p>
+      </nav>
       <main className="min-w-0 flex-1 px-8 py-6">
         <div className="mb-4 flex items-center gap-3">
           <h2 className="whitespace-nowrap text-xl font-bold">자주 묻는 질문 <span className="ml-1 text-sm font-medium text-slate-500">{ROWS.length}개</span></h2>
           <span className="flex-1" />
-          <div className="relative w-72"><Search size={15} className="absolute left-3 top-2.5 text-slate-400" /><input className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500" placeholder="질문·답변 검색" /></div>
+          <div className="relative w-72"><Search size={15} className="absolute left-3 top-2.5 text-slate-500" /><input className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500" aria-label="질문 검색" placeholder="질문이나 답변을 검색해 보세요" /></div>
           <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option>전체</option><option>고친 항목만</option><option>문제 있는 항목만</option></select>
           <button className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600"><Plus size={15} />질문 추가</button>
         </div>
@@ -51,11 +60,11 @@ export default function Faq() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {ROWS.map((r) => (
-                <tr key={r.id} onClick={() => setSel(r.id)} className={`cursor-pointer align-top hover:bg-slate-50 ${sel === r.id ? "bg-brand-50/60" : ""}`}>
+                <tr key={r.id} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setSel(r.id)} onClick={() => setSel(r.id)} aria-selected={sel === r.id} className={`cursor-pointer align-top hover:bg-slate-50 ${sel === r.id ? "bg-brand-50/60" : ""}`}>
                   <td className="w-[26%] px-4 py-3 font-medium">{r.q}</td>
                   <td className="w-[36%] px-4 py-3 text-slate-600"><span className="line-clamp-2">{r.a}</span></td>
                   <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><Chips items={r.kw} /></div></td>
-                  <td className="whitespace-nowrap px-4 py-3">{r.state === "warn" ? <StatusChip tone="err"><AlertCircle size={12} />예문 부족</StatusChip> : r.changed ? <StatusChip tone="warn">수정됨</StatusChip> : <span className="text-xs text-slate-400">게시됨</span>}</td>
+                  <td className="whitespace-nowrap px-4 py-3">{r.state === "warn" ? <StatusChip tone="err"><AlertCircle size={12} />예문을 더 추가해 주세요</StatusChip> : r.changed ? <StatusChip tone="warn">수정됨</StatusChip> : <span className="text-xs text-slate-500">게시됨</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -65,8 +74,8 @@ export default function Faq() {
 
       <aside className="sticky top-14 h-[calc(100vh-3.5rem)] w-[460px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-6">
         <div className="mb-4 flex items-start justify-between">
-          <div><div className="text-xs text-slate-500">질문 수정</div><h3 className="text-lg font-bold">{row.q}</h3><div className="mt-0.5 font-mono text-xs text-slate-400">{row.id}</div></div>
-          <button className="rounded-md p-1 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
+          <div><div className="text-xs text-slate-500">질문 수정</div><h3 className="text-lg font-bold">{row.q}</h3><div className="mt-0.5 font-mono text-xs text-slate-500">{row.id}</div></div>
+          <button aria-label="닫기" className="rounded-md p-1 text-slate-500 hover:bg-slate-100"><X size={18} /></button>
         </div>
         <div className="space-y-5">
           <div><label className="mb-1 block text-sm font-medium">고객이 묻는 말</label><input defaultValue={row.q} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500" /></div>
@@ -88,7 +97,7 @@ export default function Faq() {
             <p className="mb-2 text-xs text-slate-500">조건을 만들 때 이 예문들을 같이 보면서 확인하세요.</p>
             <ul className="space-y-1.5">
               {["카드를 잃어버렸는데 어떻게 하죠", "체크카드가 없어졌어요 정지시키고 싶어요", "누가 내 카드를 훔친 것 같아요"].map((t) => (
-                <li key={t} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-1.5 text-sm">{t}<Trash2 size={14} className="text-slate-300" /></li>
+                <li key={t} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-1.5 text-sm">{t}<Trash2 size={14} className="text-slate-500" /></li>
               ))}
             </ul>
             <button className="mt-2 text-sm font-medium text-brand-600">+ 예문 추가</button>

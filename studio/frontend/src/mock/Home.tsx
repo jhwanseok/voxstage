@@ -14,8 +14,8 @@ export default function Home() {
     <main className="mx-auto max-w-6xl px-8 py-8">
       <div className="mb-8 flex items-end justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">안녕하세요, 오늘은 어떤 상담봇을 다듬어 볼까요?</h2>
-          <p className="mt-1 text-sm text-slate-500">상담봇 하나는 업종 하나와 언어 하나로 이루어져요. 질문·시나리오·API 연결을 고치고, 검증한 뒤 게시하면 음성봇 엔진이 바로 읽어 가요.</p>
+          <h2 className="text-2xl font-bold tracking-tight">어떤 상담봇을 다듬어 볼까요?</h2>
+          <p className="mt-1 text-sm text-slate-500">상담봇은 업종 하나와 언어 하나로 이루어져요. 질문과 시나리오를 고친 뒤 검증하고 게시해 보세요. 게시한 내용은 바로 적용돼요.</p>
         </div>
         <div className="flex shrink-0 gap-2">
           <button className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-50"><Upload size={15} />기존 데이터 가져오기</button>
@@ -27,7 +27,7 @@ export default function Home() {
         {[["상담봇", "4개", "한국어 3 · 영어 1"], ["게시 대기", "2개", "변경이 있거나 검증이 필요해요"], ["최근 게시", "오늘 14:20", "은행 상담봇 3번째"]].map(([k, v, s]) => (
           <div key={k} className="rounded-xl border border-slate-200 bg-white p-5">
             <div className="text-xs font-medium text-slate-500">{k}</div>
-            <div className="mt-1 text-2xl font-bold">{v}</div>
+            <div className="num mt-1 text-2xl font-bold">{v}</div>
             <div className="mt-0.5 text-xs text-slate-500">{s}</div>
           </div>
         ))}
@@ -44,9 +44,9 @@ export default function Home() {
               <StatusChip tone={b.state.tone}>{b.state.text}</StatusChip>
             </div>
             <div className="mt-5 grid grid-cols-3 gap-3 text-sm">
-              <div className="flex items-center gap-2 whitespace-nowrap text-slate-700"><BookOpenText size={16} className="text-slate-400" /><span><b>{b.faq}</b>개 질문</span></div>
-              <div className="flex items-center gap-2 whitespace-nowrap text-slate-700"><GitBranch size={16} className="text-slate-400" /><span><b>{b.flows}</b>개 시나리오</span></div>
-              <div className="flex items-center gap-2 whitespace-nowrap text-slate-700"><PlugZap size={16} className="text-slate-400" /><span><b>{b.apis}</b>개 API</span></div>
+              <div className="flex items-center gap-2 whitespace-nowrap text-slate-700"><BookOpenText size={16} className="text-slate-500" /><span><b>{b.faq}</b>개 질문</span></div>
+              <div className="flex items-center gap-2 whitespace-nowrap text-slate-700"><GitBranch size={16} className="text-slate-500" /><span><b>{b.flows}</b>개 시나리오</span></div>
+              <div className="flex items-center gap-2 whitespace-nowrap text-slate-700"><PlugZap size={16} className="text-slate-500" /><span><b>{b.apis}</b>개 API</span></div>
             </div>
             <div className="mt-4 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500"><Clock size={13} />{b.last}</div>
           </Link>
