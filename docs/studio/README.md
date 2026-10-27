@@ -66,8 +66,9 @@ Studio items ST1 to ST3 are in [queue.md](../plan/queue.md), section "Studio tra
 3. **Rollback semantics.** DECIDED 2026-10-27 (as recommended, "추천대로 해줘"): a rollback to publication N creates a new
    publication from N's snapshot and resets the draft to it. History is kept. With unpublished draft changes the
    caller must confirm "discard and proceed" (`discard_draft: true`).
-4. **Layout and rollback.** Layout is not versioned; positions of surviving nodes stay (recommended), or layout is
-   snapshotted with each publication.
+4. **Layout and rollback.** DECIDED 2026-10-27 (as recommended, "응 그렇게하자"): layout is not versioned and not part of a
+   publication. Only the current layout is kept; a rollback leaves the positions of surviving nodes as they are, nodes
+   that no longer exist lose their position, and nodes without one are placed by Auto layout.
 5. **Backend validation of the held-out rule.** The FAQ pattern rule "patterns are written without reading the
    paraphrases" (ADR 0009) is a method of the dataset, not of operators. Recommended: the studio shows paraphrases next
    to patterns and does not enforce it.
