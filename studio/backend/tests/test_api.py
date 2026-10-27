@@ -93,3 +93,18 @@ def test_flow_graph_has_edge_labels_and_layout_is_not_content(client):
     after = client.get(f"{A}/bots/bank-en/flows/transfer").json()
     assert after["layout"]["nodes"] == {"ask_amount": {"x": 10.0, "y": 20.0, "collapsed": False}}
     assert client.get(f"{A}/bots/bank-en").json()["draft_revision"] == before
+
+
+def test_every_flow_of_every_domain_has_a_consistent_graph(client):
+    for d in ("shop", "telecom"):
+        assert client.post(f"{A}/domains/import", json={"domain": d}).status_code == 201
+    kinds = set()
+    for bot in client.get(f"{A}/bots").json():
+        for f in client.get(f"{A}/bots/{bot['slug']}/flows").json():
+            g = client.get(f"{A}/bots/{bot['slug']}/flows/{f['id']}").json()["graph"]
+            ids = {n["id"] for n in g["nodes"]}
+            assert g["start"] in ids
+            for e in g["edges"]:
+                assert e["from"] in ids and e["to"] in ids, (bot["slug"], f["id"], e)
+            kinds |= {n["type"] for n in g["nodes"]}
+    assert {"say", "ask", "form", "confirm", "call", "branch", "notices", "end"} <= kinds
