@@ -1,4 +1,4 @@
-# Studio design (proposed, awaiting approval)
+# Studio design (all open decisions answered; awaiting approval to build)
 
 A management console for the content the engine runs on: FAQ, flows, tools, notices, policy. A reference and
 learning implementation built like a product. Nothing here is built until the owner approves it.
@@ -72,5 +72,5 @@ Studio items ST1 to ST3 are in [queue.md](../plan/queue.md), section "Studio tra
 5. **Held-out rule.** DECIDED 2026-10-27 (as recommended, "추천안대로 하자"): the studio does not enforce "patterns are written
    without reading the paraphrases" (ADR 0009); that is a method of the dataset, not of operators. The FAQ form shows
    paraphrases and ASR variants next to the pattern. Datasets are still written as `domains/` files by the engine track.
-6. **Frontend test depth.** Component tests (Vitest) plus one end-to-end test of import, edit, publish (Playwright),
-   or unit tests only. Recommended: both, small.
+6. **Frontend test depth.** DECIDED 2026-10-27 (as recommended, "추천안대로 진행해줘"): small component tests (Vitest) for the
+   editor rules, plus one end-to-end test (Playwright) of import, edit, validate, publish, rollback.
