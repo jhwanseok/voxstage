@@ -94,3 +94,9 @@ One row per domain and language each time a step is measured. Every rule counts 
 | R12 | 72012cb | shop | ko | 112 | 50 | 8 | 0 | 1355 | 229 | 42 | 487 |
 | R12 | 72012cb | telecom | en | 96 | 48 | 8 | 0 | 1355 | 229 | 49 | 487 |
 | R12 | 72012cb | telecom | ko | 96 | 48 | 8 | 0 | 1355 | 229 | 48 | 487 |
+| R14 | 380d2bc | bank | en | 88 | 41 | 8 | 0 | 1355 | 229 | 43 | 487 |
+| R14 | 380d2bc | bank | ko | 88 | 41 | 8 | 0 | 1355 | 229 | 42 | 487 |
+| R14 | 380d2bc | shop | en | 130 | 56 | 8 | 0 | 1355 | 229 | 46 | 487 |
+| R14 | 380d2bc | shop | ko | 130 | 56 | 8 | 0 | 1355 | 229 | 45 | 487 |
+| R14 | 380d2bc | telecom | en | 102 | 50 | 8 | 0 | 1355 | 229 | 50 | 487 |
+| R14 | 380d2bc | telecom | ko | 102 | 50 | 8 | 0 | 1355 | 229 | 49 | 487 |
