@@ -69,8 +69,8 @@ Studio items ST1 to ST3 are in [queue.md](../plan/queue.md), section "Studio tra
 4. **Layout and rollback.** DECIDED 2026-10-27 (as recommended, "응 그렇게하자"): layout is not versioned and not part of a
    publication. Only the current layout is kept; a rollback leaves the positions of surviving nodes as they are, nodes
    that no longer exist lose their position, and nodes without one are placed by Auto layout.
-5. **Backend validation of the held-out rule.** The FAQ pattern rule "patterns are written without reading the
-   paraphrases" (ADR 0009) is a method of the dataset, not of operators. Recommended: the studio shows paraphrases next
-   to patterns and does not enforce it.
+5. **Held-out rule.** DECIDED 2026-10-27 (as recommended, "추천안대로 하자"): the studio does not enforce "patterns are written
+   without reading the paraphrases" (ADR 0009); that is a method of the dataset, not of operators. The FAQ form shows
+   paraphrases and ASR variants next to the pattern. Datasets are still written as `domains/` files by the engine track.
 6. **Frontend test depth.** Component tests (Vitest) plus one end-to-end test of import, edit, publish (Playwright),
    or unit tests only. Recommended: both, small.
