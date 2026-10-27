@@ -41,8 +41,8 @@ Studio items ST1 to ST3 are in [queue.md](../plan/queue.md), section "Studio tra
 
 ## Open decisions (recommendation first; asked one at a time)
 
-1. **Publish unit.** A whole domain (all languages) or per flow. Recommended: whole domain, because the loader checks
-   references across files and the EN/KO twin rule spans languages.
+1. **Publish unit.** DECIDED 2026-10-27 (as recommended, "도메인전체로하자"): a whole domain, all languages. The loader
+   checks references across files and the EN/KO twin rule spans languages.
 2. **Twin flows.** Edit English and Korean flows separately with a twin check, or one shared structure with per-language
    text. Recommended: separate files with a check (the engine's format is two files; shared structure is a
    later feature).

@@ -73,4 +73,4 @@ See [docs/studio/README.md](../studio/README.md), "Open decisions".
 
 ## Decider's note
 
-(none yet)
+"도메인전체로하자" (publish unit: a whole domain, all languages; 2026-10-27)
