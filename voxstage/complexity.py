@@ -26,6 +26,9 @@ REPORT = os.path.join(ROOT, "docs", "ledger", "complexity.md")
 FIGURE = os.path.join(ROOT, "docs", "ledger", "complexity.png")
 FACTORIES = ("voxstage.rules.interpreter:default_factory", "voxstage.rules.faq:default_factory")
 LANGS = ("en", "ko")
+# R13 was built before R12 and the ledger was run in a different order than the work, so the "next row" rule does not
+# hold for them: both end at the commit that closed them in the queue.
+END_COMMITS = {"R13": "a0e7e58", "R12": "3199792"}
 
 
 def _num(cell: str) -> int:
@@ -60,6 +63,8 @@ def steps(rows: list) -> list:
 def totals(rows: list, step: str, lang: str) -> dict:
     """One language's cost at a step: rules (nodes, patterns, regexes, rule-file entries) and lines of code."""
     mine = [r for r in rows if r["step"] == step and r["lang"] == lang]
+    if not mine:
+        return None
     shared = mine[0]   # the code is the same for every domain
     rules = sum(r["flow_nodes"] + r["patterns"] + r["regex"] + r["rule_entries"] for r in mine)
     return {"commit": shared["commit"], "nodes": sum(r["flow_nodes"] for r in mine), "rules": rules,
@@ -86,7 +91,7 @@ def measure(only: Optional[list] = None) -> dict:
             continue
         # A ledger row names HEAD while the step's work was still uncommitted, so the step ends at the commit the
         # next row names (the last step ends at its own).
-        commit = totals(rows, order[min(i + 1, len(order) - 1)], "en")["commit"]
+        commit = END_COMMITS.get(step) or totals(rows, order[min(i + 1, len(order) - 1)], "en")["commit"]
         entry = rates.setdefault(step, {})
         entry["commit"] = commit
         with tempfile.TemporaryDirectory() as tmp:
@@ -125,6 +130,8 @@ def to_markdown(rows: list, rates: dict) -> str:
     for step in steps(rows):
         for lang in LANGS:
             t = totals(rows, step, lang)
+            if t is None:
+                continue
             p, n = (rates.get(step, {}).get(lang) or [None, None])
             rate = f"{100 * p / n:.1f}" if n else "-"
             lines.append(f"| {step} | {lang} | {t['nodes']} | {t['rules']} | {t['flow_lines']} | {t['code_lines']} "

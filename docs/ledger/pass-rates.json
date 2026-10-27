@@ -46,5 +46,149 @@
    101,
    240
   ]
+ },
+ "R4": {
+  "commit": "2411043",
+  "en": [
+   106,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   105,
+   240
+  ]
+ },
+ "R5": {
+  "commit": "1e2cf97",
+  "en": [
+   121,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   115,
+   240
+  ]
+ },
+ "R6": {
+  "commit": "84081d0",
+  "en": [
+   123,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   116,
+   240
+  ]
+ },
+ "R7": {
+  "commit": "ee60146",
+  "en": [
+   123,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   116,
+   240
+  ]
+ },
+ "R7b": {
+  "commit": "b92f407",
+  "en": [
+   137,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   126,
+   240
+  ]
+ },
+ "R8": {
+  "commit": "7566163",
+  "en": [
+   145,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   135,
+   240
+  ]
+ },
+ "R11": {
+  "commit": "188b51b",
+  "en": [
+   146,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   136,
+   240
+  ]
+ },
+ "R9": {
+  "commit": "353959f",
+  "en": [
+   147,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   137,
+   240
+  ]
+ },
+ "R10": {
+  "commit": "6bf2f46",
+  "en": [
+   153,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   143,
+   240
+  ]
+ },
+ "R13": {
+  "commit": "a0e7e58",
+  "en": [
+   153,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   143,
+   240
+  ]
+ },
+ "R12": {
+  "commit": "3199792",
+  "en": [
+   153,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   143,
+   240
+  ]
+ },
+ "R14": {
+  "commit": "4fa13e1",
+  "en": [
+   159,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   149,
+   240
+  ]
  }
 }
