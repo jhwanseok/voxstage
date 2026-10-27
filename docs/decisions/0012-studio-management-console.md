@@ -1,6 +1,6 @@
 # 0012. Studio: a management console in the same repository, outside the engine core
 
-Status: proposed
+Status: accepted
 Date: 2026-10-27
 Decided by: jhwanseok (options and analysis prepared with AI assistance)
 
@@ -78,4 +78,4 @@ See [docs/studio/README.md](../studio/README.md), "Open decisions".
 
 ## Decider's note
 
-(none yet)
+"승인할께" (approved with decisions 1 to 6 of docs/studio/README.md; 2026-10-27)

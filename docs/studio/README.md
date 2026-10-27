@@ -1,7 +1,7 @@
-# Studio design (all open decisions answered; awaiting approval to build)
+# Studio design (approved 2026-10-27)
 
 A management console for the content the engine runs on: FAQ, flows, tools, notices, policy. A reference and
-learning implementation built like a product. Nothing here is built until the owner approves it.
+learning implementation built like a product. Approved by the owner on 2026-10-27.
 
 | Document | Content |
 |---|---|

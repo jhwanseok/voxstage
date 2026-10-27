@@ -1,6 +1,6 @@
 # 0013. Studio: the database is the source of truth; publishing exports the YAML the engine loads
 
-Status: proposed
+Status: accepted
 Date: 2026-10-27
 Decided by: jhwanseok (options and analysis prepared with AI assistance)
 
