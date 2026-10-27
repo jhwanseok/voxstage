@@ -9,20 +9,24 @@ A **bot** is one domain in one language (`bank-en`). Publishing a bot writes an 
 
 ## Run (local, single user, no login)
 
+One command, from the repository root (Docker, Python 3.10+ and Node 20+ needed; the first run creates the venv and
+installs packages):
+
 ```bash
-docker compose -f studio/docker-compose.yml up -d        # Postgres on localhost:5433
-
-cd studio/backend
-python -m venv .venv && .venv/Scripts/python -m pip install -e ../.. -e ".[test]"   # Linux/macOS: .venv/bin/python
-.venv/Scripts/python -m alembic upgrade head
-.venv/Scripts/python -m uvicorn studio_backend.main:app --port 8000
-
-cd studio/frontend
-npm install && npm run dev                                # http://localhost:5173, proxies /api to :8000
+python studio/dev.py            # Postgres, migrations, seed (imports domains/), backend, frontend; Ctrl+C stops the servers
+python studio/dev.py --check    # does the same, probes everything, stops the servers, exits 0 or 1
 ```
 
-Open the app, press **Import** on a domain from `domains/`, then edit FAQ and tools, look at the flows, **Validate**,
-**Publish**. Point the engine at `studio/exports/<bot>` as its domains directory to run the published content.
+| What | Address |
+|---|---|
+| Studio (open this) | http://127.0.0.1:5710 |
+| Backend API (docs at `/docs`) | http://127.0.0.1:8710/api/v1 |
+| Postgres (Docker, user, password and database `studio`) | localhost:5433 |
+
+Ports are fixed and do not clash with 4322, 5173 or 8000. On first start every domain of `domains/` is imported as bots
+(`bank-en`, `bank-ko`, ...). Edit FAQ and tools, look at the flows, **Validate**, **Publish**; point the engine at
+`studio/exports/<bot>` as its domains directory to run the published content. By hand: see the steps in `dev.py`
+(`docker compose up -d`, `alembic upgrade head`, `python -m studio_backend.seed`, `uvicorn`, `npm run dev`).
 
 ## Tests
 

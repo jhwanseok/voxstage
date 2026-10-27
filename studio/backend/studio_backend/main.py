@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="voxstage studio", version="0.0.1", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5710", "http://127.0.0.1:5710"],
                    allow_methods=["*"], allow_headers=["*"])
 API = "/api/v1"
 
