@@ -343,10 +343,10 @@ a trigger, one `say` with `{policy.<key> | formatter}` and `end`. The value come
 so changing the rule is one edit outside the flows. FAQ answers stay fixed text. A missing key apologises and
 hands off (R4-2).
 
-`domains_variants/hardcoded/` is a deliberate counter-example (R14-1): an overlay whose three shop replies have the
-old threshold written into the text. `python -m voxstage.policy_impact` shows, for a change of the threshold, the
-places that write the value and how many replies still say the old one after the single edit the C12 case points
-to.
+The hard-coded counter-example (R14-1) is generated, not kept: `python -m voxstage.policy_impact` copies the flows to a
+temporary folder with the v1 values written into the texts, runs C12 under v1 and v2 for both variants, and shows the
+files and lines a move to v2 must edit and how many replies still say the old threshold after the single edit the
+C12 case points to.
 
 ## Not yet
 
