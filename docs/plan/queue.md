@@ -36,7 +36,7 @@ engine's tests must still pass. Specs `docs/plan/specs/ST*.md` are written after
 
 | # | Item | Spec | Depends on | Status | Handoff note |
 |---|---|---|---|---|---|
-| ST1 | Foundation, import / export, FAQ and tools forms, flow viewer | [ST1](specs/ST1-foundation.md) | ADR 0012, 0013 accepted | ready | Backend and frontend skeleton, Postgres and Alembic baseline, importer and exporter, loader-based validation, FAQ (with patterns) and tools forms, flow list and read-only graph with automatic layout, contract test (import `domains/`, export, parsed equality, loads). |
+| ST1 | Foundation, import / export, FAQ and tools forms, flow viewer | [ST1](specs/ST1-foundation.md) | ADR 0012, 0013 accepted | in progress | Backend and frontend skeleton, Postgres and Alembic baseline, importer and exporter, loader-based validation, FAQ (with patterns) and tools forms, flow list and read-only graph with automatic layout, contract test (import `domains/`, export, parsed equality, loads). |
 | ST2 | Flow editing, validation display, publish and history | (after approval) | ST1 | needs decisions | Node-graph editing for all nine node kinds, properties panel, layout storage, validation strip, twin check, publish, history, diff, rollback, users and roles in the schema. |
 | ST3 | Notices, wording, settings, policy, preview chat | (after approval) | ST2; policy part also R14 done | needs decisions | Forms for notices, wording and settings; policy form in the format R14 leaves; preview chat on the engine's flow manager. |
 
