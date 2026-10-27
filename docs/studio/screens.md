@@ -1,7 +1,7 @@
 # Studio screens
 
 React, TypeScript, Vite; flow editor on React Flow (`@xyflow/react`). Server state through the API in
-[api.md](api.md); a domain and language switcher sits in the top bar of every screen, together with the draft status
+[api.md](api.md); a bot switcher (domain and language, e.g. `bank-en`) sits in the top bar of every screen, together with the draft status
 (`valid` / `has errors` / `unpublished changes`) and the **Publish** button.
 
 ## Map
@@ -22,7 +22,7 @@ React, TypeScript, Vite; flow editor on React Flow (`@xyflow/react`). Server sta
 
 ## 1. Domains and import
 
-A card per domain: languages, counts (FAQ, tools, flows), draft status, last publication. **Import** opens a dialog:
+A card per bot, grouped by domain: language, counts (FAQ, flows), draft status, last publication; the domain's shared assets (tools) are listed once per domain. **New bot** creates a bot for a domain and language (empty or copied from a sibling). **Import** opens a dialog:
 choose a domain from the repository's `domains/` (or upload a zip), see what will be modelled and what stays raw,
 confirm. Re-import of an existing domain asks to replace the draft.
 
@@ -45,8 +45,7 @@ need exactly one verifying tool).
 
 ## 4. Flow list
 
-Per language: flow id, trigger summary, buttons, node count, `role: verification` marker, validation badge, and an EN/KO
-twin marker (green if the twin check passes, grey if the twin does not exist yet). **New flow** (blank or copy).
+Flow id, trigger summary, buttons, node count, `role: verification` marker, validation badge. A flow belongs to the current bot (one language). An optional sibling marker shows whether the same flow id exists in the other bots of the domain and, if the sibling check is on, whether the structure matches. **New flow** (blank or copy, also from a sibling bot).
 
 ## 5 and 6. Flow viewer and editor
 
@@ -97,8 +96,8 @@ Flow-level properties (when nothing is selected): `id`, `triggers`, `buttons`, `
 
 Add node from the palette (drag or click; a new node is placed next to the selection), connect handles, delete
 node or line (with its lines), duplicate node, change kind (keeps compatible keys), rename node id (updates every
-line that pointed to it), undo/redo (client-side history of the working copy), copy a flow's twin text from the other
-language (ST2, text only). The working copy lives in the browser; **Save** sends the whole flow, and saving is
+line that pointed to it), undo/redo (client-side history of the working copy), copy a flow's structure from a sibling bot
+(ST2: node ids, kinds and links are copied, texts and triggers are left to be written in this bot's language). The working copy lives in the browser; **Save** sends the whole flow, and saving is
 also triggered on idle. A `409` offers reload or overwrite.
 
 ### Validation display
@@ -110,8 +109,9 @@ also triggered on idle. A `409` offers reload or overwrite.
 - Flow-level messages (unreachable nodes, a loop without waiting, no `end`) mark the nodes the message names.
 - The loader stops at the first problem in a file, so one item per file is normal; the strip says "the engine reports
   one problem per file at a time" so a clean list is not mistaken for a clean flow.
-- Studio-only items: **twin check** (the English and Korean flows must have the same node ids, kinds, `next` links, tools
-  and arguments; the engine enforces this in a test, not in the loader) and an unused-slot hint.
+- Studio-only items: the optional **sibling check** (off by default; when on, it warns where a sibling bot's flow of
+  the same id differs in node ids, kinds, `next` links, tools or arguments; the engine's twin test is a dataset rule,
+  not a loader rule, and never blocks a publish) and an unused-slot hint.
 
 ### Automatic layout
 

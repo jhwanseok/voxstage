@@ -1,6 +1,6 @@
 # Studio API
 
-FastAPI, JSON, prefix `/api/v1`. Resource paths use the domain slug (`bank`) and language (`en`, `ko`). The
+FastAPI, JSON, prefix `/api/v1`. Resource paths use the domain slug (`bank`) for what all bots of a domain share (tools, slot lists) and the bot slug (`bank-en`) for everything else; a bot is one domain in one language (see data-model.md, "Bots"). The
 OpenAPI document FastAPI generates is the exact contract; this page is the plan. Errors: `404` unknown resource,
 `409` revision conflict, `422` input shape (Pydantic) or a failed publish (with a `ValidationReport`), `400` a
 broken request that is not a shape error.
@@ -15,13 +15,16 @@ with the current row. Every response row contains `revision`.
 | `GET /me` | The current user and roles. v1: the seeded local user, all roles. |
 | `GET /roles` | The role names. Present so the UI can show role chips; there is no user management in v1. |
 
-## Domains and import
+## Domains, bots and import
 
 | Method and path | Request | Response |
 |---|---|---|
-| `GET /domains` | | domains with languages, `draft_revision`, `last_published_number`, `has_unpublished_changes`, `valid` |
-| `POST /domains/import` | `{source: "repo_domains" \| "upload", domain: "bank", replace: false}`; upload sends a zip | the domain; `409` if it exists and `replace` is false |
-| `GET /domains/{d}` | | one domain plus counts per entity |
+| `GET /domains` | | domains with their bots |
+| `GET /bots` | | bots: slug, domain, lang, title, `draft_revision`, `last_published_number`, `has_unpublished_changes`, `valid` |
+| `POST /bots` | `{domain, lang, title, copy_from?: bot slug}` | new empty bot (or a copy of another bot's content, e.g. to start a Korean bot from the English one) |
+| `GET /bots/{b}` | | one bot plus counts per entity |
+| `POST /domains/import` | `{source: "repo_domains" \| "upload", domain: "bank", replace: false}`; upload sends a zip | the domain and one bot per language directory found; `409` if it exists and `replace` is false |
+| `GET /domains/{d}` | | the domain, its bots and shared-asset counts |
 
 `repo_domains` reads `domains/<domain>/` of the checked-out repository from a configured root (server-side; the client
 never sends a path). Import stores unknown files raw and returns a list of what was modelled and what stayed raw.
@@ -30,11 +33,11 @@ never sends a path). Import stores unknown files raw and returns a list of what 
 
 | Method and path | Request | Response |
 |---|---|---|
-| `GET /domains/{d}/langs/{l}/faq` | | entries in order, each with its pattern |
-| `POST /domains/{d}/langs/{l}/faq` | entry | created entry |
-| `PUT /domains/{d}/langs/{l}/faq/{entry_id}` | entry (question, answer, paraphrases, asr_variants, pattern) | entry |
-| `DELETE /domains/{d}/langs/{l}/faq/{entry_id}` | | `204` |
-| `PUT /domains/{d}/langs/{l}/faq/order` | `{ids: [...]}` | `204` |
+| `GET /bots/{b}/faq` | | entries in order, each with its pattern |
+| `POST /bots/{b}/faq` | entry | created entry |
+| `PUT /bots/{b}/faq/{entry_id}` | entry (question, answer, paraphrases, asr_variants, pattern) | entry |
+| `DELETE /bots/{b}/faq/{entry_id}` | | `204` |
+| `PUT /bots/{b}/faq/order` | `{ids: [...]}` | `204` |
 
 Saves do not run the loader. Shape errors (wrong types, missing id/question/answer) answer `422`; the engine's rules
 (at least 3 paraphrases and 1 ASR variant, a pattern per entry) are reported by validation, so a half-written entry can
@@ -55,12 +58,12 @@ Rename is delete plus create; the response of `PUT` for a tool that flows use wa
 
 | Method and path | Request | Response |
 |---|---|---|
-| `GET /domains/{d}/langs/{l}/flows` | | list: id, start, node count, buttons, role, validation items for the flow |
-| `GET /domains/{d}/langs/{l}/flows/{id}` | | `{flow: {header, start, nodes, node_order}, layout: {viewport, direction, nodes: {id: {x, y}}}, graph: {nodes, edges}, items: [...]}` |
-| `POST /domains/{d}/langs/{l}/flows` | `{id, template?: "blank"\|"copy", copy_from?}` | new flow with `start` and one `end` node |
-| `PUT /domains/{d}/langs/{l}/flows/{id}` | the whole flow (header, start, nodes, node_order) | flow plus `items` (the studio's quick checks) |
-| `PUT /domains/{d}/langs/{l}/flows/{id}/layout` | `{viewport, direction, nodes: {id: {x, y, collapsed}}}` | `204`; does not change `revision` |
-| `DELETE /domains/{d}/langs/{l}/flows/{id}` | | `204`; `409` when another flow references it (`carry`, buttons are not references) or it is the verification flow while protected tools exist |
+| `GET /bots/{b}/flows` | | list: id, start, node count, buttons, role, validation items for the flow |
+| `GET /bots/{b}/flows/{id}` | | `{flow: {header, start, nodes, node_order}, layout: {viewport, direction, nodes: {id: {x, y}}}, graph: {nodes, edges}, items: [...]}` |
+| `POST /bots/{b}/flows` | `{id, template?: "blank"\|"copy", copy_from?}` | new flow with `start` and one `end` node |
+| `PUT /bots/{b}/flows/{id}` | the whole flow (header, start, nodes, node_order) | flow plus `items` (the studio's quick checks) |
+| `PUT /bots/{b}/flows/{id}/layout` | `{viewport, direction, nodes: {id: {x, y, collapsed}}}` | `204`; does not change `revision` |
+| `DELETE /bots/{b}/flows/{id}` | | `204`; `409` when another flow references it (`carry`, buttons are not references) or it is the verification flow while protected tools exist |
 
 `graph` is derived by the server so the browser needs no copy of the node rules: `edges` come from the same table as the
 engine's `NodeType.edges` (see screens, "Node kinds"), each as `{from, to, label, handle}`. The graph is a whole-flow
@@ -75,35 +78,35 @@ authoritative and runs on validate.
 
 | Method and path | Purpose |
 |---|---|
-| `GET/POST/PUT/DELETE /domains/{d}/langs/{l}/notices[/{id}]` | Fixed notices: text, unique integer priority, optional `applies_when` |
-| `GET/PUT /domains/{d}/langs/{l}/wording` | The fixed set of situation keys; `PUT` takes all keys |
-| `GET/PUT /domains/{d}/settings/{kind}` and `/langs/{l}/settings/{kind}` | `config`, `confirm`, `commands`, `corrections`, `confusions`, `sensitive_slots`, `readback_slots` |
-| `GET/PUT /domains/{d}/files/{path}` | Raw files (also the policy files until the format is modelled) |
+| `GET/POST/PUT/DELETE /bots/{b}/notices[/{id}]` | Fixed notices: text, unique integer priority, optional `applies_when` |
+| `GET/PUT /bots/{b}/wording` | The fixed set of situation keys; `PUT` takes all keys |
+| `GET/PUT /bots/{b}/settings/{kind}` (bot) and `/domains/{d}/settings/{kind}` (shared: `sensitive_slots`, `readback_slots`) | `config`, `confirm`, `commands`, `corrections`, `confusions`, `sensitive_slots`, `readback_slots` |
+| `GET/PUT /bots/{b}/files/{path}` and `/domains/{d}/files/{path}` | Raw files (also the policy files until the format is modelled) |
 
 ## Validation, publication, history
 
 | Method and path | Request | Response |
 |---|---|---|
-| `POST /domains/{d}/validate` | `{}` | `ValidationReport` for the current draft (all languages). Exports to a temp directory and runs the loader. |
-| `POST /domains/{d}/publications` | `{note}` | `201` publication. Runs validation first; with errors: `422` and the report, nothing is written. Needs the `publisher` role (v1: always true). |
-| `GET /domains/{d}/publications` | | list newest first: number, note, kind, published_by, published_at, file count |
-| `GET /domains/{d}/publications/{n}` | | publication with its files (paths and sizes) |
-| `GET /domains/{d}/publications/{n}/files/{path}` | | file content |
-| `GET /domains/{d}/publications/{n}/diff?against={m \| "draft"}` | | per-file status (added, removed, changed) and unified diffs of the exported text |
-| `POST /domains/{d}/publications/{n}/rollback` | `{note, discard_draft: false}` | `201` new publication of kind `rollback`; the draft is reset to it. `409` when the draft has unpublished changes and `discard_draft` is false |
-| `GET /domains/{d}/publications/{n}/export.zip` | | the files as a zip |
+| `POST /bots/{b}/validate` | `{}` | `ValidationReport` for the bot's current draft, including the domain's shared assets. Exports to a temp directory and runs the loader for this bot's language only. |
+| `POST /bots/{b}/publications` | `{note}` | `201` publication. Runs validation first; with errors: `422` and the report, nothing is written. Needs the `publisher` role (v1: always true). |
+| `GET /bots/{b}/publications` | | list newest first: number, note, kind, published_by, published_at, file count |
+| `GET /bots/{b}/publications/{n}` | | publication with its files (paths and sizes) |
+| `GET /bots/{b}/publications/{n}/files/{path}` | | file content |
+| `GET /bots/{b}/publications/{n}/diff?against={m \| "draft"}` | | per-file status (added, removed, changed) and unified diffs of the exported text |
+| `POST /bots/{b}/publications/{n}/rollback` | `{note, discard_draft: false}` | `201` new publication of kind `rollback`; the draft is reset to it. `409` when the draft has unpublished changes and `discard_draft` is false |
+| `GET /bots/{b}/publications/{n}/export.zip` | | the files as a zip |
 
-Flow of a publish: validate (engine loader on a temp export, plus the studio's twin check) then, only if no errors,
+Flow of a publish: validate (engine loader on a temp export of this bot; the optional sibling check is a warning and never blocks) then, only if no errors,
 compute `content_hash`; if equal to the newest publication, answer `409 nothing to publish`; otherwise store
 `publication` and `publication_file` in one transaction, write the export directory (temp directory and rename), set
-`domain.last_published_number`. A crash between the transaction and the rename is repaired at startup by
+`bot.last_published_number`. A crash between the transaction and the rename is repaired at startup by
 re-exporting the newest publication.
 
 ## Preview (ST3)
 
 | Method and path | Request | Response |
 |---|---|---|
-| `POST /domains/{d}/preview/sessions` | `{lang, source: "draft" \| publication number, setup?: {customer, policy, now}}` | session id; draft sources are exported to a temp directory and loaded; invalid drafts answer `422` with the report |
+| `POST /bots/{b}/preview/sessions` | `{source: "draft" \| publication number, setup?: {customer, policy, now}}` | session id; draft sources are exported to a temp directory and loaded; invalid drafts answer `422` with the report |
 | `POST /preview/sessions/{id}/turns` | `{text}` or `{button}` or `{digits}` | `{reply, actions, trace, state}` from the engine's flow manager (`trace` is the engine's own trace) |
 | `DELETE /preview/sessions/{id}` | | `204` |
 
@@ -114,3 +117,5 @@ object back each turn (ADR 0002), so no engine change is needed.
 
 Authentication (the `Authorization` header is ignored), user management, comments, multi-user locking beyond the
 `revision` check, audio preview.
+
+Shared assets: tools and the slot lists belong to the domain, so `PUT /domains/{d}/tools/{name}` changes what every bot of the domain will export. The response lists the bots it affects, and their validation goes stale (`shared_revision`, see data-model.md).
