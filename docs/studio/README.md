@@ -63,8 +63,9 @@ Studio items ST1 to ST3 are in [queue.md](../plan/queue.md), section "Studio tra
    another domain is a separate bot.
 2. **Language.** DECIDED 2026-10-27 ("봇별로 언어를 설정하게하자"): each bot has one language and its content is edited
    in that language only; no screen edits an English and a Korean flow together. Consequences: see "Bots".
-3. **Rollback semantics.** Rollback makes a new publication and resets the draft (recommended), or only loads the old
-   snapshot into the draft for the owner to publish after review.
+3. **Rollback semantics.** DECIDED 2026-10-27 (as recommended, "추천대로 해줘"): a rollback to publication N creates a new
+   publication from N's snapshot and resets the draft to it. History is kept. With unpublished draft changes the
+   caller must confirm "discard and proceed" (`discard_draft: true`).
 4. **Layout and rollback.** Layout is not versioned; positions of surviving nodes stay (recommended), or layout is
    snapshotted with each publication.
 5. **Backend validation of the held-out rule.** The FAQ pattern rule "patterns are written without reading the
