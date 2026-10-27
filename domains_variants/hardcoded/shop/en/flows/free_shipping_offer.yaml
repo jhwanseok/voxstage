@@ -1,7 +1,0 @@
-# Counter-example (R14-1): the threshold is written into the text.
-id: free_shipping_offer
-triggers: {all_of: [[free], [shipping, delivery]], any_of: [offer, have, available, there], none_of: [minimum, least, threshold, much, spend, how, get, qualify], priority: 1}
-start: say_it
-nodes:
-  say_it: {type: say, text: "Yes, shipping is free when your order is $50 or more.", next: done}
-  done: {type: end}

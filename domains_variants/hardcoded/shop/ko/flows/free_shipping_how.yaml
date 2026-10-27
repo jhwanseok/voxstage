@@ -1,7 +1,0 @@
-# 반례 (R14-1): 기준액을 문구에 직접 적었다.
-id: free_shipping_how
-triggers: {all_of: [[무료], [배송]], any_of: [어떻, 방법, 받], none_of: [얼마, 이상, 최소], priority: 1}
-start: say_it
-nodes:
-  say_it: {type: say, text: "주문 금액이 50달러이 되도록 담으시면 배송이 무료입니다.", next: done}
-  done: {type: end}
