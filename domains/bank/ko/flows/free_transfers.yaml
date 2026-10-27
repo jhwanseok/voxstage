@@ -1,0 +1,7 @@
+# 정책 값을 요청의 policy에서 읽어 말한다 (R14). 영어 쌍둥이와 노드 구조가 같다.
+id: free_transfers
+triggers: {all_of: [[무료], [이체, 송금]], priority: 1}
+start: say_it
+nodes:
+  say_it: {type: say, text: "한 달에 무료 이체는 {policy.free_transfers_per_month | count}번 가능합니다.", next: done}
+  done: {type: end}

@@ -178,13 +178,13 @@ class LedgerTest(unittest.TestCase):
             os.makedirs(os.path.join(root, "voxstage", "rules"))
             os.makedirs(os.path.join(root, "domains", "bank", "en", "flows"))
             os.makedirs(os.path.join(root, "domains", "bank", "en", "rules"))
-            with open(os.path.join(root, "voxstage", "rules", "interpreter.py"), "w") as f:
+            with open(os.path.join(root, "voxstage", "rules", "interpreter.py"), "w", encoding="utf-8") as f:
                 f.write("# c\n\nx = 1\ny = 2\n")
-            with open(os.path.join(root, "voxstage", "rules", "faq.py"), "w") as f:
+            with open(os.path.join(root, "voxstage", "rules", "faq.py"), "w", encoding="utf-8") as f:
                 f.write("z = 3\n")
-            with open(os.path.join(root, "domains", "bank", "en", "flows", "a.yaml"), "w") as f:
+            with open(os.path.join(root, "domains", "bank", "en", "flows", "a.yaml"), "w", encoding="utf-8") as f:
                 f.write("id: a\n# c\nnodes:\n  n1: {type: say}\n  n2: {type: end}\n")
-            with open(os.path.join(root, "domains", "bank", "en", "rules", "faq_patterns.yaml"), "w") as f:
+            with open(os.path.join(root, "domains", "bank", "en", "rules", "faq_patterns.yaml"), "w", encoding="utf-8") as f:
                 f.write("entries:\n  - {id: a, all_of: [x]}\n  - {id: b, regex: 'x.*y'}\n")
             m = ledger.measure(root)
             self.assertEqual(m["code"], {"interpreter_lines": 2, "other_rule_lines": 1, "normalize_lines": 0})
@@ -201,12 +201,12 @@ class LedgerTest(unittest.TestCase):
     def test_rule_file_entries_and_normalize_lines(self):   # R11-5
         with tempfile.TemporaryDirectory() as root:
             os.makedirs(os.path.join(root, "voxstage", "normalize"))
-            with open(os.path.join(root, "voxstage", "normalize", "en.py"), "w") as f:
+            with open(os.path.join(root, "voxstage", "normalize", "en.py"), "w", encoding="utf-8") as f:
                 f.write("# c\na = 1\nb = 2\n")
             rules = os.path.join(root, "domains", "bank", "en", "rules")
             os.makedirs(rules)
             os.makedirs(os.path.join(root, "domains", "bank", "en", "flows"))
-            with open(os.path.join(root, "domains", "bank", "en", "flows", "a.yaml"), "w") as f:
+            with open(os.path.join(root, "domains", "bank", "en", "flows", "a.yaml"), "w", encoding="utf-8") as f:
                 f.write("id: a\ninterrupts: {any_of: [x]}\ncaptures: {o: {extractor: digits, cue: [order, 주문]}}\n"
                         "nodes: {}\n")
             for name, text in (("commands.yaml", "cancel: {}\nback: {}\nagent: {}\n"),
@@ -215,7 +215,7 @@ class LedgerTest(unittest.TestCase):
                                ("confirm.yaml", "yes_words: [a, b]\nno_words: [c]\n")):
                 with open(os.path.join(rules, name), "w", encoding="utf-8") as f:
                     f.write(text)
-            with open(os.path.join(root, "domains", "bank", "readback_slots.yaml"), "w") as f:
+            with open(os.path.join(root, "domains", "bank", "readback_slots.yaml"), "w", encoding="utf-8") as f:
                 f.write("readback_slots: {amount: count}\n")
             m = ledger.measure(root)
         self.assertEqual(m["code"]["normalize_lines"], 2)

@@ -1,0 +1,7 @@
+# Policy value spoken from the request's policy (R14).
+id: grace_period
+triggers: {all_of: [[grace], [late, overdue, payment, pay]], priority: 1}
+start: say_it
+nodes:
+  say_it: {type: say, text: "You have {policy.late_payment_grace_days | count} days to pay after the due date.", next: done}
+  done: {type: end}

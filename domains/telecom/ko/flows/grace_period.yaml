@@ -1,0 +1,7 @@
+# 정책 값을 요청의 policy에서 읽어 말한다 (R14). 영어 쌍둥이와 노드 구조가 같다.
+id: grace_period
+triggers: {all_of: [[유예], [늦, 연체, 납부, 요금]], priority: 1}
+start: say_it
+nodes:
+  say_it: {type: say, text: "납부 기한 후 {policy.late_payment_grace_days | count}일까지 유예됩니다.", next: done}
+  done: {type: end}

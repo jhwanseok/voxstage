@@ -1,0 +1,7 @@
+# 정책 값을 요청의 policy에서 읽어 말한다 (R14). 영어 쌍둥이와 노드 구조가 같다.
+id: free_shipping_offer
+triggers: {all_of: [[무료], [배송]], any_of: [되, 있, 가능], none_of: [얼마, 이상, 최소, 어떻, 방법], priority: 1}
+start: say_it
+nodes:
+  say_it: {type: say, text: "네, 주문 금액이 {policy.free_shipping_threshold | money('USD')} 이상이면 배송이 무료입니다.", next: done}
+  done: {type: end}
