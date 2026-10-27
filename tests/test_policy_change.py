@@ -64,14 +64,13 @@ class PolicyFlowTest(unittest.TestCase):
 
 
 class ImpactTest(unittest.TestCase):
-    def test_generated_variant_writes_v1_and_ignores_the_policy(self):
+    def test_hardcoded_variant_ignores_the_policy(self):
+        import shutil
         import tempfile
         for lang in ("en", "ko"):
             with self.subTest(lang=lang), tempfile.TemporaryDirectory() as tmp:
-                changed = policy_impact.hardcode(DEFAULT_DOMAINS_DIR, tmp, {"free_shipping_threshold": "50",
-                                                                           "free_transfers_per_month": "3",
-                                                                           "late_payment_grace_days": "10"})
-                self.assertEqual(sum(1 for f in changed if f"/{lang}/" in f), 5)
+                shutil.copytree(DEFAULT_DOMAINS_DIR, tmp, dirs_exist_ok=True)
+                shutil.copytree(policy_impact.VARIANT_DIR, tmp, dirs_exist_ok=True)
                 got = policy_impact.replies(tmp, lang, 100)
                 self.assertTrue(all(policy_impact.say(50, lang) in r for r in got.values()))
 
@@ -83,8 +82,8 @@ class ImpactTest(unittest.TestCase):
                 self.assertEqual(d["referenced"]["edit_files"], 0)
                 self.assertEqual(d["referenced"]["stale"], [])
                 self.assertEqual(len(d["referenced"]["current"]), 3)
-                self.assertEqual(d["hardcoded"]["c12"], {"v1": (3, 3), "v2": (0, 3)})
-                self.assertEqual((d["hardcoded"]["edit_files"], d["hardcoded"]["edit_lines"]), (5, 5))
+                self.assertEqual(d["hardcoded"]["c12"], {"v1": (3, 3), "v2": (2, 3)})
+                self.assertEqual((d["hardcoded"]["edit_files"], d["hardcoded"]["edit_lines"]), (3, 3))
                 self.assertEqual(d["hardcoded"]["stale"], ["free_shipping_how", "free_shipping_offer"])
                 self.assertEqual(d["hardcoded"]["current"], ["free_shipping"])
 

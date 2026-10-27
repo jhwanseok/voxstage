@@ -1,12 +1,11 @@
 """How far does one policy edit reach? (R14, decisions R14-1, R14-2 and R14-3)
 
 The shop says its free-shipping threshold in three replies, each reading `{policy.<key> | formatter}` from the
-request. The hard-coded counter-example is not kept in the repository: this tool copies `domains/` to a temporary
-folder and writes the v1 value in place of every `{policy.<key>}` in the flows (the formatter applied), so the
-variant cannot drift from the real flows. Both variants run the C12 scenarios under v1 and v2, and the report
-gives, per variant, the C12 passes and the files and lines that a move to v2 must edit. For the threshold change
-of R14-2 (default 50 to 100) it also counts the replies that still say the old value after the single edit the C12
-case points to (the minimum-order reply).
+request. The hard-coded counter-example is kept as files (R14-1): `domains_variants/hardcoded/shop/<lang>/flows/`
+holds the same three flows with the v1 value written into the text, laid over a copy of `domains/`. Both variants
+run the C12 scenarios under v1 and v2, and the report gives, per variant, the C12 passes and the flow files and
+lines a move to v2 must edit. For the threshold change of R14-2 (default 50 to 100) it also counts the replies that
+still say the old value after the single edit the C12 case points to (the minimum-order reply).
 
   python -m voxstage.policy_impact [--old 50] [--new 100] [--lang en]
 """
@@ -16,20 +15,21 @@ from __future__ import annotations
 import argparse
 import glob
 import os
-import re
 import shutil
 import sys
 import tempfile
 from typing import Optional
 
-from . import dataset, evaluate
+from . import evaluate
 from .dialogue import step
 from .rules.formatters import FORMATTERS
 from .rules.interpreter import build_manager
 from .tools import FakeApiExecutor
 from .turn import Utterance
 
+VARIANT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "domains_variants", "hardcoded")
 ENTRY_FLOW = "free_shipping"   # the reply the C12 case asks about
+
 QUESTIONS = {
     "en": {"free_shipping": "What is the minimum order for free shipping",
            "free_shipping_offer": "Do you offer free shipping",
@@ -38,36 +38,6 @@ QUESTIONS = {
            "free_shipping_offer": "무료 배송 되나요",
            "free_shipping_how": "무료 배송 어떻게 받아요"},
 }
-FIELD = re.compile(r"\{policy\.(\w+)\s*(?:\|\s*(\w+)(?:\(([^)]*)\))?)?\s*\}")
-
-
-def write_value(match, policy: dict, lang: str) -> str:
-    """The text a `{policy.<key> | formatter(args)}` field speaks for this policy."""
-    key, name, args = match.group(1), match.group(2), match.group(3)
-    value = policy[key]
-    if not name:
-        return str(value)
-    return FORMATTERS[name].fn(value, lang, *[a.strip().strip("'\"") for a in (args or "").split(",") if a.strip()])
-
-
-def hardcode(domains_dir: str, dest: str, policy: dict) -> dict:
-    """Copy `domains_dir` to `dest`, writing `policy` into the flow texts. Returns {file: lines changed}."""
-    shutil.copytree(domains_dir, dest, dirs_exist_ok=True)
-    changed = {}
-    for path in glob.glob(os.path.join(dest, "*", "*", "flows", "*.yaml")):
-        lang = path.split(os.sep)[-3]
-        with open(path, encoding="utf-8") as f:
-            lines = f.read().split("\n")
-        n = 0
-        for i, line in enumerate(lines):
-            new = FIELD.sub(lambda m: write_value(m, policy, lang), line)
-            if new != line:
-                lines[i], n = new, n + 1
-        if n:
-            with open(path, "w", encoding="utf-8", newline="\n") as f:
-                f.write("\n".join(lines))
-            changed[os.path.relpath(path, dest).replace(os.sep, "/")] = n
-    return changed
 
 
 def policy_cases(domains_dir: str, lang: str) -> list:
@@ -99,22 +69,31 @@ def say(value, lang: str) -> str:
     return FORMATTERS["money"].fn(value, lang, "USD")
 
 
-def measure(lang: str, old, new, domains_dir: str = evaluate.DEFAULT_DOMAINS_DIR) -> dict:
+def literal_lines(pack: str, lang: str, value) -> dict:
+    """{flow file: lines} of the shop flows in `pack` that write the value into a text."""
+    literal, found = say(value, lang), {}
+    for path in glob.glob(os.path.join(pack, "shop", lang, "flows", "*.yaml")):
+        with open(path, encoding="utf-8") as f:
+            n = sum(1 for line in f if literal in line)
+        if n:
+            found[os.path.basename(path)] = n
+    return found
+
+
+def measure(lang: str, old, new, domains_dir: str = evaluate.DEFAULT_DOMAINS_DIR,
+            variant_dir: str = VARIANT_DIR) -> dict:
     """Both variants after the threshold changes from `old` to `new` and the C12 reply is edited."""
-    v1 = {}
-    for case in policy_cases(domains_dir, lang):   # the v1 values of every domain's policy
-        if case.setup["policy"].get("version") == "v1":
-            v1.update(case.setup["policy"])
     result = {}
     with tempfile.TemporaryDirectory() as tmp:
-        for name in ("referenced", "hardcoded"):
+        for name, vdir in (("referenced", None), ("hardcoded", variant_dir)):
             pack = os.path.join(tmp, name)
-            sites = {f: n for f, n in hardcode(domains_dir, pack, v1).items() if f"/{lang}/" in f} if name == "hardcoded" else {}
-            if name == "referenced":
-                shutil.copytree(domains_dir, pack)
-            entry = os.path.join(pack, "shop", lang, "flows", ENTRY_FLOW + ".yaml")
+            shutil.copytree(domains_dir, pack)
+            if vdir:
+                shutil.copytree(vdir, pack, dirs_exist_ok=True)
+            sites = literal_lines(pack, lang, old)
             passes = {v: c12_passes(pack, lang, v, domains_dir) for v in ("v1", "v2")}
             if sites:   # the one edit the C12 case points to
+                entry = os.path.join(pack, "shop", lang, "flows", ENTRY_FLOW + ".yaml")
                 with open(entry, encoding="utf-8") as f:
                     text = f.read().replace(say(old, lang), say(new, lang))
                 with open(entry, "w", encoding="utf-8", newline="\n") as f:

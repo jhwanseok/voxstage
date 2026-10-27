@@ -19,11 +19,11 @@ Read first: this file, [queue.md](../queue.md), decision sheet rows R14-1 to R14
 2. Shop only, for the R14-2 comparison: two more flows that say the same threshold in other words
    (`free_shipping_offer`: "do you offer free shipping", `free_shipping_how`: "how do I get free shipping"), so the
    value is spoken in three replies. In the referenced pack each reads `policy.free_shipping_threshold`.
-3. Hard-coded variant: generated, not kept (R14-1, confirmed in a second conversation): `policy_impact` copies
-   `domains/` to a temporary folder and writes the v1 value, through its formatter, in place of every
-   `{policy.<key>}` in the flows.
-4. `voxstage/policy_impact.py` (`python -m voxstage.policy_impact`): for the referenced pack and the generated
-   variant it reports the C12 passes under v1 and v2, the flow files and lines a move to v2 must edit, and, for the
+3. Hard-coded variant, kept as files (R14-1; the owner chose files over a generated copy on 2026-10-27):
+   `domains_variants/hardcoded/shop/{en,ko}/flows/` holds the same three flows with the v1 value (50 dollars) written
+   into the text. An overlay: only these files differ from `domains/`.
+4. `voxstage/policy_impact.py` (`python -m voxstage.policy_impact`): for the referenced pack and the
+   hard-coded overlay it reports the C12 passes under v1 and v2, the flow files and lines a move to v2 must edit, and, for the
    R14-2 threshold change (default 50 to 100) after the edit the C12 case points to (the minimum-order reply), how
    many of the three replies still say the old value.
 5. Ledger rows for R14 (`python -m voxstage.ledger R14`); `compare` of the whole suite before and after, in both
