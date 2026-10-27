@@ -1,0 +1,7 @@
+# Policy value spoken from the request's policy (R14).
+id: free_shipping
+triggers: {all_of: [[free], [shipping, delivery]], any_of: [minimum, least, threshold, much, spend, order], priority: 1}
+start: say_it
+nodes:
+  say_it: {type: say, text: "Orders of {policy.free_shipping_threshold | money('USD')} or more ship free.", next: done}
+  done: {type: end}

@@ -336,6 +336,18 @@ fills; bad extractors; file name differing from the id; a protected tool called 
 verification flows, or a verification flow that does not call the `verifies` tool or calls a protected one. Korean and English flows are twins: the same node ids,
 types, `next` links, tools and arguments; only texts and triggers differ (a test enforces it).
 
+## Policy values (R14)
+
+A reply that holds a rule value (free transfers, the free-shipping threshold, the grace period) is a small flow:
+a trigger, one `say` with `{policy.<key> | formatter}` and `end`. The value comes from `setup.policy` of the request,
+so changing the rule is one edit outside the flows. FAQ answers stay fixed text. A missing key apologises and
+hands off (R4-2).
+
+`domains_variants/hardcoded/` is a deliberate counter-example (R14-1): an overlay whose three shop replies have the
+old threshold written into the text. `python -m voxstage.policy_impact` shows, for a change of the threshold, the
+places that write the value and how many replies still say the old one after the single edit the C12 case points
+to.
+
 ## Not yet
 
-Policy change (R14).
+(nothing in the rule engine; R15 closes S1.)
