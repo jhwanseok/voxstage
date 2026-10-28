@@ -132,7 +132,7 @@ export function WordsInput({ value, onChange, placeholder = "입력 후 Enter", 
         <span key={w} className={cn("inline-flex items-center gap-0.5 rounded-md py-0.5 pl-2 pr-0.5 text-xs font-medium", TONE[tone].replace(/ring-\S+/, ""))}>
           {w}
           <button type="button" aria-label={`${w} 지우기`} onClick={() => onChange(value.filter((x) => x !== w))}
-            className="grid h-5 w-5 place-items-center rounded opacity-70 hover:bg-black/5 hover:opacity-100"><X size={12} aria-hidden /></button>
+            className="-my-0.5 grid h-6 w-6 place-items-center rounded opacity-70 hover:bg-black/5 hover:opacity-100"><X size={12} aria-hidden /></button>
         </span>
       ))}
       <input
@@ -149,14 +149,14 @@ export function WordsInput({ value, onChange, placeholder = "입력 후 Enter", 
   );
 }
 
-/** One choice of a few, as a row of buttons (a radio group). */
+/** One choice of a few, as a row of toggle buttons (`aria-pressed`; Tab moves between them). */
 export function Segmented<T extends string>({ value, onChange, options, label }: {
   value: T; onChange: (v: T) => void; options: { value: T; label: ReactNode; count?: number }[]; label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg bg-sunken p-0.5">
+    <div role="group" aria-label={label} className="inline-flex max-w-full overflow-x-auto rounded-lg bg-sunken p-0.5">
       {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}
+        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}
           className={cn("inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium",
             value === o.value ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink")}>
           {o.label}{o.count !== undefined && <span className="num text-xs text-muted">{o.count}</span>}
@@ -285,9 +285,16 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
   );
 }
 
+/** 을 or 를 after a Korean word, from its last syllable (a final consonant takes 을). */
+export function eul(word: string): string {
+  const c = word.trim().charCodeAt(word.trim().length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return `${word}을(를)`;
+  return `${word}${(c - 0xac00) % 28 ? "을" : "를"}`;
+}
+
 export function ErrorState({ error, onRetry, what = "내용" }: { error: Error; onRetry?: () => void; what?: string }) {
   return (
-    <Notice tone="err" title={`${what}을 불러오지 못했어요`}
+    <Notice tone="err" title={`${eul(what)} 불러오지 못했어요`}
       action={onRetry && <Button size="sm" variant="secondary" icon={<RotateCw size={14} />} onClick={onRetry}>다시 시도</Button>}>
       서버가 켜져 있는지 확인해 보세요. 받은 응답: {error.message}
     </Notice>

@@ -230,10 +230,11 @@ export default function FaqPage({ bot }: { bot: Bot }) {
                 {shown.map((e) => {
                   const words = (e.pattern?.all_of ?? []).flatMap((g: any) => (Array.isArray(g) ? g.slice(0, 2) : [g])).slice(0, 4);
                   return (
-                    <tr key={e.id} tabIndex={0} onClick={() => setOpen(e.id)} onKeyDown={(ev) => ev.key === "Enter" && setOpen(e.id)}
-                      aria-label={`${e.question} 고치기`} className={cn("cursor-pointer align-top hover:bg-sunken/60 focus-visible:bg-brand-50", open === e.id && "bg-brand-50")}>
+                    <tr key={e.id} onClick={() => setOpen(e.id)}
+                      className={cn("cursor-pointer align-top hover:bg-sunken/60 focus-within:bg-brand-50", open === e.id && "bg-brand-50")}>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-ink">{e.question}</div>
+                        <button type="button" onClick={(ev) => { ev.stopPropagation(); setOpen(e.id); }}
+                          className="text-left font-medium text-ink outline-offset-4">{e.question}<span className="sr-only"> 고치기</span></button>
                         <div className="mt-0.5 line-clamp-1 text-[13px] text-muted">{e.answer}</div>
                       </td>
                       <td className="px-4 py-3 max-md:hidden"><div className="flex flex-wrap gap-1">{words.map((w: string) => <Tag key={w}>{w}</Tag>)}</div></td>

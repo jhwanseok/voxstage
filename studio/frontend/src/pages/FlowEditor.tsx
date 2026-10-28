@@ -38,11 +38,17 @@ const KIND: Record<Kind, { label: string; hint: string; icon: typeof MessageSqua
 const WAITS = new Set(["ask", "form", "confirm"]);
 const CARD_W = 280;
 
+/** The name inside `{amount | money('USD')}`; a longer expression reads as "값" (the whole one is in the tooltip). */
+function placeholder(part: string): string {
+  const name = part.slice(1, -1).split("|")[0].trim();
+  return /^[A-Za-z_][\w.]*$/.test(name) ? name : "값";
+}
+
 /** `{amount}` placeholders tinted, so the spoken sentence still reads as one sentence. */
 function Spoken({ text }: { text: string }) {
   if (!text) return <span className="italic text-muted">문장을 적어 주세요</span>;
   return <>{text.split(/(\{[^{}]*\})/).map((part, i) => part.startsWith("{") && part.endsWith("}")
-    ? <span key={i} className="rounded bg-brand-50 px-0.5 font-medium text-brand-700">{part.slice(1, -1).split("|")[0].trim()}</span>
+    ? <span key={i} className="rounded bg-brand-50 px-0.5 font-medium text-brand-700" title={part}>{placeholder(part)}</span>
     : <span key={i}>{part}</span>)}</>;
 }
 
@@ -63,6 +69,7 @@ function headline(b: Record<string, any>, tools: Map<string, Tool>): ReactNode {
 interface CardData extends Record<string, unknown> { nid: string; body: Record<string, any>; tools: Map<string, Tool>; engine: number; local: number; isStart: boolean }
 
 function StepCard({ data, selected }: NodeProps<Node<CardData>>) {
+  if (!data.body) return null;
   const k = KIND[data.body.type as Kind] ?? KIND.goto;
   const Icon = k.icon;
   const risky = data.body.type === "call" && data.tools.get(data.body.tool)?.body.risky;
@@ -418,6 +425,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
   const [adding, setAdding] = useState(false);
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
   const layoutTimer = useRef<number | undefined>(undefined);
+  const placed = useRef<Record<string, { x: number; y: number }>>({});   // where new steps go, until React Flow has them
   const dirty = JSON.stringify(d) !== JSON.stringify(base);
   useUnsavedWarning(dirty);
 
@@ -451,7 +459,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
     setRfNodes((prev) => {
       const old = new Map(prev.map((n) => [n.id, n]));
       const card = (id: string): Node => ({
-        id, type: "step", position: old.get(id)?.position ?? initialPositions[id] ?? { x: 0, y: 0 },
+        id, type: "step", position: old.get(id)?.position ?? placed.current[id] ?? initialPositions[id] ?? { x: 0, y: 0 },
         measured: old.get(id)?.measured,
         data: { nid: id, body: d.nodes[id], tools: toolMap, isStart: d.start === id,
                 engine: engineItems.filter((i) => i.node_id === id).length, local: local.filter((p) => p.node === id).length },
@@ -499,7 +507,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
     const { draft, id } = addNode(d, kind, after);
     const anchor = after ? rfNodes.find((n) => n.id === after)?.position : null;
     const position = anchor ? { x: anchor.x + 40, y: anchor.y + 200 } : rf.screenToFlowPosition({ x: window.innerWidth / 2 - 300, y: window.innerHeight / 2 });
-    setRfNodes((ns) => [...ns, { id, type: "step", position, data: {} }]);
+    placed.current[id] = position;
     setD(draft);
     select(id);
   };
@@ -544,7 +552,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
   const status = dirty ? <StatusChip tone="warn">저장하지 않은 변경</StatusChip>
     : !bot.validated ? <StatusChip tone="idle">검증 전</StatusChip>
     : errCount ? <StatusChip tone="err">엔진 검사 문제 {errCount}개</StatusChip>
-    : bot.valid ? <StatusChip tone="ok">검증 통과</StatusChip> : <StatusChip tone="warn">다른 곳에 문제가 있어요</StatusChip>;
+    : bot.valid ? <StatusChip tone="ok">검증 통과</StatusChip> : <StatusChip tone="warn">다른 파일에 고칠 곳이 있어요</StatusChip>;
   const next = dirty ? <Button variant="primary" size="sm" icon={<Save size={14} />} loading={saving} onClick={save}>초안 저장</Button>
     : !bot.validated ? <Button variant="primary" size="sm" icon={<ShieldCheck size={14} />} loading={actions.validating} onClick={() => void actions.validate()}>검증하기</Button>
     : bot.valid && bot.has_unpublished_changes ? <Button variant="primary" size="sm" icon={<Rocket size={14} />} onClick={actions.openPublish}>게시하기</Button> : null;
@@ -556,7 +564,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
   const flowLevel = [...engineItems.filter((i) => !i.node_id).map((i) => i.message), ...local.filter((p) => !p.node).map((p) => p.text)];
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)]" onKeyDown={onKey}>
+    <main className="flex h-[calc(100vh-3.5rem)]" onKeyDown={onKey}>
       <div className="relative min-w-0 flex-1">
         <div className="absolute left-4 right-4 top-4 z-10 flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 rounded-xl bg-surface/95 px-3 py-2 shadow-sm ring-1 ring-line">
@@ -564,7 +572,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
               onClick={(e) => { if (dirty && !window.confirm("저장하지 않은 변경이 있어요. 버리고 나갈까요?")) e.preventDefault(); }}><ArrowLeft size={16} /></Link>
             <h1 className="text-sm font-semibold text-ink">{flowId}</h1>
             {status}
-            <span className="num text-xs text-muted">단계 {d.order.length}개</span>
+            <span className="num whitespace-nowrap text-xs text-muted">단계 {d.order.length}개</span>
             {next}
           </div>
           <span className="flex-1" />
@@ -605,19 +613,29 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
       <aside aria-label="편집 패널" className="flex w-[380px] shrink-0 flex-col border-l border-line bg-surface max-lg:w-[320px]">
         <div role="tablist" aria-label="편집 대상" className="flex border-b border-line text-sm font-medium">
           {([["node", "선택한 단계"], ["flow", "시나리오 설정"]] as const).map(([k, l]) => (
-            <button key={k} role="tab" type="button" aria-selected={tab === k} onClick={() => setTab(k)}
+            <button key={k} role="tab" type="button" id={`tab-${k}`} aria-controls="flow-panel" aria-selected={tab === k} onClick={() => setTab(k)}
               className={cn("flex-1 border-b-2 px-4 py-3", tab === k ? "border-brand-500 text-brand-700" : "border-transparent text-muted hover:text-ink")}>{l}</button>
           ))}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto" role="tabpanel">
+        <div id="flow-panel" className="min-h-0 flex-1 overflow-y-auto" role="tabpanel" aria-labelledby={`tab-${tab}`}>
           {flowLevel.length > 0 && <div className="px-5 pt-5"><Notice tone="warn" title="시나리오 전체">{flowLevel.join(" ")}</Notice></div>}
           {tab === "node" && sel && d.nodes[sel] ? (
             <NodeForm d={d} id={sel} tools={tools} problems={panelProblems}
               onPatch={(patch, drop = []) => setD((x) => { const b = { ...x.nodes[sel], ...patch }; drop.forEach((k) => delete b[k]); return { ...x, nodes: { ...x.nodes, [sel]: b } }; })}
               onConnect={(h, to) => link(sel, h, to)} onRemove={() => remove(sel)} onMakeStart={() => setD((x) => ({ ...x, start: sel }))}
-              onRename={(to) => { setD((x) => renameNode(x, sel, to)); setRfNodes((ns) => ns.map((n) => (n.id === sel ? { ...n, id: to } : n))); setSel(to); }} />
+              onRename={(to) => { const p = rfNodes.find((n) => n.id === sel)?.position; if (p) placed.current[to] = p; setD((x) => renameNode(x, sel, to)); setSel(to); }} />
           ) : tab === "node" ? (
-            <div className="p-5 text-sm text-muted">캔버스에서 단계를 눌러 고쳐 보세요. 새 단계는 위의 <b className="text-ink-2">단계 추가</b>로 넣어요.</div>
+            <div className="space-y-3 p-5">
+              <p className="text-sm text-muted">캔버스에서 단계를 누르거나 아래에서 골라 고쳐 보세요. 새 단계는 위의 <b className="text-ink-2">단계 추가</b>로 넣어요.</p>
+              <ul className="space-y-1" aria-label="단계 목록">
+                {d.order.map((id) => { const k = KIND[d.nodes[id].type as Kind] ?? KIND.goto; const I = k.icon; return (
+                  <li key={id}><button type="button" onClick={() => select(id)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] hover:bg-sunken">
+                    <span className={cn("grid h-6 w-6 shrink-0 place-items-center rounded", k.soft)}><I size={13} aria-hidden /></span>
+                    <span className="min-w-0 flex-1 truncate text-ink">{k.label}<span className="ml-1.5 text-muted">{String(d.nodes[id].text ?? d.nodes[id].prompt ?? d.nodes[id].tool ?? "")}</span></span>
+                    {d.start === id && <span className="text-xs font-medium text-brand-700">첫 단계</span>}
+                  </button></li>); })}
+              </ul>
+            </div>
           ) : (
             <FlowSettings bot={bot} flowId={flowId} d={d} onHeader={(h) => setD((x) => ({ ...x, header: h }))}
               onDeleted={() => { refresh(); toast("시나리오를 지웠어요"); nav(paths.bot(bot.slug, "flows")); }} />
@@ -629,7 +647,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
           <Button variant="primary" icon={<Save size={15} />} loading={saving} disabled={!dirty} onClick={save}>초안 저장</Button>
         </div>
       </aside>
-    </div>
+    </main>
   );
 }
 

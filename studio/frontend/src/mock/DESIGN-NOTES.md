@@ -92,6 +92,24 @@ to `/mock/api/home`, which matched `*` again, and so on (`/mock/api/home/home/ho
 pattern (`/b/<bot>/<unknown>/faq/faq/...`). Fix: every link and redirect is built by `src/paths.ts` and is absolute.
 Regression tests: `src/routes.test.tsx` (redirect targets, and repeated clicks on the menus including "API 연결").
 
+### Review pass on the running screens (5710, real data)
+
+| Skill | Finding | Fix |
+|---|---|---|
+| design-critique | Header said "은행 상담봇" while the name field showed the raw import title "bank (ko)" | The form shows the readable name; a save stores it |
+| design-critique | Cards showed whole expressions such as `{'저축' if to_account == 'savings' else '입출금'}` | Simple names stay (`amount`), longer expressions read "값" with the full one in the tooltip |
+| design-critique | Adding a step blanked the page (a placeholder card with no data reached React Flow) | New positions are kept in a ref until the card is built; the card guards an empty body |
+| design-critique | Overview carried a filler line of icons under the tiles | Removed |
+| accessibility-review | Clickable table rows were `tr tabIndex` (announced as a row, not an action) | A real button in the first cell; the row stays clickable for the mouse |
+| accessibility-review | Segmented filter claimed `radio` roles without arrow keys | Toggle buttons with `aria-pressed` |
+| accessibility-review | Canvas steps reachable only by mouse | A step list in the panel, and 이어지는 곳 selects for every exit |
+| accessibility-review | Word-tag remove button 20 px; editor had no `main` landmark | 24 px target; `main` added; tab and tabpanel wired with ids |
+| ux-copy | 을/를 after a vowel ("시나리오을 불러오지 못했어요") | `eul()` picks the particle (tested) |
+| ux-copy | Tile "연결된 API" against menu "API 연결"; vague "다른 곳에 문제가 있어요" | One term "API 연결"; "다른 파일에 고칠 곳이 있어요" |
+
+Open (not done here): strings are not yet in one i18n dictionary (checklist item); window.confirm dialogs keep the
+browser's OK / 취소 labels; the main chunk is over 500 kB (React Flow and dagre, a lazy split is possible).
+
 ## Skills used
 
 Mockups: `claude-mem:design-is` (audit table above) and the `dataviz` rules for the home summary tiles.

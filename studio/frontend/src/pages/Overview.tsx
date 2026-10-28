@@ -173,11 +173,13 @@ export default function Overview({ bot }: { bot: Bot }) {
   const { version } = useShell();
   const { data: detail } = useFetch<BotDetail>(`/bots/${bot.slug}`, [version]);
   const { data: settings, error, loading, reload, setData } = useFetch<BotSettings>(`/bots/${bot.slug}/settings`);
-  const counts = useMemo(() => detail?.counts, [detail]);
+  const counts = detail?.counts;
+  // imported bots are titled "bank (ko)"; the form shows the readable name, so a first save stores it
+  const initial = useMemo(() => (settings ? { ...settings, title: botName(settings) } : null), [settings]);
   const tiles = [
     { to: paths.bot(bot.slug, "faq"), icon: BookOpenText, label: "자주 묻는 질문", n: counts?.faq },
     { to: paths.bot(bot.slug, "flows"), icon: GitBranch, label: "시나리오", n: counts?.flows },
-    { to: paths.bot(bot.slug, "tools"), icon: PlugZap, label: "연결된 API", n: counts?.tools },
+    { to: paths.bot(bot.slug, "tools"), icon: PlugZap, label: "API 연결", n: counts?.tools },
   ];
   return (
     <main className="mx-auto max-w-5xl px-8 py-8">
@@ -194,7 +196,7 @@ export default function Overview({ bot }: { bot: Bot }) {
       </div>
       {error && <ErrorState error={error} onRetry={reload} what="기본 설정" />}
       {loading && <LoadingBlock rows={6} label="기본 설정을 불러오는 중" />}
-      {settings && <SettingsForm bot={bot} initial={settings} onSaved={(x) => setData(x)} />}
+      {initial && <SettingsForm bot={bot} initial={initial} onSaved={(x) => setData(x)} />}
     </main>
   );
 }
