@@ -96,3 +96,11 @@ Open details raised on 2026-10-05 (the run uses the default unless you change it
 | D-R2 | Expression grammar boundary. | Comparison, and/or/not, `+ - * / // %`, `in`, attribute and constant-index access, conditional expression, and calls only to whitelisted functions (`len`, `lower`, `upper`, `int`, `str`; formatters added in R4). No lambdas, comprehensions, assignments or imports. |  Confirmed 2026-10-25 as used, including the list and tuple literals added in R2 for `in` (R2 handoff note). |
 
 Step titles: R0 = Evaluation harness (text mode) and effort ledger; R1 = FAQ with keyword rules (C00, the STT, FAQ, TTS start point without STT and TTS); R2 = Flow interpreter; R3 = Button and DTMF input (C04); R4 = Answers from attributes and API results (C08); R5 = Condition-specific fixed answers (C09); R6 = Scenario switching (C01); R7 = Side question, then return (C02); R8 = Cancel, back, hand-off (C03); R9 = Slot correction after misrecognition (C05); R10 = Many slots at once, carry-over, references (C06); R11 = Normalisation of numbers, dates and times (C07); R12 = API failure and delay fallback (C10); R13 = Identity gate (C11); R14 = Policy change (C12); R15 = Interactions and the complexity report
+
+## S2 decisions (started 2026-10-28)
+
+S2 is the NLU / retrieval stage; its rows are compared with S1 in [../stage-comparison.md](../stage-comparison.md).
+
+| ID | Question | Recommendation | Answer |
+|---|---|---|---|
+| S2-1 | Scope of the first S2 build. | FAQ retrieval (embeddings) only, compared with S1 on C00; slot extraction (NLU) and dialogue state tracking go to S2-2. | Decided 2026-10-28 (as recommended, "추천대로 진행해줘"): S2 first covers FAQ retrieval only. Slot extraction and dialogue state tracking are a separate later item (S2-2), which must also take into account how slots and API attributes are typed and bound (a raised point about differing roles, e.g. booker and visitor, and about linking a fixed API spec to the attributes a scenario collects). |
