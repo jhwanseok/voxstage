@@ -84,8 +84,7 @@ matched.
 
 ## Details (from the studio review, [review-adr-0014.md](../studio/review-adr-0014.md); written 2026-10-29)
 
-These follow the studio track's proposals P1 to P7 and P9 as recommended; they are part of the draft and are accepted
-or changed together with the ADR. P5 and P8 wait for the owner's answers (D and the studio question on labels).
+These follow the studio track's proposals P1 to P9; P5 and P8 were decided by the owner. They are accepted or changed together with the ADR.
 
 - **Binding syntax (P2).** A `call` node has `args` (old form) or `bind` (new form), never both for one parameter
   (load error). `bind` maps each parameter to exactly one source:
@@ -112,10 +111,10 @@ or changed together with the ADR. P5 and P8 wait for the owner's answers (D and 
 - **Where things live (P7).** Types and session roles (`caller`) live in `types.yaml` (language-neutral). Flow roles live
   in the flow header under a new key `roles`. Texts inside a role (the default question) are per language and live in
   the flow files, which are already per language. Typed `params` and `returns` stay in `tools.yaml`.
-- **Whole records as parameters (P5): waiting for D.** If nesting is not allowed (the recommendation of D) a parameter
-  is a scalar field and the binding names `role.field`; a parameter cannot take a whole `Person`.
-- **Display names (P8): waiting for the owner's answer to the studio question.** If the answer is "in the files", a
-  type, field or role may carry an optional `label: {ko: ..., en: ...}`; until then the model has identifiers only.
+- **Whole records as parameters (P5), decided with D (2026-10-29, "허용하지 말자").** No nesting in v1: a parameter is a scalar
+  field and a binding names `role.field`; a parameter cannot take a whole `Person`.
+- **Display names (P8), decided 2026-10-29 ("yaml 파일에 둬").** A type, field or role may carry `label: {ko: ..., en: ...}` in
+  `types.yaml` and in the scenario files; it is part of the published files and may be used by the read-back of R9.
 
 ## Consequences
 
@@ -162,4 +161,4 @@ Order, so the load is spread: Q50 (S2 embedding model, already open), then A, B,
   Recommendation: the same; the gate fills `caller`.
 - C (decided 2026-10-29, "추천대로": `types.yaml` per domain is the reference, edited in the studio and exported on publish; engine and load check share one definition). Question was: does a field have a fixed list (Person.name, phone, customer_id) per domain, or can the studio add fields?
   Recommendation: per domain in `types.yaml`, editable in the studio.
-- D. Is nesting allowed (a Person with an Address record)? Recommendation: no nesting in v1, like Lex.
+- D (decided 2026-10-29, "허용하지 말자": no nesting in v1). Question was: is nesting allowed (a Person with an Address record)? Recommendation: no nesting in v1, like Lex.
