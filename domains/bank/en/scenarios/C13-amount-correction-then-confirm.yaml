@@ -1,0 +1,25 @@
+id: bank.C13.002
+lang: en
+domain: bank
+capability: C13
+title: "The amount is corrected, and the confirmation names the corrected amount"
+tags: [interaction, R9xR7b]
+turns:
+  - user:
+      kind: utterance
+      text: Transfer thirty dollars to savings
+      asr_text: Transfer thirteen dollars to savings   # simulated recognition error (hand-written)
+    expect:
+      slots: {amount: "13", to_account: savings}
+      reply_contains_any: [thirteen dollars, "$13"]
+  - user: {kind: utterance, text: No I said thirty dollars}
+    expect:
+      flow: transfer
+      slots: {amount: "30", to_account: savings}
+      reply_contains_any: [thirty dollars, "$30"]
+      tool_calls: []
+  - user: {kind: utterance, text: "Yes"}
+    expect:
+      tool_calls:
+        - {name: make_transfer, args: {amount: "30", to_account: savings}}
+      reply_contains: [TR1001]

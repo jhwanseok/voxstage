@@ -1,0 +1,24 @@
+id: telecom.C13.007
+lang: en
+domain: telecom
+capability: C13
+title: "A no at the confirmation that also corrects the plan size"
+tags: [interaction, R7bxR9]
+turns:
+  - user:
+      kind: utterance
+      text: Switch me to the fourteen gigabyte plan
+      asr_text: Switch me to the forty gigabyte plan   # simulated recognition error (hand-written)
+    expect:
+      flow: data_plan
+      slots: {plan_gb: "40"}
+      reply_contains_any: [forty, "40"]
+  - user: {kind: utterance, text: No I said fourteen}
+    expect:
+      slots: {plan_gb: "14"}
+      tool_calls: []
+      reply_contains_any: [fourteen, "14"]
+  - user: {kind: utterance, text: "Yes"}
+    expect:
+      tool_calls:
+        - {name: set_data_plan, args: {plan_gb: "14"}}

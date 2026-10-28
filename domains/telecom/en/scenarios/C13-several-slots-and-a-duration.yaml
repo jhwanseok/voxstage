@@ -1,0 +1,16 @@
+id: telecom.C13.006
+lang: en
+domain: telecom
+capability: C13
+title: "Line, feature and a spoken duration arrive in one sentence and are confirmed with the call"
+tags: [interaction, R10xR11]
+turns:
+  - user: {kind: utterance, text: Add roaming to the line ending 5580 for ten days}
+    expect:
+      flow: roaming_setup
+      slots: {line_last4: "5580", feature: roaming, duration_days: "10"}
+      reply_contains_any: ["10 days", ten days]
+  - user: {kind: utterance, text: "Yes"}
+    expect:
+      tool_calls:
+        - {name: add_feature, args: {line_last4: "5580", feature: roaming, duration_days: "10"}}

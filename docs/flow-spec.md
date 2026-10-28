@@ -306,7 +306,7 @@ Extractors: `text` (the words as given), `digits` (one run of digits, keypad dig
 
 ## Numbers, dates and the clock (R11)
 
-Spoken values are read by `voxstage/normalize/`, a self-contained package (it imports nothing else from
+Spoken values are read by `normalize/voxstage_normalize/` (its own package since R11-4; before that `voxstage/normalize/`), a self-contained package (it imports nothing else from
 `voxstage`; decision R11-1) for English and Korean, covering what the datasets need. Numbers that are part of a date
 ("the fifteenth", "십오일") are not numbers. Korean native numerals count only before a counter (두 개), so 네 (yes)
 is never four; a numeral at the start of a Korean word counts only when the rest of the word is a unit, a counter,

@@ -6,7 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from voxstage import normalize as N
+import voxstage  # noqa: F401  (puts the checkout's normalize/ on the path)
+import voxstage_normalize as N
 
 NOW = "2026-10-05T09:00:00"   # a Monday, the clock of the C07 scenarios
 
@@ -152,7 +153,7 @@ class AmbiguityTest(unittest.TestCase):
 
 class SelfContainedTest(unittest.TestCase):
     def test_the_package_imports_nothing_else_from_voxstage(self):
-        folder = os.path.join(os.path.dirname(__file__), "..", "voxstage", "normalize")
+        folder = os.path.join(os.path.dirname(__file__), "..", "normalize", "voxstage_normalize")
         for name in os.listdir(folder):
             if name.endswith(".py"):
                 with open(os.path.join(folder, name), encoding="utf-8") as f:

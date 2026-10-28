@@ -1,0 +1,26 @@
+id: shop.C13.004
+lang: en
+domain: shop
+capability: C13
+title: "After the order lookup fails, the caller starts a return and nothing is called again"
+tags: [interaction, R12xR6]
+turns:
+  - user: {kind: button, button_id: menu_track}
+    expect:
+      flow: order_status
+  - user: {kind: dtmf, digits: "9999"}
+    expect:
+      tool_calls: []
+      reply_contains_any: [ZIP code]
+  - user: {kind: dtmf, digits: "12345"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {order_id: "9999", zip_code: "12345"}}
+        - {name: get_order_status, args: {order_id: "9999"}, error: timeout}
+        - {name: get_order_status, args: {order_id: "9999"}, error: timeout}
+      reply_contains_any: [try again, unable, couldn't]
+  - user: {kind: utterance, text: Okay then I want to return a laptop}
+    expect:
+      flow: return_request
+      tool_calls: []
+      reply_contains_any: [order number]

@@ -1,0 +1,25 @@
+id: bank.C13.002
+lang: ko
+domain: bank
+capability: C13
+title: "금액을 정정한 뒤 확인 질문이 정정된 금액을 말한다"
+tags: [interaction, R9xR7b]
+turns:
+  - user:
+      kind: utterance
+      text: 삼십 달러 저축 계좌로 이체해 주세요
+      asr_text: 십삼 달러 저축 계좌로 이체해 주세요   # 모의 인식 오류 (직접 작성)
+    expect:
+      slots: {amount: "13", to_account: savings}
+      reply_contains_any: [십삼, "13"]
+  - user: {kind: utterance, text: 아니요 삼십 달러라고 했어요}
+    expect:
+      flow: transfer
+      slots: {amount: "30", to_account: savings}
+      reply_contains_any: [삼십, "30"]
+      tool_calls: []
+  - user: {kind: utterance, text: 네}
+    expect:
+      tool_calls:
+        - {name: make_transfer, args: {amount: "30", to_account: savings}}
+      reply_contains: [TR1001]

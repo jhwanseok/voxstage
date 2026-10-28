@@ -1,0 +1,21 @@
+id: bank.C13.001
+lang: en
+domain: bank
+capability: C13
+title: "A side question while the account digits are asked on the keypad"
+tags: [interaction, R3xR7]
+turns:
+  - user: {kind: button, button_id: menu_balance}
+    expect:
+      flow: balance_inquiry
+      reply_contains_any: [last four digits]
+  - user: {kind: utterance, text: Wait what time do you close}
+    expect:
+      flow: balance_inquiry
+      reply_contains: [9 a.m. to 4 p.m.]
+      reply_contains_any: [last four digits]
+  - user: {kind: dtmf, digits: "4821"}
+    expect:
+      slots: {account_last4: "4821"}
+      tool_calls: []
+      reply_contains_any: [PIN]

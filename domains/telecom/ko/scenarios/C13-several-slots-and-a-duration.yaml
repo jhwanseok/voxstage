@@ -1,0 +1,16 @@
+id: telecom.C13.006
+lang: ko
+domain: telecom
+capability: C13
+title: "회선, 서비스, 말로 한 기간이 한 문장에 오고 확인 뒤 호출된다"
+tags: [interaction, R10xR11]
+turns:
+  - user: {kind: utterance, text: 5580으로 끝나는 번호에 해외 로밍 십 일만 추가해 주세요}
+    expect:
+      flow: roaming_setup
+      slots: {line_last4: "5580", feature: roaming, duration_days: "10"}
+      reply_contains_any: ["10일", 십일]
+  - user: {kind: utterance, text: 네}
+    expect:
+      tool_calls:
+        - {name: add_feature, args: {line_last4: "5580", feature: roaming, duration_days: "10"}}

@@ -1,0 +1,21 @@
+id: shop.C13.008
+lang: en
+domain: shop
+capability: C13
+title: "A policy question while the order number is asked, then the return goes on"
+tags: [interaction, R14xR7]
+setup:
+  policy: {version: v1, free_shipping_threshold: "50"}
+turns:
+  - user: {kind: utterance, text: I want to return a laptop}
+    expect:
+      flow: return_request
+      reply_contains_any: [order number]
+  - user: {kind: utterance, text: What is the minimum order for free shipping}
+    expect:
+      flow: return_request
+      reply_contains_any: ["$50", fifty dollars]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      flow: return_request
+      slots: {order_id: "1001", item: laptop}

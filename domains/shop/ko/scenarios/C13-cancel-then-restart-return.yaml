@@ -1,0 +1,24 @@
+id: shop.C13.005
+lang: ko
+domain: shop
+capability: C13
+title: "확인 질문에서 취소한 뒤 새 반품이 처음부터 시작된다"
+tags: [interaction, R8xR10]
+turns:
+  - user: {kind: utterance, text: 노트북 반품하려고 하는데요}
+    expect:
+      flow: return_request
+      reply_contains_any: [주문번호]
+  - user: {kind: dtmf, digits: "1001"}
+    expect:
+      slots: {order_id: "1001", item: laptop}
+      reply_contains_any: ["1001"]
+  - user: {kind: utterance, text: 그만할게요}
+    expect:
+      flow: main_menu
+      tool_calls: []
+  - user: {kind: utterance, text: 파란 재킷 반품하려고 하는데요}
+    expect:
+      flow: return_request
+      slots: {item: blue jacket}
+      reply_contains_any: [주문번호]

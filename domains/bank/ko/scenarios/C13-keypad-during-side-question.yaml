@@ -1,0 +1,21 @@
+id: bank.C13.001
+lang: ko
+domain: bank
+capability: C13
+title: "계좌 끝자리를 키패드로 받는 중에 들어온 곁질문"
+tags: [interaction, R3xR7]
+turns:
+  - user: {kind: button, button_id: menu_balance}
+    expect:
+      flow: balance_inquiry
+      reply_contains_any: [네 자리]
+  - user: {kind: utterance, text: 그 전에 영업시간부터 알려 주세요}
+    expect:
+      flow: balance_inquiry
+      reply_contains: [오전 9시]
+      reply_contains_any: [네 자리]
+  - user: {kind: dtmf, digits: "4821"}
+    expect:
+      slots: {account_last4: "4821"}
+      tool_calls: []
+      reply_contains_any: [비밀번호, PIN]

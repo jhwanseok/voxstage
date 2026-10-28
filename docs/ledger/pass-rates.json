@@ -1,0 +1,444 @@
+{
+ "R0": {
+  "commit": "0abd454",
+  "cost": {
+   "en": {
+    "nodes": 0,
+    "rules": 0,
+    "flow_lines": 0,
+    "code_lines": 0
+   },
+   "ko": {
+    "nodes": 0,
+    "rules": 0,
+    "flow_lines": 0,
+    "code_lines": 0
+   }
+  },
+  "en": [
+   0,
+   234
+  ],
+  "manager": "null",
+  "ko": [
+   0,
+   240
+  ]
+ },
+ "R1": {
+  "commit": "44dc1ee",
+  "cost": {
+   "en": {
+    "nodes": 0,
+    "rules": 24,
+    "flow_lines": 0,
+    "code_lines": 148
+   },
+   "ko": {
+    "nodes": 0,
+    "rules": 24,
+    "flow_lines": 0,
+    "code_lines": 148
+   }
+  },
+  "en": [
+   100,
+   234
+  ],
+  "manager": "voxstage.rules.faq:default_factory",
+  "ko": [
+   99,
+   240
+  ]
+ },
+ "R2": {
+  "commit": "e916924",
+  "cost": {
+   "en": {
+    "nodes": 18,
+    "rules": 45,
+    "flow_lines": 36,
+    "code_lines": 685
+   },
+   "ko": {
+    "nodes": 18,
+    "rules": 45,
+    "flow_lines": 36,
+    "code_lines": 685
+   }
+  },
+  "en": [
+   97,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   95,
+   240
+  ]
+ },
+ "R3": {
+  "commit": "b7a5eba",
+  "cost": {
+   "en": {
+    "nodes": 18,
+    "rules": 50,
+    "flow_lines": 39,
+    "code_lines": 719
+   },
+   "ko": {
+    "nodes": 18,
+    "rules": 50,
+    "flow_lines": 39,
+    "code_lines": 719
+   }
+  },
+  "en": [
+   103,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   101,
+   240
+  ]
+ },
+ "R4": {
+  "commit": "2411043",
+  "cost": {
+   "en": {
+    "nodes": 36,
+    "rules": 73,
+    "flow_lines": 79,
+    "code_lines": 899
+   },
+   "ko": {
+    "nodes": 36,
+    "rules": 73,
+    "flow_lines": 79,
+    "code_lines": 899
+   }
+  },
+  "en": [
+   106,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   105,
+   240
+  ]
+ },
+ "R5": {
+  "commit": "34e24d4",
+  "cost": {
+   "en": {
+    "nodes": 49,
+    "rules": 92,
+    "flow_lines": 110,
+    "code_lines": 935
+   },
+   "ko": {
+    "nodes": 49,
+    "rules": 92,
+    "flow_lines": 110,
+    "code_lines": 935
+   }
+  },
+  "en": [
+   111,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   111,
+   240
+  ]
+ },
+ "R6": {
+  "commit": "0808728",
+  "cost": {
+   "en": {
+    "nodes": 56,
+    "rules": 105,
+    "flow_lines": 133,
+    "code_lines": 988
+   },
+   "ko": {
+    "nodes": 56,
+    "rules": 105,
+    "flow_lines": 133,
+    "code_lines": 988
+   }
+  },
+  "en": [
+   121,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   115,
+   240
+  ]
+ },
+ "R7": {
+  "commit": "7c34719",
+  "cost": {
+   "en": {
+    "nodes": 68,
+    "rules": 121,
+    "flow_lines": 154,
+    "code_lines": 1033
+   },
+   "ko": {
+    "nodes": 68,
+    "rules": 121,
+    "flow_lines": 154,
+    "code_lines": 1033
+   }
+  },
+  "en": [
+   123,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   116,
+   240
+  ]
+ },
+ "R7b": {
+  "commit": "a729bed",
+  "cost": {
+   "en": {
+    "nodes": 69,
+    "rules": 158,
+    "flow_lines": 155,
+    "code_lines": 1099
+   },
+   "ko": {
+    "nodes": 69,
+    "rules": 155,
+    "flow_lines": 155,
+    "code_lines": 1099
+   }
+  },
+  "en": [
+   123,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   116,
+   240
+  ]
+ },
+ "R8": {
+  "commit": "da3aad9",
+  "cost": {
+   "en": {
+    "nodes": 76,
+    "rules": 175,
+    "flow_lines": 166,
+    "code_lines": 1137
+   },
+   "ko": {
+    "nodes": 76,
+    "rules": 172,
+    "flow_lines": 166,
+    "code_lines": 1137
+   }
+  },
+  "en": [
+   137,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   126,
+   240
+  ]
+ },
+ "R11": {
+  "commit": "5f962fd",
+  "cost": {
+   "en": {
+    "nodes": 99,
+    "rules": 209,
+    "flow_lines": 204,
+    "code_lines": 1611
+   },
+   "ko": {
+    "nodes": 99,
+    "rules": 206,
+    "flow_lines": 204,
+    "code_lines": 1611
+   }
+  },
+  "en": [
+   145,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   135,
+   240
+  ]
+ },
+ "R9": {
+  "commit": "8186a93",
+  "cost": {
+   "en": {
+    "nodes": 112,
+    "rules": 253,
+    "flow_lines": 227,
+    "code_lines": 1714
+   },
+   "ko": {
+    "nodes": 112,
+    "rules": 250,
+    "flow_lines": 227,
+    "code_lines": 1714
+   }
+  },
+  "en": [
+   146,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   136,
+   240
+  ]
+ },
+ "R10": {
+  "commit": "7d5e5ee",
+  "cost": {
+   "en": {
+    "nodes": 117,
+    "rules": 269,
+    "flow_lines": 248,
+    "code_lines": 1895
+   },
+   "ko": {
+    "nodes": 117,
+    "rules": 266,
+    "flow_lines": 248,
+    "code_lines": 1895
+   }
+  },
+  "en": [
+   147,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   137,
+   240
+  ]
+ },
+ "R13": {
+  "commit": "a0e7e58",
+  "cost": {
+   "en": {
+    "nodes": 137,
+    "rules": 295,
+    "flow_lines": 290,
+    "code_lines": 2017
+   },
+   "ko": {
+    "nodes": 137,
+    "rules": 292,
+    "flow_lines": 290,
+    "code_lines": 2017
+   }
+  },
+  "en": [
+   153,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   143,
+   240
+  ]
+ },
+ "R12": {
+  "commit": "3199792",
+  "cost": {
+   "en": {
+    "nodes": 137,
+    "rules": 295,
+    "flow_lines": 290,
+    "code_lines": 2071
+   },
+   "ko": {
+    "nodes": 137,
+    "rules": 292,
+    "flow_lines": 290,
+    "code_lines": 2071
+   }
+  },
+  "en": [
+   153,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   143,
+   240
+  ]
+ },
+ "R14": {
+  "commit": "f12fda0",
+  "cost": {
+   "en": {
+    "nodes": 147,
+    "rules": 310,
+    "flow_lines": 320,
+    "code_lines": 2071
+   },
+   "ko": {
+    "nodes": 147,
+    "rules": 307,
+    "flow_lines": 320,
+    "code_lines": 2071
+   }
+  },
+  "en": [
+   159,
+   234
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   149,
+   240
+  ]
+ },
+ "R15": {
+  "commit": "e87db02",
+  "cost": {
+   "en": {
+    "nodes": 147,
+    "rules": 310,
+    "flow_lines": 320,
+    "code_lines": 2071
+   },
+   "ko": {
+    "nodes": 147,
+    "rules": 307,
+    "flow_lines": 320,
+    "code_lines": 2071
+   }
+  },
+  "en": [
+   163,
+   242
+  ],
+  "manager": "voxstage.rules.interpreter:default_factory",
+  "ko": [
+   153,
+   248
+  ]
+ }
+}
