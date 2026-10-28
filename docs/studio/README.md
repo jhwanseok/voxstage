@@ -10,6 +10,7 @@ learning implementation built like a product. Approved by the owner on 2026-10-2
 | [data-model.md](data-model.md) | Tables, layout apart from meaning, publications, export and import rules |
 | [api.md](api.md) | Endpoints, validate / publish / import / rollback flows |
 | [screens.md](screens.md) | Screens, the flow node-graph editor, validation display, auto layout |
+| [review-adr-0014.md](review-adr-0014.md) | Studio review of ADR 0014 (types, roles, API binding): screens, round trip, errors on the graph, proposals P1 to P9 |
 
 ## Layout of the code (when built)
 
