@@ -145,3 +145,12 @@ Asked one at a time with `ask studio`, after Q53 (C) and not overlapping it or D
 
 1. Display names of types, fields and roles: in the files (`label` per language, exported, also usable by read-back),
    or studio-only? Recommendation: in the files.
+
+## Owner decisions for ST4 (2026-10-29)
+
+- Q54: display names live in the YAML files as a `label` per language. The studio reads them from the files and exports
+  what is edited back into the files (no studio-only table; the "display names" row of section 6 needs no migration).
+- Q55: no nesting in v1; a field is a scalar. The type form offers only scalar field types, and a parameter of a named
+  type is bound field by field (see P5).
+
+ST4 starts after ADR 0014 is accepted.
