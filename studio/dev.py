@@ -55,7 +55,9 @@ def main() -> int:
     run(["docker", "compose", "-f", str(STUDIO / "docker-compose.yml"), "up", "-d"])
     if not VENV_PY.exists():
         run([sys.executable, "-m", "venv", str(BACKEND / ".venv")])
-        run([str(VENV_PY), "-m", "pip", "install", "-q", "-e", str(STUDIO.parent), "-e", f"{BACKEND}[test]"])
+        # the engine depends on voxstage-normalize, which lives in this repository and is not on PyPI (R11-4)
+        run([str(VENV_PY), "-m", "pip", "install", "-q", "-e", str(STUDIO.parent / "normalize"), "-e", str(STUDIO.parent),
+             "-e", f"{BACKEND}[test]"])
     wait_db()
     run([str(VENV_PY), "-m", "alembic", "upgrade", "head"], cwd=BACKEND)
     run([str(VENV_PY), "-m", "studio_backend.seed"], cwd=BACKEND)
