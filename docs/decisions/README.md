@@ -30,6 +30,7 @@ reading an analysis, the record says that, and the decider may add their own wor
 | [0011](0011-korean-tokenisation.md) | Korean rule matching uses the Kiwi morphological analyzer as an optional dependency | accepted |
 | [0012](0012-studio-management-console.md) | Studio: a management console in the same repository, outside the engine core | accepted |
 | [0013](0013-studio-database-source-of-truth.md) | Studio: the database is the source of truth; publishing exports the YAML the engine loads | accepted |
+| [0014](0014-typed-attributes-roles-and-api-binding.md) | Typed attributes, roles and API binding | proposed |
 
 ## Template
 
