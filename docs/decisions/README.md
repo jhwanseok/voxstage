@@ -49,3 +49,4 @@ We will ...
 ## Open questions
 ## Decider's note
 ```
+| [0014](0014-typed-attributes-roles-and-api-binding.md) | Typed attributes, roles and API binding | proposed |
