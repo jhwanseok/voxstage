@@ -54,7 +54,8 @@ function Action({ label, value, onChange }: { label: string; value: OnExceed; on
   );
 }
 
-const NotInEngine = () => <StatusChip tone="idle">스튜디오에만 저장</StatusChip>;
+/** Owner decision of 2026-10-28 (Q44): kept in the studio only, never exported, no engine item until needed. */
+const NotInEngine = () => <StatusChip tone="idle">엔진 미반영</StatusChip>;
 
 function SettingsForm({ bot, initial, onSaved }: { bot: Bot; initial: BotSettings; onSaved: (s: BotSettings) => void }) {
   const { refresh } = useShell();
@@ -137,7 +138,7 @@ function SettingsForm({ bot, initial, onSaved }: { bot: Bot; initial: BotSetting
         </Section>
 
         <Section title="상담사 연결 번호" tag={<NotInEngine />}
-          description="엔진은 지금 '상담사에게 연결'이라는 동작만 내보내고 번호는 쓰지 않아요. 여기 적은 번호는 게시 파일에 들어가지 않아요.">
+          description="스튜디오에만 저장돼요. 엔진은 지금 '상담사에게 연결'이라는 동작만 내보내고 번호는 쓰지 않아서, 이 번호는 게시 파일에 들어가지 않아요.">
           <Field label="연결할 번호" optional error={/^[0-9+\-() ]*$/.test(s.studio_only.handoff_number ?? "") ? null : "숫자, 공백, + - ( ) 만 쓸 수 있어요"}>
             <Input inputMode="tel" value={s.studio_only.handoff_number ?? ""} placeholder="예: 1588-0000"
               onChange={(ev) => studio({ handoff_number: ev.target.value })} />
@@ -145,7 +146,7 @@ function SettingsForm({ bot, initial, onSaved }: { bot: Bot; initial: BotSetting
         </Section>
 
         <Section title="정책값" tag={<NotInEngine />}
-          description="시나리오 문구에 들어가는 규칙 값이에요. 엔진은 통화를 시작할 때 받은 값을 쓰므로, 여기 값은 지금은 기록용이에요.">
+          description="시나리오 문구에 들어가는 규칙 값이에요. 스튜디오에만 저장돼요. 엔진은 통화를 시작할 때 받은 값을 쓰므로 여기 값은 게시 파일에 들어가지 않아요.">
           {s.policy_refs.length === 0 ? (
             <p className="text-sm text-muted sm:col-span-2">이 상담봇의 시나리오는 정책값을 쓰지 않아요.</p>
           ) : s.policy_refs.map((r) => (

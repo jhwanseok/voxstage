@@ -59,6 +59,14 @@ emerald-50 5.21, amber-700 on amber-50 4.84, rose-700 on rose-50 5.72.
 
 Tokens and components: `src/ui/DESIGN-SYSTEM.md`. The mockups stay under `/mock/*` as the reference.
 
+### (1) Bot defaults on 개요
+
+Engine values (`rules/config.yaml`: re-prompts, misses, corrections, verification attempts, tool failures and timeout,
+parked flows, and the action when each limit is passed) are edited here and published like any other draft change.
+The hand-off number and the R14 policy values are not read by the engine; owner decision 2026-10-28 (Q44): keep both
+in the studio only (`bot.studio_settings`), marked 엔진 미반영, never in the published files, and no engine item until
+they are needed.
+
 ### (2) FAQ edit form was "정신없다": before and after
 
 | Before (mock `/mock/faq`) | Why it was noisy | After (`/b/<bot>/faq`) |
