@@ -55,8 +55,48 @@ emerald-50 5.21, amber-700 on amber-50 4.84, rose-700 on rose-50 5.72.
 - Charts and numbers (home summary): big number plus label plus one-line meaning; no dual axes; counts use tabular numbers.
 - i18n: all strings in one dictionary, Korean default, English switch.
 
+## Real screens (2026-10-28): owner feedback and what changed
+
+Tokens and components: `src/ui/DESIGN-SYSTEM.md`. The mockups stay under `/mock/*` as the reference.
+
+### (2) FAQ edit form was "정신없다": before and after
+
+| Before (mock `/mock/faq`) | Why it was noisy | After (`/b/<bot>/faq`) |
+|---|---|---|
+| Three columns at once: filter rail, table, 460 px drawer | Three panels compete; the table squeezes to half width while editing | Full-width list; the editor is a 560 px sheet over a dimmed list, so only one task is on screen |
+| The same filter twice (rail and a select) | Two controls for one choice | One segmented control: 전체 / 게시 후 고친 질문 / 확인이 필요한 질문, with counts |
+| Four columns: question, answer, keywords, state | Answer text and keywords pull the eye from the question | Question in bold with a one-line answer under it; keywords in a narrower column, hidden on small screens |
+| Drawer shows everything open: question, answer, three chip inputs, an example box, paraphrases, ASR | Four jobs (wording, matching, examples, ASR) at equal weight; long scroll before the save button | Order by how often a field is edited: wording first (always open); then 알아듣는 조건, 같은 뜻의 다른 말, 잘못 알아들은 예시 as sections that show a one-line summary when closed and open themselves only when something is missing |
+| Matching rule as raw chips with hints such as "각 줄에서 하나 이상" | The rule is hard to read back | Each 반드시 포함 row says "이 중 한 단어 이상"; the whole rule is read back as one Korean sentence under the inputs and as the closed summary |
+| Priority and regex mixed with the main rule | Rarely used, but always visible | Under 고급 inside the rule section |
+| Id in monospace under the title | Internal name in the most visible place | Under 개발 정보 (closed); editable only for a new question |
+| Errors not drawn; save always active | No feedback | Save is disabled until something changed; missing wording blocks the save with one notice; counts below the guidance (3 paraphrases, 1 ASR) are saved and flagged in the list as 확인 필요 |
+| Footer: 삭제 · 취소 · 저장 | Delete next to Cancel | Delete on the far left in red, then the unsaved state, 취소, 저장 |
+
+### (3) Scenario editing
+
+The canvas keeps the approved layout (trigger card first, cards top to bottom, exits under each card). Now: 단계 추가 menu
+(nine kinds, joined after the selected step when it has a free exit), drag from an exit dot to a card to connect, drag
+an edge end to reconnect, select an edge or a card and press Delete, a property form per kind with "이어지는 곳" selects
+as the keyboard alternative to dragging, rename with all links updated, 시나리오 설정 for the trigger words and buttons.
+초안 저장 (also Ctrl+S) sends the meaning to `PUT /bots/<b>/flows/<id>` and the positions to `/layout`; the toolbar
+then offers 검증하기, and after a pass 게시하기 (the same dialog as the top bar). Engine problems are drawn on the
+cards (red ring, count) and listed in the panel; local checks (no start, a link to nowhere, unreachable step, no end)
+show before saving.
+
+### (4) URL bug
+
+Cause: `<Navigate to="home" />` and `<Navigate to="faq" />` inside `path="*"` routes. React Router v7 resolves a relative
+`to` against the whole URL inside a splat route, so a menu item without its own route ("API 연결" in the mock) redirected
+to `/mock/api/home`, which matched `*` again, and so on (`/mock/api/home/home/home/...`). The real app had the same
+pattern (`/b/<bot>/<unknown>/faq/faq/...`). Fix: every link and redirect is built by `src/paths.ts` and is absolute.
+Regression tests: `src/routes.test.tsx` (redirect targets, and repeated clicks on the menus including "API 연결").
+
 ## Skills used
 
-`claude-mem:design-is` (audit table above) and the `dataviz` rules for the home summary tiles. The newly installed `frontend-design`, `Design` and
-`design-skills` plugins are not in this session's skill list (they load at session start); the later implementation steps
-should use them where available.
+Mockups: `claude-mem:design-is` (audit table above) and the `dataviz` rules for the home summary tiles.
+Real screens: `design:design-system` (tokens and component table, `src/ui/DESIGN-SYSTEM.md`), `frontend-design` (direction
+review: kept the approved direction, removed template tells such as middle-dot meta strings and monospace ids on cards,
+and spent the one bold element on the scenario canvas, where `{slot}` placeholders are tinted inside the spoken
+sentence), then `design:design-critique`, `design:accessibility-review` and `design:ux-copy` for the review pass
+(findings below).

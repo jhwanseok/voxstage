@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import portable, service, settings
+from . import portable, service, settings, yamlio
 from .db import get_session, session_scope
 from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile, Role, Tool, User, UserRole)
@@ -267,11 +267,40 @@ def _faq(session: Session, bot: Bot, entry_id: str) -> FaqEntry:
     return e
 
 
+def published_faq(session: Session, bot: Bot) -> dict[str, dict] | None:
+    """FAQ entries of the newest publication by id (entry fields plus its pattern), or None if never published."""
+    pub = session.scalar(select(Publication).where(Publication.bot_id == bot.id).order_by(Publication.number.desc()).limit(1))
+    if pub is None:
+        return None
+    dom = session.get(Domain, bot.domain_id)
+    base = f"{dom.slug}/{bot.lang}"
+    faq = session.get(PublicationFile, (pub.id, f"{base}/faq.yaml"))
+    pats = session.get(PublicationFile, (pub.id, f"{base}/rules/faq_patterns.yaml"))
+    by_id = {e["id"]: dict(e) for e in ((yamlio.load(faq.content) or {}).get("entries") or [])} if faq else {}
+    for p in ((yamlio.load(pats.content) or {}).get("entries") or []) if pats else []:
+        p = dict(p)
+        if p.get("id") in by_id:
+            by_id[p.pop("id")]["pattern"] = p
+    return by_id
+
+
+def _same_as_published(e: FaqEntry, pub: dict) -> bool:
+    mine = {"question": e.question, "answer": e.answer, "paraphrases": e.paraphrases, "asr_variants": e.asr_variants,
+            "pattern": e.pattern}
+    theirs = {k: pub.get(k) for k in mine}
+    return mine == theirs
+
+
 @app.get(API + "/bots/{b}/faq")
 def list_faq(b: str, session: Session = Depends(get_session)):
+    """`published`: "same", "changed" or "new" against the newest publication; null when nothing is published."""
     bot = get_bot(session, b)
-    return [faq_out(e) for e in session.scalars(select(FaqEntry).where(FaqEntry.bot_id == bot.id)
-                                                .order_by(FaqEntry.position))]
+    pub = published_faq(session, bot)
+    out = []
+    for e in session.scalars(select(FaqEntry).where(FaqEntry.bot_id == bot.id).order_by(FaqEntry.position)):
+        state = None if pub is None else "new" if e.entry_id not in pub else             "same" if _same_as_published(e, pub[e.entry_id]) else "changed"
+        out.append({**faq_out(e), "published": state})
+    return out
 
 
 @app.post(API + "/bots/{b}/faq", status_code=201)

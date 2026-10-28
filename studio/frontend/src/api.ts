@@ -40,6 +40,8 @@ export interface Pattern { all_of?: any[]; any_of?: string[]; none_of?: string[]
 export interface Faq {
   id: string; position: number; question: string; answer: string; paraphrases: string[] | null;
   asr_variants: string[] | null; pattern: Pattern | null; revision: number;
+  /** against the newest publication; null when the bot was never published */
+  published?: "same" | "changed" | "new" | null;
 }
 export interface Tool { name: string; position: number; body: Record<string, any>; revision: number }
 export interface FlowSummary {
@@ -53,6 +55,24 @@ export interface FlowDetail {
   graph: { start: string; nodes: GraphNode[]; edges: GraphEdge[] };
   items: Item[];
 }
+export interface BotDetail extends Bot { counts: { faq: number; flows: number; tools: number } }
+
+export type OnExceed = "handoff" | "end_call";
+export interface EngineSettings {
+  fallback: { max_misses: number; on_exceed: OnExceed };
+  ask: { max_reprompts: number; on_exceed: OnExceed };
+  switch: { max_parked: number };
+  correction: { max_corrections: number; on_exceed: OnExceed };
+  verification: { max_attempts: number; on_exceed: OnExceed };
+  tools: { max_failures: number; timeout_ms: number; on_exceed: OnExceed };
+}
+export interface BotSettings {
+  slug: string; title: string; lang: string; domain: string; revision: number; has_config_file: boolean;
+  engine: EngineSettings;
+  studio_only: { handoff_number: string | null; policy: Record<string, string> };
+  policy_refs: { key: string; flows: string[] }[];
+}
+
 export interface Publication {
   number: number; note: string; kind: string; published_by: string | null; published_at: string;
   content_hash: string; file_count?: number;

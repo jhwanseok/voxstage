@@ -1,79 +1,72 @@
+@import "tailwindcss";
+
+/* Design tokens of the studio (src/ui/DESIGN-SYSTEM.md). Components use the semantic names (bg-surface, text-muted,
+   border-line, bg-ok-bg ...), never raw hex, so light and dark switch in one place. Contrast pairs are listed in
+   DESIGN-SYSTEM.md (all text pairs >= 4.5:1, borders that carry meaning >= 3:1). */
 :root {
-  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #667085; --line: #d9dee7;
-  --accent: #2f6fed; --accent-ink: #ffffff; --ok: #1a7f4b; --warn: #b7791f; --err: #c53030;
-  --k-say: #e8f1ff; --k-ask: #fff4e0; --k-form: #fff0d6; --k-confirm: #fde8f0; --k-call: #e6f6ee;
-  --k-branch: #efe9ff; --k-notices: #e9f3f6; --k-goto: #eceff3; --k-end: #f1e7e7;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink);
+  --ground: #f6f7f9; --surface: #ffffff; --sunken: #f1f3f6;
+  --line: #e3e7ee; --line-strong: #8a94a6;
+  --ink: #101828; --ink-2: #475467; --muted: #5d6b82;
+  --brand-50: #eef0ff; --brand-100: #e0e3ff; --brand-500: #4f4fe0; --brand-600: #4141c4; --brand-700: #3a3ab3;
+  --on-brand: #ffffff;
+  --ok-fg: #047857; --ok-bg: #ecfdf5; --ok-line: #a7f3d0;
+  --warn-fg: #b45309; --warn-bg: #fffbeb; --warn-line: #fde68a;
+  --err-fg: #be123c; --err-bg: #fff1f2; --err-line: #fecdd3;
+  --idle-fg: #475467; --idle-bg: #f1f3f6; --idle-line: #e3e7ee;
+  --canvas: #f2f3f7; --canvas-dot: #d9dde6; --edge: #8a94a6;
+  --scrim: rgb(16 24 40 / 0.36);
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12151b; --panel: #1b2029; --ink: #e6e9ef; --muted: #93a0b4; --line: #2d3542;
-    --accent: #6c9bff; --accent-ink: #0c1424; --ok: #4cc38a; --warn: #e0a64a; --err: #ff7b7b;
-    --k-say: #1d2a44; --k-ask: #3a2f1a; --k-form: #3a2c14; --k-confirm: #3d1f2c; --k-call: #17352a;
-    --k-branch: #2a2446; --k-notices: #17313a; --k-goto: #262b34; --k-end: #3a2424;
+    --ground: #0f1218; --surface: #161a22; --sunken: #1c212b;
+    --line: #2a313d; --line-strong: #636d7e;
+    --ink: #e8ebf1; --ink-2: #b4bdcc; --muted: #96a1b3;
+    --brand-50: #23264a; --brand-100: #2d3160; --brand-500: #5b5bea; --brand-600: #6e6ef0; --brand-700: #b9bcff;
+    --ok-fg: #6ee7b7; --ok-bg: #0f2a22; --ok-line: #1f5b47;
+    --warn-fg: #fcd34d; --warn-bg: #2e2410; --warn-line: #5c4714;
+    --err-fg: #fda4af; --err-bg: #33161d; --err-line: #6b2533;
+    --idle-fg: #b4bdcc; --idle-bg: #222833; --idle-line: #2a313d;
+    --canvas: #12161d; --canvas-dot: #262c37; --edge: #7a8496;
+    --scrim: rgb(0 0 0 / 0.55);
+    color-scheme: dark;
   }
 }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); }
-a { color: var(--accent); text-decoration: none; }
-button, select, input, textarea { font: inherit; color: inherit; }
-button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-button.danger { color: var(--err); }
-button:disabled { opacity: .5; cursor: default; }
-input, textarea, select { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; width: 100%; }
-textarea { resize: vertical; min-height: 70px; }
 
-.topbar { display: flex; align-items: center; gap: 14px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
-.topbar .brand { font-weight: 700; }
-.topbar select { width: auto; }
-.spacer { flex: 1; }
-.nav { display: flex; gap: 4px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.nav a { padding: 8px 12px; color: var(--muted); border-bottom: 2px solid transparent; }
-.nav a.active { color: var(--ink); border-bottom-color: var(--accent); }
-main { padding: 16px; }
-.badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
-.badge.ok { color: var(--ok); border-color: var(--ok); }
-.badge.err { color: var(--err); border-color: var(--err); }
-.badge.warn { color: var(--warn); border-color: var(--warn); }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
-.card h3 { margin: 0 0 6px; }
-.split { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(420px, 1.4fr); gap: 16px; align-items: start; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-tr.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-tr.click { cursor: pointer; }
-label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 3px; }
-.row { display: flex; gap: 8px; align-items: center; }
-.row > * { flex: 1; }
-.row > button, .row > .fit { flex: none; }
-.items { margin: 8px 0; padding: 0; list-style: none; }
-.items li { padding: 6px 8px; border-left: 3px solid var(--err); background: color-mix(in srgb, var(--err) 8%, transparent); margin-bottom: 4px; font-size: 13px; }
-.items li.warning { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, transparent); }
-.muted { color: var(--muted); }
-.small { font-size: 12px; }
-code, pre { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
-pre { background: var(--bg); padding: 8px; border-radius: 6px; overflow: auto; margin: 4px 0; }
-.dialog-bg { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: 20; }
-.dialog { background: var(--panel); border-radius: 10px; padding: 18px; width: min(560px, 92vw); max-height: 86vh; overflow: auto; }
-.flowwrap { display: grid; grid-template-columns: 1fr 320px; gap: 12px; height: calc(100vh - 190px); min-height: 480px; }
-.flowcanvas { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
-.flowside { overflow: auto; }
+@theme inline {
+  --font-sans: "Pretendard Variable", Pretendard, "Noto Sans KR", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-ground: var(--ground); --color-surface: var(--surface); --color-sunken: var(--sunken);
+  --color-line: var(--line); --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink); --color-ink-2: var(--ink-2); --color-muted: var(--muted);
+  --color-brand-50: var(--brand-50); --color-brand-100: var(--brand-100); --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600); --color-brand-700: var(--brand-700); --color-on-brand: var(--on-brand);
+  --color-ok-fg: var(--ok-fg); --color-ok-bg: var(--ok-bg); --color-ok-line: var(--ok-line);
+  --color-warn-fg: var(--warn-fg); --color-warn-bg: var(--warn-bg); --color-warn-line: var(--warn-line);
+  --color-err-fg: var(--err-fg); --color-err-bg: var(--err-bg); --color-err-line: var(--err-line);
+  --color-idle-fg: var(--idle-fg); --color-idle-bg: var(--idle-bg); --color-idle-line: var(--idle-line);
+  --color-canvas: var(--canvas);
+}
 
-/* flow nodes */
-.fnode { width: 240px; border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 10px 8px; font-size: 12px; position: relative; background: var(--panel); }
-.fnode.waits { border-style: double; border-width: 4px; padding: 4px 8px 6px; }
-.fnode.sel { outline: 2px solid var(--accent); }
-.fnode.err { border-color: var(--err); }
-.fnode .kind { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; justify-content: space-between; }
-.fnode .nid { font-weight: 600; font-size: 13px; }
-.fnode .sum { color: var(--muted); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.fnode .exit { display: flex; justify-content: flex-end; font-size: 11px; color: var(--muted); height: 20px; align-items: center; position: relative; }
-.k-say { background: var(--k-say); } .k-ask { background: var(--k-ask); } .k-form { background: var(--k-form); }
-.k-confirm { background: var(--k-confirm); } .k-call { background: var(--k-call); } .k-branch { background: var(--k-branch); }
-.k-notices { background: var(--k-notices); } .k-goto { background: var(--k-goto); } .k-end { background: var(--k-end); }
-.startnode { background: var(--accent); color: var(--accent-ink); padding: 6px 14px; border-radius: 18px; font-size: 12px; font-weight: 600; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
-.legend span { font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); }
+@layer base {
+  html, body { background: var(--ground); color: var(--ink); }
+  body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  :focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+  ::selection { background: var(--brand-100); }
+}
+
+.num { font-variant-numeric: tabular-nums; }
+.skeleton { background: linear-gradient(90deg, var(--sunken), var(--line), var(--sunken)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 6px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* React Flow, quieted to the tokens */
+.react-flow { --xy-background-color: var(--canvas); --xy-edge-stroke: var(--edge); --xy-minimap-background-color: var(--surface);
+  --xy-controls-button-background-color: var(--surface); --xy-controls-button-color: var(--ink-2);
+  --xy-controls-button-border-color: var(--line); --xy-controls-button-background-color-hover: var(--sunken); }
+.react-flow__handle { width: 10px; height: 10px; background: var(--line-strong); border: 2px solid var(--surface); }
+.react-flow__handle.connectingto, .react-flow__handle:hover { background: var(--brand-500); }
+.react-flow__edge-text { font-size: 12px; font-weight: 600; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: var(--brand-500) !important; stroke-width: 2.5; }
+.react-flow__node:focus-visible { outline: none; }
+.react-flow__node:focus-visible > div { outline: 2px solid var(--brand-500); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }

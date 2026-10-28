@@ -145,3 +145,15 @@ def test_create_and_delete_flow(client):
     assert client.post(f"{A}/bots/bank-ko/flows", json={"id": "Bad-Id"}).status_code == 422
     assert client.delete(f"{A}/bots/bank-ko/flows/new_one").status_code == 204
     assert client.get(f"{A}/bots/bank-ko/flows/new_one").status_code == 404
+
+
+def test_faq_list_tells_what_changed_since_the_newest_publication(client):
+    assert {e["published"] for e in client.get(f"{A}/bots/bank-ko/faq").json()} == {None}
+    client.post(f"{A}/bots/bank-ko/validate")
+    assert client.post(f"{A}/bots/bank-ko/publications", json={}).status_code == 201
+    faq = client.get(f"{A}/bots/bank-ko/faq").json()
+    assert {e["published"] for e in faq} == {"same"}
+    e = faq[0]
+    client.put(f"{A}/bots/bank-ko/faq/{e['id']}", json={**e, "answer": e["answer"] + " 추가"})
+    states = {x["id"]: x["published"] for x in client.get(f"{A}/bots/bank-ko/faq").json()}
+    assert states[e["id"]] == "changed" and list(states.values()).count("changed") == 1
