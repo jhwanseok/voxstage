@@ -82,11 +82,49 @@ below; the part is only built when it is answered.
 The engine stays rule-based underneath: roles and types change what is stored and checked, not how an utterance is
 matched.
 
+## Details (from the studio review, [review-adr-0014.md](../studio/review-adr-0014.md); written 2026-10-29)
+
+These follow the studio track's proposals P1 to P7 and P9 as recommended; they are part of the draft and are accepted
+or changed together with the ADR. P5 and P8 wait for the owner's answers (D and the studio question on labels).
+
+- **Binding syntax (P2).** A `call` node has `args` (old form) or `bind` (new form), never both for one parameter
+  (load error). `bind` maps each parameter to exactly one source:
+  ```yaml
+  lookup: {type: call, tool: get_balance, bind: {account_last4: {role: caller, field: last4}}, on_ok: ..., on_error: ...}
+  # sources: {role: <role>, field: <field>}   {call: <step id>, field: <returned field>}   {const: "4821"}
+  ```
+  An earlier call is named by its step id; renaming a step rewrites bindings that name it. `args: {order_id: "{order_id}"}`
+  with exactly one placeholder is read as binding the flat slot `order_id`.
+- **Structured load errors (P1).** The load-time check reports every problem of a flow at once, each as
+  `{code, node, parameter, role, field, path}` with `code` one of `unbound`, `type_mismatch`, `not_collected`; for
+  `not_collected`, `path` is one witness path of node ids on which the value is not collected. Text for people is built
+  from these items, not the other way round.
+- **Default question (P3).** A role default (`default: {from: booker, ask: "..."}`) is asked as an explicit step the
+  loader inserts nowhere implicitly: the flow writes a `confirm`-style node `use_role_default` (new node option
+  `role_default: visitor`), whose yes copies the fields from the source role and whose no leads to the `ask` nodes of
+  that role. It is an ordinary node, so it is drawn, tested and recorded in the trace like any other. A role with
+  `default` but no such node is a load error.
+- **Optional parameters (P4).** A parameter with `required: false` replaces the template filter `default('')`; an
+  unbound optional parameter is left out of the call (absent, not empty). A parameter that is required and unbound is
+  `unbound`.
+- **Fake API rules (P6).** The loader checks `rules[].when` names declared params and `return` names declared
+  `returns` fields, with matching types, so the fake API and the spec cannot drift.
+- **Where things live (P7).** Types and session roles (`caller`) live in `types.yaml` (language-neutral). Flow roles live
+  in the flow header under a new key `roles`. Texts inside a role (the default question) are per language and live in
+  the flow files, which are already per language. Typed `params` and `returns` stay in `tools.yaml`.
+- **Whole records as parameters (P5): waiting for D.** If nesting is not allowed (the recommendation of D) a parameter
+  is a scalar field and the binding names `role.field`; a parameter cannot take a whole `Person`.
+- **Display names (P8): waiting for the owner's answer to the studio question.** If the answer is "in the files", a
+  type, field or role may carry an optional `label: {ko: ..., en: ...}`; until then the model has identifiers only.
+
 ## Consequences
 
 - The studio (ST2/ST3) can draw typed forms and show unbound params, because the model exists in data, not in code.
 - Part 1, 3, 4 and 5 are loader and data changes with a back-compatible reading of today's files. Part 2 and 6 touch
   the interpreter and the dialogue state.
+- The studio stores `types.yaml` as a modelled shared setting; until its ST4 it round-trips the file unchanged, so
+  no studio work blocks parts 1 and 2 of the engine. Once a flow header may carry `roles`, the studio's accepted header
+  keys must add it before such a flow is saved there.
 - The load-time data-flow check is new code with its own test burden (graphs with branches and loops).
 - The size of a domain pack grows (a `types.yaml`); the effort ledger gets a column for it.
 
