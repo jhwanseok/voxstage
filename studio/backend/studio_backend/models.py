@@ -81,6 +81,8 @@ class Bot(Base):
     # draft_revision / shared_revision at the last publication, to tell "unpublished changes"
     published_draft_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     published_shared_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # values the engine does not read yet (hand-off number, policy values); never exported (settings.py)
+    studio_settings: Mapped[dict | None] = mapped_column(Json, nullable=True)
     domain: Mapped[Domain] = relationship(back_populates="bots")
 
 

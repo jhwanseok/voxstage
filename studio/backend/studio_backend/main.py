@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import zipfile
 from contextlib import asynccontextmanager
 from io import BytesIO
@@ -15,10 +16,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import portable, service
+from . import portable, service, settings
 from .db import get_session, session_scope
-from .models import (Bot, Domain, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication, PublicationFile, Role,
-                     Tool, User, UserRole)
+from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
+                     PublicationFile, Role, Tool, User, UserRole)
 
 LOCAL_USER_EMAIL = "local@studio"
 ROLES = ("editor", "publisher", "admin")
@@ -178,6 +179,68 @@ def one_domain(d: str, session: Session = Depends(get_session)):
     return {"slug": dom.slug, "title": dom.title, "shared_revision": dom.shared_revision,
             "bots": [service.bot_status(b, dom) for b in sorted(dom.bots, key=lambda x: x.slug)],
             "tool_count": session.scalar(select(func.count()).select_from(Tool).where(Tool.domain_id == dom.id))}
+
+
+# --- bot defaults: engine config (exported) and studio-only values (not exported) ---
+
+class SettingsIn(BaseModel):
+    title: str | None = None
+    engine: dict[str, Any] | None = None
+    studio_only: dict[str, Any] | None = None
+    revision: int | None = None
+
+
+def _config(session: Session, bot: Bot) -> DomainSetting | None:
+    return session.scalar(select(DomainSetting).where(DomainSetting.bot_id == bot.id, DomainSetting.kind == "config"))
+
+
+def settings_out(session: Session, bot: Bot) -> dict:
+    cfg = _config(session, bot)
+    stored = bot.studio_settings or {}
+    flows = session.scalars(select(Flow).where(Flow.bot_id == bot.id)).all()
+    return {"slug": bot.slug, "title": bot.title, "lang": bot.lang, "domain": session.get(Domain, bot.domain_id).slug,
+            "revision": cfg.revision if cfg else 0, "has_config_file": cfg is not None,
+            "engine": settings.engine_view(cfg.body if cfg else None),
+            "studio_only": {"handoff_number": stored.get("handoff_number"), "policy": stored.get("policy") or {}},
+            "policy_refs": settings.policy_refs(flows)}
+
+
+@app.get(API + "/bots/{b}/settings")
+def get_settings(b: str, session: Session = Depends(get_session)):
+    return settings_out(session, get_bot(session, b))
+
+
+@app.put(API + "/bots/{b}/settings")
+def put_settings(b: str, body: SettingsIn, session: Session = Depends(get_session), user: User = Depends(current_user)):
+    """Only the engine part changes the draft (and so needs validation and publishing); the name and the
+    studio-only values are not exported."""
+    bot = get_bot(session, b)
+    cfg = _config(session, bot)
+    if cfg is not None:
+        check_revision(cfg, body.revision, settings_out(session, bot))
+    try:
+        clean = settings.check_engine(body.engine) if body.engine is not None else None
+        studio = settings.check_studio_only(body.studio_only) if body.studio_only is not None else None
+    except settings.SettingsError as exc:
+        raise HTTPException(422, str(exc))
+    if body.title is not None:
+        if not body.title.strip() or len(body.title) > 200:
+            raise HTTPException(422, "title: 1 to 200 characters")
+        bot.title = body.title.strip()
+    if studio is not None:
+        bot.studio_settings = studio
+    if clean is not None:
+        merged = settings.merge_config(cfg.body if cfg else None, clean)
+        if cfg is None:
+            session.add(DomainSetting(bot_id=bot.id, kind="config", body=merged, updated_by=user.id))
+            touch_bot(bot)
+        elif merged != cfg.body:
+            cfg.body = merged
+            cfg.revision += 1
+            cfg.updated_by = user.id
+            touch_bot(bot)
+    session.commit()
+    return settings_out(session, bot)
 
 
 # --- FAQ ---
@@ -411,6 +474,94 @@ def put_layout(b: str, flow_id: str, body: LayoutIn, session: Session = Depends(
         if node_id in f.nodes:
             session.add(FlowNodeLayout(bot_id=bot.id, flow_id=flow_id, node_id=node_id, x=float(p.get("x", 0)),
                                        y=float(p.get("y", 0)), collapsed=bool(p.get("collapsed", False))))
+    session.commit()
+    return Response(status_code=204)
+
+
+# --- flow editing (ST2): meaning only; positions go through /layout ---
+
+NODE_KINDS = {"say", "ask", "form", "confirm", "call", "branch", "notices", "goto", "end"}
+FLOW_HEADER_KEYS = set(portable.FLOW_HEADER_ORDER) | {"role"}
+NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+class FlowIn(BaseModel):
+    header: dict[str, Any] | None = None
+    start: str | None = None
+    nodes: dict[str, dict[str, Any]]
+    node_order: list[str] | None = None
+    revision: int | None = None
+
+
+def _flow(session: Session, bot: Bot, flow_id: str) -> Flow:
+    f = session.scalar(select(Flow).where(Flow.bot_id == bot.id, Flow.flow_id == flow_id))
+    if f is None:
+        raise HTTPException(404, f"no flow {flow_id}")
+    return f
+
+
+def check_flow_shape(body: FlowIn) -> None:
+    """Shape only: the engine loader checks meaning (reachability, tools, names) at validation. A draft may hold
+    a dangling link while it is being edited."""
+    for nid, node in body.nodes.items():
+        if not NAME.match(nid):
+            raise HTTPException(422, f"node id {nid!r}: letters, digits and _ only, not starting with a digit")
+        if not isinstance(node, dict) or node.get("type") not in NODE_KINDS:
+            raise HTTPException(422, f"node {nid}: type must be one of {sorted(NODE_KINDS)}")
+    if body.start is not None and body.start not in body.nodes:
+        raise HTTPException(422, f"start {body.start!r} is not a node of this flow")
+    if body.header is not None and set(body.header) - FLOW_HEADER_KEYS:
+        raise HTTPException(422, f"unknown flow keys {sorted(set(body.header) - FLOW_HEADER_KEYS)}")
+
+
+@app.put(API + "/bots/{b}/flows/{flow_id}")
+def update_flow(b: str, flow_id: str, body: FlowIn, session: Session = Depends(get_session),
+                user: User = Depends(current_user)):
+    bot = get_bot(session, b)
+    f = _flow(session, bot, flow_id)
+    check_revision(f, body.revision, {"revision": f.revision})
+    check_flow_shape(body)
+    order = [n for n in (body.node_order or f.node_order) if n in body.nodes]
+    order += [n for n in body.nodes if n not in order]
+    if body.header is not None:
+        f.header = dict(body.header)
+    f.start, f.nodes, f.node_order = body.start, dict(body.nodes), order
+    f.revision += 1
+    f.updated_by = user.id
+    portable.prune_layout(session, bot, flow_id, set(body.nodes))
+    touch_bot(bot)
+    session.commit()
+    return get_flow(b, flow_id, session)
+
+
+class NewFlowIn(BaseModel):
+    id: str
+
+
+@app.post(API + "/bots/{b}/flows", status_code=201)
+def create_flow(b: str, body: NewFlowIn, session: Session = Depends(get_session), user: User = Depends(current_user)):
+    """A new flow starts as one `end` node with an empty trigger; validation says what is still missing."""
+    bot = get_bot(session, b)
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", body.id):
+        raise HTTPException(422, "id: lower-case letters, digits and _ only, starting with a letter")
+    if session.scalar(select(Flow).where(Flow.bot_id == bot.id, Flow.flow_id == body.id)):
+        raise HTTPException(409, f"flow {body.id} exists")
+    session.add(Flow(bot_id=bot.id, flow_id=body.id, header={"triggers": {"any_of": []}}, start="done",
+                     nodes={"done": {"type": "end"}}, node_order=["done"], updated_by=user.id))
+    touch_bot(bot)
+    session.commit()
+    return get_flow(b, body.id, session)
+
+
+@app.delete(API + "/bots/{b}/flows/{flow_id}", status_code=204)
+def delete_flow(b: str, flow_id: str, session: Session = Depends(get_session)):
+    bot = get_bot(session, b)
+    session.delete(_flow(session, bot, flow_id))
+    session.execute(delete(FlowNodeLayout).where(FlowNodeLayout.bot_id == bot.id, FlowNodeLayout.flow_id == flow_id))
+    lay = session.get(FlowLayout, (bot.id, flow_id))
+    if lay is not None:
+        session.delete(lay)
+    touch_bot(bot)
     session.commit()
     return Response(status_code=204)
 
