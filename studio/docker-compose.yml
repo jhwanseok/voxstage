@@ -1,0 +1,14 @@
+# Local Postgres for the studio (no credentials of value: local development only).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: studio
+      POSTGRES_PASSWORD: studio
+      POSTGRES_DB: studio
+    ports:
+      - "5433:5432"
+    volumes:
+      - studio-db:/var/lib/postgresql/data
+volumes:
+  studio-db:

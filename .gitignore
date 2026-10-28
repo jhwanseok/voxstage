@@ -224,3 +224,6 @@ data/audio/
 # studio
 studio/exports/
 studio/**/node_modules/
+studio/**/.venv/
+studio/**/__pycache__/
+studio/**/dist/
