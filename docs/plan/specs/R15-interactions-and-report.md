@@ -18,8 +18,10 @@ Read first: this file, [queue.md](../queue.md), decision sheet rows R15-1 and R1
 1. Capability `C13` in `voxstage/dataset.py` and `docs/dataset-spec.md`; sixteen scenario files
    `domains/<d>/<lang>/scenarios/C13-*.yaml`, ids `<domain>.C13.001` to `.008` (twins share the number).
 2. `voxstage/complexity.py`: reads the effort ledger and measures each step's clean-mode pass rate by running the
-   harness on the commit where the step ended (a ledger row names HEAD while the step's work was uncommitted, so
-   the step ends at the commit the next row names); results kept in `docs/ledger/pass-rates.json`;
+   harness on the commit that ended the step (a ledger row cannot say it: the ledger was run while the work was
+   uncommitted and in a different order than the work, so the end commits are listed in the tool); cost is
+   re-measured from the same commit with the current ledger code, because the early ledger rows lack rule-file
+   entries and normalize lines (decision R11-5); results kept in `docs/ledger/pass-rates.json`;
    `report` writes `docs/ledger/complexity.md` and `complexity.png` (rules, flow lines and code lines against pass
    rate).
 3. `docs/stage-comparison.md`: the S1 row (pass rate per capability, both languages and modes; rules, flow lines

@@ -1,8 +1,9 @@
 """The complexity curve of S1 (R15): what the rules cost, step by step, against what they pass.
 
-Cost comes from the effort ledger (`docs/ledger/effort.md`), pass rates from running the evaluation harness on the
+Cost comes from re-measuring the tree at each step's commit with the current ledger code (the early ledger rows lack
+rule-file entries and normalize lines, decision R11-5; the ledger rows are the fallback), pass rates from running the evaluation harness on the
 commit each ledger row names. Pass rates are the step's own dataset in clean mode (the dataset grew with the steps,
-so a rate is "how much of what was asked at that time"; a step is measured at the commit where its work ended, see `measure`). A rate is measured once and kept in
+so a rate is "how much of what was asked at that time"; a step is measured at the commit where its work ended, see `END_COMMITS`). A rate is measured once and kept in
 `docs/ledger/pass-rates.json`; the report is built from the two files.
 
   python -m voxstage.complexity measure [--steps R1 R2 ...]   # runs the harness on each ledger commit (slow)
@@ -19,6 +20,8 @@ import sys
 import tempfile
 from typing import Optional
 
+from . import ledger
+
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 LEDGER = os.path.join(ROOT, "docs", "ledger", "effort.md")
 RATES = os.path.join(ROOT, "docs", "ledger", "pass-rates.json")
@@ -26,9 +29,12 @@ REPORT = os.path.join(ROOT, "docs", "ledger", "complexity.md")
 FIGURE = os.path.join(ROOT, "docs", "ledger", "complexity.png")
 FACTORIES = ("voxstage.rules.interpreter:default_factory", "voxstage.rules.faq:default_factory")
 LANGS = ("en", "ko")
-# R13 was built before R12 and the ledger was run in a different order than the work, so the "next row" rule does not
-# hold for them: both end at the commit that closed them in the queue.
-END_COMMITS = {"R13": "a0e7e58", "R12": "3199792"}
+# The commit that ended each step: its own commit (R0 to R5), the queue commit that marked it done (R6 to R13), or the
+# last commit of its code. A ledger row cannot say it: the ledger was run while a step's work was still uncommitted, in
+# a different order than the work (R13 before R12), and for R14 and R15 after the commit.
+END_COMMITS = {"R0": "0abd454", "R1": "44dc1ee", "R2": "e916924", "R3": "b7a5eba", "R4": "2411043", "R5": "34e24d4",
+               "R6": "0808728", "R7": "7c34719", "R7b": "a729bed", "R8": "da3aad9", "R11": "5f962fd", "R9": "8186a93",
+               "R10": "7d5e5ee", "R13": "a0e7e58", "R12": "3199792", "R14": "f12fda0"}
 
 
 def _num(cell: str) -> int:
@@ -72,6 +78,23 @@ def totals(rows: list, step: str, lang: str) -> dict:
             "code_lines": shared["interpreter"] + shared["other_code"] + shared["normalize"]}
 
 
+def from_measurement(m: dict, lang: str) -> dict:
+    """The same totals as `totals`, from a `ledger.measure` result (used to re-measure steps whose ledger rows have
+    no rule-file entries or normalize lines, decision R11-5)."""
+    packs = [p for p in m["packs"] if p["lang"] == lang]
+    code = m["code"]
+    return {"nodes": sum(p["flow_nodes"] for p in packs),
+            "rules": sum(p["flow_nodes"] + p["patterns"] + p["regex"] + p["rule_entries"] for p in packs),
+            "flow_lines": sum(p["flow_lines"] for p in packs),
+            "code_lines": code["interpreter_lines"] + code["other_rule_lines"] + code["normalize_lines"]}
+
+
+def cost(rows: list, rates: dict, step: str, lang: str) -> Optional[dict]:
+    """The step's cost: re-measured from its commit when kept in the rates file, else the ledger row."""
+    kept = (rates.get(step) or {}).get("cost", {}).get(lang)
+    return kept or totals(rows, step, lang)
+
+
 def _run(args: list, **kw) -> subprocess.CompletedProcess:
     return subprocess.run(args, capture_output=True, text=True, encoding="utf-8", **kw)
 
@@ -89,15 +112,16 @@ def measure(only: Optional[list] = None) -> dict:
     for i, step in enumerate(order):
         if only and step not in only:
             continue
-        # A ledger row names HEAD while the step's work was still uncommitted, so the step ends at the commit the
-        # next row names (the last step ends at its own).
-        commit = END_COMMITS.get(step) or totals(rows, order[min(i + 1, len(order) - 1)], "en")["commit"]
+        # Steps not in END_COMMITS end at the commit their own ledger row names.
+        commit = END_COMMITS.get(step) or totals(rows, step, "en")["commit"]
         entry = rates.setdefault(step, {})
         entry["commit"] = commit
         with tempfile.TemporaryDirectory() as tmp:
             tree = os.path.join(tmp, "tree")
             _run(["git", "worktree", "add", "--detach", tree, commit], cwd=ROOT)
             try:
+                measured = ledger.measure(tree)
+                entry["cost"] = {lang: from_measurement(measured, lang) for lang in LANGS}
                 for lang in LANGS:
                     out = os.path.join(tmp, "out")
                     for factory in FACTORIES + ("null",):
@@ -129,7 +153,7 @@ def to_markdown(rows: list, rates: dict) -> str:
              "|---|---|---|---|---|---|---|---|---|"]
     for step in steps(rows):
         for lang in LANGS:
-            t = totals(rows, step, lang)
+            t = cost(rows, rates, step, lang)
             if t is None:
                 continue
             p, n = (rates.get(step, {}).get(lang) or [None, None])
@@ -150,7 +174,7 @@ def draw(rows: list, rates: dict, path: str = FIGURE) -> None:
         for step in steps(rows):
             p, n = (rates.get(step, {}).get(lang) or [None, None])
             if n:
-                t = totals(rows, step, lang)
+                t = cost(rows, rates, step, lang)
                 xs.append(t["rules"] + t["flow_lines"] + t["code_lines"])
                 ys.append(100 * p / n)
                 names.append(step)
