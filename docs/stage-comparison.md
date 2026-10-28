@@ -5,6 +5,8 @@ The same cases run against every stage, so the stages can be put side by side
 left empty for the later stages to fill in beside it. Rates are cases passed out of cases in the capability, from
 `python -m voxstage.evaluate run voxstage.rules.interpreter:default_factory`, measured at the end of R15.
 
+S1 was declared finished on 2026-10-28 (decision R15-2): no more rules are added; the findings below are carried into the S3 comparison.
+
 ## S1 row: pass rate per capability
 
 | Capability | en clean | en noisy | ko clean | ko noisy | S2 | S3 |
