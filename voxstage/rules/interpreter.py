@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-from .. import normalize
+import voxstage_normalize as normalize
 from ..dialogue import DialogueManager, DMResult, EndCall, HandOff
 from ..domain_pack import DomainPack
 from ..tools import ToolExecutor, ToolResult

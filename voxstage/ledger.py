@@ -7,7 +7,7 @@ Counted per domain and language: YAML lines and nodes in `flows/`, patterns and 
 `rules/faq_patterns.yaml`, and rule-file entries (decision R11-5): one per flow trigger, `interrupts`, capture and
 cue word, plus the global commands, correction patterns, confusion pairs, yes and no words, read-back slots and
 sensitive slots. Counted once for the repo: interpreter lines (interpreter.py, flows.py, expr.py under
-voxstage/rules/), other rule-code lines, and the lines of `voxstage/normalize/`. Blank lines and comment-only lines
+voxstage/rules/), other rule-code lines, and the lines of the normalize package (`normalize/voxstage_normalize/`, before R11-4 `voxstage/normalize/`). Blank lines and comment-only lines
 are not counted.
 """
 
@@ -101,7 +101,7 @@ def measure(root: str = ROOT) -> dict:
             packs.append({"domain": d, "lang": lang, "flow_lines": lines, "flow_nodes": nodes,
                           "patterns": patterns, "regex": regex,
                           "rule_entries": rule_entries(root, d, lang, flow_files)})
-    normalize_lines = sum(code_lines(p) for p in glob.glob(os.path.join(root, "voxstage", "normalize", "*.py")))
+    normalize_lines = sum(code_lines(p) for p in glob.glob(os.path.join(root, "voxstage", "normalize", "*.py")) + glob.glob(os.path.join(root, "normalize", "voxstage_normalize", "*.py")))
     return {"code": {"interpreter_lines": interp, "other_rule_lines": other, "normalize_lines": normalize_lines},
             "packs": packs}
 
