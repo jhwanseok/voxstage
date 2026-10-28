@@ -122,6 +122,6 @@ Order, so the load is spread: Q50 (S2 embedding model, already open), then A, B,
   with S2-2.
 - B (decided 2026-10-29, "같은 걸로 보자": the gate fills `caller`; a booker who is not the caller is the flow role `booker`). Question was: is the session role `caller` the same thing as the identity gate (replace R13's state) or a separate role?
   Recommendation: the same; the gate fills `caller`.
-- C. Does a field have a fixed list (Person.name, phone, customer_id) per domain, or can the studio add fields?
+- C (decided 2026-10-29, "추천대로": `types.yaml` per domain is the reference, edited in the studio and exported on publish; engine and load check share one definition). Question was: does a field have a fixed list (Person.name, phone, customer_id) per domain, or can the studio add fields?
   Recommendation: per domain in `types.yaml`, editable in the studio.
 - D. Is nesting allowed (a Person with an Address record)? Recommendation: no nesting in v1, like Lex.
