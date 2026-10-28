@@ -117,7 +117,7 @@ every product.
 
 Order, so the load is spread: Q50 (S2 embedding model, already open), then A, B, C, D below, each after the previous.
 
-- A. Scope of the first build: types and roles (parts 1, 2, 4) only, then API typing and the load check (3, 5), then
+- A (decided 2026-10-28, "1,2단계 모두 적용": A1 = parts 1, 2, 4 then A2 = parts 3, 5, both in scope in that order; part 6 with S2-2). Question was: scope of the first build: types and roles (parts 1, 2, 4) only, then API typing and the load check (3, 5), then
   the DST link (6) with S2-2? Recommendation: yes, in two builds (A1 = 1, 2, 4 in the flow engine, A2 = 3, 5), 6 goes
   with S2-2.
 - B. Is the session role `caller` the same thing as the identity gate (replace R13's state) or a separate role?
