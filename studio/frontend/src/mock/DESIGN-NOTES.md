@@ -163,6 +163,34 @@ thing is a 속성, a slot of a type is a 항목, a binding picks the 가져올 �
 
 The tables above this section keep the words used when they were written.
 
+## 대화로 테스트 (design memo, 2026-10-29)
+
+Owner request: once a bot passes validation, talk to it like a chatbot (text first), with what happened in each turn.
+
+**Engine dependency: none new.** The engine already runs a dialogue on text: `build_manager(domains_dir, domain, lang,
+tools)` gives a `FlowManager`; `initial_state(id, setup)` and `respond(state, Utterance(text, source="typed") | Dtmf |
+ButtonPress)` return a `DMResult` (reply, new state, actions such as `HandOff`/`EndCall`, and a `trace`). API calls go
+through `FakeApiExecutor.from_yaml(tools.yaml)` (the rules and default answers of API 연결), which the studio wraps to
+record each call's arguments and result. Collected 속성 are in `state.slots` (`<role>.<field>` for roles), re-asks in
+`meta.ask_misses`, the identity check in `meta.verified` / `meta.caller`, call results in `meta.calls`. The studio only
+reads these; `voxstage/` is not changed.
+
+**Backend** (`studio_backend/chat.py`, in memory, one process):
+
+| Endpoint | Does |
+|---|---|
+| `POST /bots/<b>/chat` `{setup: {now?, customer?}}` | Refused (409, with the reason) unless the current draft passed validation. Exports the draft to a temp dir, builds the manager, keeps the session (at most 20, oldest dropped, 30 min idle). The bot's 정책값 (studio-only) go into `setup.policy`. Returns id, the draft revisions it runs, and the flows' buttons |
+| `POST /bots/<b>/chat/<id>/turns` `{kind: text \| digits \| button, text}` | One turn: reply, actions, flow and step before and after, 속성 after (changed ones marked), API calls of the turn with the 넘긴 속성 and the result, re-ask count, verified, the raw trace; `stale` when the draft changed since the start |
+| `DELETE /bots/<b>/chat/<id>` | Ends the session and removes the temp dir |
+
+**Screen**: a docked panel on the right of every bot screen (not a modal, so the user can keep the scenario open next
+to it), opened by **대화로 테스트** in the top bar and on the 검증 page after a pass. Disabled with the reason while the
+draft is not validated or has problems. Inside: a header (draft it runs, 처음부터 다시, 닫기), 시작 조건 (기준 시각,
+고객 정보) folded, the transcript (고객 on the right, 상담봇 on the left, 상담사 연결 / 통화 종료 as a line), and under
+each bot reply a folded **이 턴에서 일어난 일**: 시나리오 · 단계, 수집한 속성 (role.항목 with labels), 호출한 API with
+넘긴 속성 and 결과, 재질문 횟수, 본인 확인; the raw trace under 개발 정보. Input: text box (Enter sends), a 말 / 키패드
+switch, and the scenario buttons as chips. When the draft changes the panel says so and offers 처음부터 다시.
+
 ## Skills used
 
 Mockups: `claude-mem:design-is` (audit table above) and the `dataviz` rules for the home summary tiles.
