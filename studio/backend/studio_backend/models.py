@@ -83,6 +83,8 @@ class Bot(Base):
     published_shared_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # values the engine does not read yet (hand-off number, policy values); never exported (settings.py)
     studio_settings: Mapped[dict | None] = mapped_column(Json, nullable=True)
+    # a copy's source bot and what still holds its language: {copied_from, to_translate: {faq, flows, notices}}
+    origin: Mapped[dict | None] = mapped_column(Json, nullable=True)
     domain: Mapped[Domain] = relationship(back_populates="bots")
 
 

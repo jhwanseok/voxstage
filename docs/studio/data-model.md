@@ -52,7 +52,7 @@ that language only. Bots of the same domain are separate bots; they share only t
 | Table | Columns |
 |---|---|
 | `domain` | id, slug (unique, the engine's directory name: `bank`), title, shared_revision (+1 when a shared asset changes) |
-| `bot` | id, domain_id, lang, slug (unique: `<domain>-<lang>`), title, draft_revision (+1 on any change to the bot's content), last_validated_revision, last_validated_shared_revision, last_published_number. Unique (domain_id, lang) |
+| `bot` | id, domain_id, lang, slug (unique: `<domain>-<lang>`), title, draft_revision (+1 on any change to the bot's content), last_validated_revision, last_validated_shared_revision, last_published_number, studio_settings (not exported), origin (a copy's source and what is still to translate: `{copied_from, to_translate: {faq, flows, notices}}`, not exported; migration 0004). Unique (domain_id, lang) |
 
 Shared assets (they belong to the domain and are language-free in the engine too): `tools.yaml`,
 `sensitive_slots.yaml`, `readback_slots.yaml`. Every bot of the domain exports them. Changing one raises
@@ -154,5 +154,5 @@ The engine's test requires the English and Korean flows of a domain to be twins 
 arguments; `docs/flow-spec.md`, end of "What the loader checks"). The loader does not check it. With one bot per
 language the studio treats it as an optional report, not a rule: `GET /bots/{b}/siblings/check` compares a bot's
 flows with the same-id flows of the other bots of the domain and returns warnings; nothing in validation or
-publication depends on it. A new bot can be started as a copy of a sibling (structure copied, texts to be translated).
+publication depends on it. A new bot can be started as a copy of a sibling (structure copied, texts to be translated). Empty and copied bots both get the language starter (`studio_backend/starters/<lang>/`: situation wording, confirm, command, correction and confusion words), because those files are about the language and the loader needs them once `config.yaml` exists; a copy takes its FAQ, flows, layout, config numbers and fixed notices from the sibling.
 The engine's twin test keeps running on `domains/`, which the studio does not write.

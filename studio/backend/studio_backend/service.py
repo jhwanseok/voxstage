@@ -10,7 +10,7 @@ import shutil
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from . import validation
+from . import bots, validation
 from .models import Bot, Domain, Publication, PublicationFile
 from .portable import export_bot
 
@@ -39,7 +39,8 @@ def bot_status(bot: Bot, domain: Domain) -> dict:
         bot.last_validated_shared_revision == domain.shared_revision
     unpublished = bot.published_draft_revision != bot.draft_revision or \
         bot.published_shared_revision != domain.shared_revision
-    return {"slug": bot.slug, "domain": domain.slug, "lang": bot.lang, "title": bot.title,
+    return {"slug": bot.slug, "domain": domain.slug, "domain_title": domain.title, "lang": bot.lang, "title": bot.title,
+            "copied_from": (bot.origin or {}).get("copied_from"), "to_translate": bots.translate_count(bot),
             "draft_revision": bot.draft_revision, "shared_revision": domain.shared_revision,
             "last_published_number": bot.last_published_number,
             "has_unpublished_changes": unpublished,

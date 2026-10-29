@@ -122,7 +122,7 @@ function Editor({ bot, tool, names, onClose, onSaved }: { bot: Bot; tool: Tool |
         <Button variant="primary" loading={busy} disabled={!dirty || !d.name || !!nameErr} onClick={save}>저장</Button>
       </>}>
       <div className="space-y-6">
-        <Notice tone="brand" title={`${domainName(bot.domain)}의 모든 상담봇이 함께 써요`}>여기서 바꾸면 같은 업종의 다른 언어 상담봇도 다시 검증해야 해요.</Notice>
+        <Notice tone="brand" title={`${domainName(bot.domain, bot.domain_title)}의 모든 상담봇이 함께 써요`}>여기서 바꾸면 같은 업종의 다른 언어 상담봇도 다시 검증해야 해요.</Notice>
         <Field label="이름" hint="시나리오의 API 호출 단계에서 이 이름으로 골라요." error={nameErr || null}>
           <Input data-autofocus={isNew || undefined} className="font-mono" value={d.name} disabled={!isNew} onChange={(e) => set("name", e.target.value)} />
         </Field>
@@ -162,7 +162,7 @@ export default function Tools({ bot }: { bot: Bot }) {
   return (
     <main className="mx-auto max-w-5xl px-8 py-8">
       <PageHeader title="API 연결" count={tools ? list.length : undefined}
-        description={`시나리오가 부르는 외부 API 목록이에요. ${domainName(bot.domain)}의 모든 상담봇이 함께 써요.`}
+        description={`시나리오가 부르는 외부 API 목록이에요. ${domainName(bot.domain, bot.domain_title)}의 모든 상담봇이 함께 써요.`}
         actions={<Button variant="primary" icon={<Plus size={15} />} onClick={() => setOpen("new")}>API 추가</Button>} />
       {error && <ErrorState error={error} onRetry={reload} what="API 목록" />}
       {loading && <LoadingBlock rows={4} />}

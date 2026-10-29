@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import chat, datatypes, portable, service, settings, yamlio
+from . import bots, chat, datatypes, portable, service, settings, yamlio
 from .db import get_session, session_scope
 from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile, Role, Tool, User, UserRole)
@@ -129,7 +129,65 @@ def one_bot(b: str, session: Session = Depends(get_session)):
         "flows": session.scalar(select(func.count()).select_from(Flow).where(Flow.bot_id == bot.id)),
         "tools": session.scalar(select(func.count()).select_from(Tool).where(Tool.domain_id == bot.domain_id)),
     }
-    return {**bot_row(session, bot), "counts": counts}
+    return {**bot_row(session, bot), "counts": counts, "translate": bots.to_translate(bot)}
+
+
+@app.get(f"{API}/languages")
+def languages():
+    """The engine's languages: a bot in any other language would not load."""
+    return list(bots.engine_langs())
+
+
+class NewBotIn(BaseModel):
+    domain: str
+    domain_title: str | None = None
+    lang: str
+    title: str | None = None
+    start: str = "empty"
+    copy_from: str | None = None
+    settings: dict[str, Any] | None = None
+
+
+@app.post(f"{API}/bots", status_code=201)
+def create_bot(body: NewBotIn, session: Session = Depends(get_session), user: User = Depends(current_user)):
+    """An empty bot (language starter only) or a copy of a sibling; the 기본 설정 values are checked as on 개요."""
+    present = set(session.scalars(select(Domain.slug)))
+    importable = [d for d in bots.repo_folders(service.domains_root()) if d not in present]
+    extra = set(body.settings or {}) - {"engine", "studio_only"}
+    if extra:
+        raise HTTPException(422, f"settings: unknown keys {sorted(extra)}")
+    try:
+        bot = bots.create_bot(session, domain=body.domain, lang=body.lang, domain_title=body.domain_title,
+                              title=body.title, start=body.start, copy_from=body.copy_from,
+                              engine=(body.settings or {}).get("engine"),
+                              studio_only=(body.settings or {}).get("studio_only"),
+                              importable=importable, user_id=user.id)
+    except bots.BotExists as exc:
+        session.rollback()
+        raise HTTPException(409, {"message": str(exc), "reason": exc.reason})
+    except (bots.BotError, settings.SettingsError) as exc:
+        session.rollback()
+        raise HTTPException(422, str(exc))
+    session.commit()
+    return one_bot(bot.slug, session)
+
+
+class TranslateIn(BaseModel):
+    faq: list[str] = Field(default_factory=list)
+    flows: list[str] = Field(default_factory=list)
+    notices: list[str] = Field(default_factory=list)
+
+
+@app.put(f"{API}/bots/{{b}}/translation")
+def put_translation(b: str, body: TranslateIn, session: Session = Depends(get_session)):
+    """What a copied bot still holds in its source's language; only removals are possible."""
+    bot = get_bot(session, b)
+    try:
+        bots.set_to_translate(bot, body.model_dump())
+    except bots.BotError as exc:
+        raise HTTPException(422, str(exc))
+    session.commit()
+    return bots.to_translate(bot)
 
 
 @app.get(f"{API}/domains")
@@ -198,7 +256,8 @@ def settings_out(session: Session, bot: Bot) -> dict:
     cfg = _config(session, bot)
     stored = bot.studio_settings or {}
     flows = session.scalars(select(Flow).where(Flow.bot_id == bot.id)).all()
-    return {"slug": bot.slug, "title": bot.title, "lang": bot.lang, "domain": session.get(Domain, bot.domain_id).slug,
+    dom = session.get(Domain, bot.domain_id)
+    return {"slug": bot.slug, "title": bot.title, "lang": bot.lang, "domain": dom.slug, "domain_title": dom.title,
             "revision": cfg.revision if cfg else 0, "has_config_file": cfg is not None,
             "engine": settings.engine_view(cfg.body if cfg else None),
             "studio_only": {"handoff_number": stored.get("handoff_number"), "policy": stored.get("policy") or {}},
@@ -296,10 +355,11 @@ def list_faq(b: str, session: Session = Depends(get_session)):
     """`published`: "same", "changed" or "new" against the newest publication; null when nothing is published."""
     bot = get_bot(session, b)
     pub = published_faq(session, bot)
+    left = set(bots.to_translate(bot)["faq"])
     out = []
     for e in session.scalars(select(FaqEntry).where(FaqEntry.bot_id == bot.id).order_by(FaqEntry.position)):
         state = None if pub is None else "new" if e.entry_id not in pub else             "same" if _same_as_published(e, pub[e.entry_id]) else "changed"
-        out.append({**faq_out(e), "published": state})
+        out.append({**faq_out(e), "published": state, "to_translate": e.entry_id in left})
     return out
 
 
@@ -343,6 +403,7 @@ def update_faq(b: str, entry_id: str, body: FaqIn, session: Session = Depends(ge
     e.paraphrases, e.asr_variants, e.pattern = body.paraphrases, body.asr_variants, body.pattern
     e.revision += 1
     e.updated_by = user.id
+    bots.mark_translated(bot, "faq", entry_id)
     touch_bot(bot)
     session.commit()
     return faq_out(e)
@@ -352,6 +413,7 @@ def update_faq(b: str, entry_id: str, body: FaqIn, session: Session = Depends(ge
 def delete_faq(b: str, entry_id: str, session: Session = Depends(get_session)):
     bot = get_bot(session, b)
     session.delete(_faq(session, bot, entry_id))
+    bots.mark_translated(bot, "faq", entry_id)
     touch_bot(bot)
     session.commit()
     return Response(status_code=204)
@@ -519,11 +581,12 @@ def flow_items(bot: Bot, flow_id: str) -> list[dict]:
 @app.get(API + "/bots/{b}/flows")
 def list_flows(b: str, session: Session = Depends(get_session)):
     bot = get_bot(session, b)
+    left = set(bots.to_translate(bot)["flows"])
     out = []
     for f in session.scalars(select(Flow).where(Flow.bot_id == bot.id).order_by(Flow.flow_id)):
         out.append({"id": f.flow_id, "start": f.start, "node_count": len(f.nodes), "buttons": f.header.get("buttons", []),
                     "role": f.header.get("role"), "triggers": f.header.get("triggers"),
-                    "items": flow_items(bot, f.flow_id)})
+                    "items": flow_items(bot, f.flow_id), "to_translate": f.flow_id in left})
     return out
 
 
@@ -630,6 +693,7 @@ def update_flow(b: str, flow_id: str, body: FlowIn, session: Session = Depends(g
     f.revision += 1
     f.updated_by = user.id
     portable.prune_layout(session, bot, flow_id, set(body.nodes))
+    bots.mark_translated(bot, "flows", flow_id)
     touch_bot(bot)
     session.commit()
     return get_flow(b, flow_id, session)
@@ -662,6 +726,7 @@ def delete_flow(b: str, flow_id: str, session: Session = Depends(get_session)):
     lay = session.get(FlowLayout, (bot.id, flow_id))
     if lay is not None:
         session.delete(lay)
+    bots.mark_translated(bot, "flows", flow_id)
     touch_bot(bot)
     session.commit()
     return Response(status_code=204)

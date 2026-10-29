@@ -1,5 +1,6 @@
 import { BookOpenText, Plus, Search, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ApiError, api, type Bot, type Faq, type Report } from "../api";
 import { useFetch, useShell, useUnsavedWarning } from "../hooks";
 import { MIN_ASR, MIN_PARAPHRASES, needsAttention, problems, readPattern, toBody, toDraft, toPattern, type FaqDraft } from "../lib/faq";
@@ -8,7 +9,7 @@ import {
   Sheet, StatusChip, Tag, Textarea, useToast, WordsInput,
 } from "../ui";
 
-type Filter = "all" | "changed" | "attention";
+type Filter = "all" | "changed" | "attention" | "translate";
 
 /** Sentences, one per row: edit in place, delete, or add at the bottom with Enter. */
 function SentenceList({ items, onChange, label, placeholder }: { items: string[]; onChange: (v: string[]) => void; label: string; placeholder: string }) {
@@ -168,6 +169,7 @@ function Editor({ bot, entry, ids, onClose, onSaved }: {
 
 function stateChip(e: Faq) {
   if (needsAttention(e)) return <StatusChip tone="err">확인 필요</StatusChip>;
+  if (e.to_translate) return <StatusChip tone="warn">번역 필요</StatusChip>;
   if (e.published === "new") return <StatusChip tone="warn">새 질문</StatusChip>;
   if (e.published === "changed") return <StatusChip tone="warn">고침</StatusChip>;
   if (e.published === "same") return <span className="text-xs text-muted">게시됨</span>;
@@ -179,14 +181,16 @@ export default function FaqPage({ bot }: { bot: Bot }) {
   const { data: list, error, loading, reload } = useFetch<Faq[]>(`/bots/${bot.slug}/faq`);
   const { data: report } = useFetch<Report | null>(`/bots/${bot.slug}/validation`, [bot.draft_revision, bot.validated]);
   const [open, setOpen] = useState<string | "new" | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState<Filter>(params.get("filter") === "translate" ? "translate" : "all");
   const [q, setQ] = useState("");
   useEffect(() => { setOpen(null); }, [bot.slug]);
 
   const all = list ?? [];
   const changed = all.filter((e) => e.published === "changed" || e.published === "new");
   const attention = all.filter(needsAttention);
-  const shown = (filter === "changed" ? changed : filter === "attention" ? attention : all)
+  const translate = all.filter((e) => e.to_translate);
+  const shown = (filter === "changed" ? changed : filter === "attention" ? attention : filter === "translate" ? translate : all)
     .filter((e) => !q || `${e.question} ${e.answer} ${(e.paraphrases ?? []).join(" ")}`.toLowerCase().includes(q.toLowerCase()));
   const engineItems = (report?.items ?? []).filter((i) => /faq/.test(i.file) && i.severity === "error");
   const published = all.some((e) => e.published);
@@ -214,6 +218,7 @@ export default function FaqPage({ bot }: { bot: Bot }) {
               { value: "all", label: "전체", count: all.length },
               ...(published ? [{ value: "changed" as const, label: "게시 후 고친 질문", count: changed.length }] : []),
               { value: "attention", label: "확인이 필요한 질문", count: attention.length },
+              ...(translate.length || filter === "translate" ? [{ value: "translate" as const, label: "번역할 질문", count: translate.length }] : []),
             ]} />
             <span className="flex-1" />
             <div className="relative w-72 max-w-full">

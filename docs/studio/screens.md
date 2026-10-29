@@ -22,7 +22,7 @@ React, TypeScript, Vite; flow editor on React Flow (`@xyflow/react`). Server sta
 
 ## 1. Domains and import
 
-A card per bot, grouped by domain: language, counts (FAQ, flows), draft status, last publication; the domain's shared assets (tools) are listed once per domain. **New bot** creates a bot for a domain and language (empty or copied from a sibling). **Import** opens a dialog:
+A card per bot, grouped by domain: language, counts (FAQ, flows), draft status, last publication; the domain's shared assets (tools) are listed once per domain. **New bot** creates a bot for a domain and language (empty or copied from a sibling): one dialog with the domain (existing, or a new one with a name and an id), the language (the engine's languages; taken ones disabled), the start (empty, or copy of a sibling) and the first defaults (name, re-prompts, hand-off number), then the new bot's overview. A copy marks its FAQ entries, flows and fixed notices **to translate** until each is saved. **Import** opens a dialog:
 choose a domain from the repository's `domains/` (or upload a zip), see what will be modelled and what stays raw,
 confirm. Re-import of an existing domain asks to replace the draft.
 

@@ -161,7 +161,7 @@ function TypeEditor({ bot, doc, id, uses, fieldTypes, onClose, save }: {
         <Button variant="primary" loading={busy} disabled={!dirty || blocking} onClick={onSave}>저장</Button>
       </>}>
       <div className="space-y-6">
-        <Notice tone="brand" title={`${domainName(bot.domain)}의 모든 상담봇이 함께 써요`}>
+        <Notice tone="brand" title={`${domainName(bot.domain, bot.domain_title)}의 모든 상담봇이 함께 써요`}>
           {uses.length ? `${usageText(uses)}. 항목을 지우면 그 항목을 묻거나 넘기던 단계를 고쳐야 해요.` : "고객에게서 수집하는 속성의 모양을 정해요. 시나리오에서 예약자, 방문자처럼 이름을 붙여 써요."}
         </Notice>
         <Field label="표시 이름" hint="화면과 고객에게 다시 읽어 줄 때 써요.">
@@ -256,7 +256,7 @@ export default function DataPage({ bot }: { bot: Bot }) {
 
   return (
     <main className="mx-auto max-w-5xl px-8 py-8">
-      <PageHeader title="데이터" description={`상담봇이 고객에게서 수집하는 속성의 모양이에요. ${domainName(bot.domain)}의 모든 상담봇이 함께 써요.`}
+      <PageHeader title="데이터" description={`상담봇이 고객에게서 수집하는 속성의 모양이에요. ${domainName(bot.domain, bot.domain_title)}의 모든 상담봇이 함께 써요.`}
         actions={<Button variant="primary" icon={<Plus size={15} />} onClick={() => setOpen({ kind: "type", id: null })}>속성 종류 추가</Button>} />
       {error && <ErrorState error={error} onRetry={reload} what="데이터" />}
       {loading && <LoadingBlock rows={4} />}

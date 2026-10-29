@@ -184,8 +184,8 @@ def export_bot(session: Session, bot: Bot) -> dict[str, str]:
     d, lang = domain.slug, bot.lang
     files: dict[str, str] = {}
     tools = session.scalars(select(Tool).where(Tool.domain_id == domain.id).order_by(Tool.position)).all()
-    if tools:
-        files[f"{d}/tools.yaml"] = yamlio.dump({"tools": {t.name: t.body for t in tools}})
+    # always written: the loader and the fake API open it even when a new domain has no API yet
+    files[f"{d}/tools.yaml"] = yamlio.dump({"tools": {t.name: t.body for t in tools}})
     for s in session.scalars(select(DomainSetting).where(DomainSetting.domain_id == domain.id)):
         files[f"{d}/{SHARED_SETTINGS[s.kind]}"] = yamlio.dump(s.body)
     for f in session.scalars(select(DomainFile).where(DomainFile.domain_id == domain.id)):

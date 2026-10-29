@@ -7,7 +7,7 @@ import App from "./App";
 import { paths } from "./paths";
 
 const BOT = {
-  slug: "bank-ko", domain: "bank", lang: "ko", title: "bank (ko)", draft_revision: 1, shared_revision: 1,
+  slug: "bank-ko", domain: "bank", domain_title: "bank", copied_from: null, to_translate: 0, lang: "ko", title: "bank (ko)", draft_revision: 1, shared_revision: 1,
   last_published_number: 0, has_unpublished_changes: true, validated: false, valid: false,
 };
 
@@ -38,7 +38,7 @@ beforeEach(() => {
                 correction: { max_corrections: 2, ...a }, verification: { max_attempts: 3, ...a }, tools: { max_failures: 2, timeout_ms: 5000, ...a } },
       studio_only: { handoff_number: null, policy: {} }, policy_refs: [] };
     const body = url.endsWith("/api/v1/bots") ? [BOT]
-      : url.endsWith("/bots/bank-ko") ? { ...BOT, counts: { faq: 0, flows: 0, tools: 0 } }
+      : url.endsWith("/bots/bank-ko") ? { ...BOT, counts: { faq: 0, flows: 0, tools: 0 }, translate: { faq: [], flows: [], notices: [] } }
       : url.endsWith("/settings") ? settings
       : url.endsWith("/validation") ? null
       : url.endsWith("/types") ? { domain: "bank", exists: false, revision: 0, body: { types: {}, session_roles: {} }, usage: {}, field_types: ["text"], affects_bots: ["bank-ko"] }

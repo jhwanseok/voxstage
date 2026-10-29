@@ -26,7 +26,9 @@ export const api = {
 };
 
 export interface Bot {
-  slug: string; domain: string; lang: string; title: string;
+  slug: string; domain: string; domain_title: string; lang: string; title: string;
+  /** the bot this one was copied from, and how many of its items still hold that bot's language */
+  copied_from: string | null; to_translate: number;
   draft_revision: number; shared_revision: number; last_published_number: number;
   has_unpublished_changes: boolean; validated: boolean; valid: boolean;
 }
@@ -42,10 +44,12 @@ export interface Faq {
   asr_variants: string[] | null; pattern: Pattern | null; revision: number;
   /** against the newest publication; null when the bot was never published */
   published?: "same" | "changed" | "new" | null;
+  /** copied from another language and not saved since */
+  to_translate?: boolean;
 }
 export interface Tool { name: string; position: number; body: Record<string, any>; revision: number }
 export interface FlowSummary {
-  id: string; start: string; node_count: number; buttons: string[]; role: string | null; triggers: any; items: Item[];
+  id: string; start: string; node_count: number; buttons: string[]; role: string | null; triggers: any; items: Item[]; to_translate?: boolean;
 }
 export interface GraphNode { id: string; type: string; data: Record<string, any> }
 export interface GraphEdge { id: string; from: string; to: string; label: string; handle: string }
@@ -55,7 +59,8 @@ export interface FlowDetail {
   graph: { start: string; nodes: GraphNode[]; edges: GraphEdge[] };
   items: Item[];
 }
-export interface BotDetail extends Bot { counts: { faq: number; flows: number; tools: number } }
+export interface ToTranslate { faq: string[]; flows: string[]; notices: string[] }
+export interface BotDetail extends Bot { counts: { faq: number; flows: number; tools: number }; translate: ToTranslate }
 
 export type OnExceed = "handoff" | "end_call";
 export interface EngineSettings {
@@ -67,7 +72,7 @@ export interface EngineSettings {
   tools: { max_failures: number; timeout_ms: number; on_exceed: OnExceed };
 }
 export interface BotSettings {
-  slug: string; title: string; lang: string; domain: string; revision: number; has_config_file: boolean;
+  slug: string; title: string; lang: string; domain: string; domain_title: string; revision: number; has_config_file: boolean;
   engine: EngineSettings;
   studio_only: { handoff_number: string | null; policy: Record<string, string> };
   policy_refs: { key: string; flows: string[] }[];

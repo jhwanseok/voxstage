@@ -1,4 +1,4 @@
-import { BookOpenText, Download, GitBranch, PlugZap, RefreshCw } from "lucide-react";
+import { BookOpenText, Bot as BotIcon, GitBranch, Languages, Plus, PlugZap, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError, api, type BotDetail, type Domain } from "../api";
@@ -6,6 +6,7 @@ import { botName, botStatus, domainName, langName } from "../copy";
 import { useFetch, useShell } from "../hooks";
 import { paths } from "../paths";
 import { Button, EmptyState, ErrorState, LoadingBlock, Notice, PageHeader, StatusChip, useToast } from "../ui";
+import NewBot from "./NewBot";
 
 function BotCard({ slug }: { slug: string }) {
   const { version } = useShell();
@@ -17,7 +18,9 @@ function BotCard({ slug }: { slug: string }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-lg font-semibold text-ink group-hover:text-brand-700">{botName(b)}</div>
-          <div className="mt-0.5 text-xs text-muted">{langName(b.lang)}</div>
+          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted">{langName(b.lang)}
+            {b.to_translate > 0 && <span className="inline-flex items-center gap-1 font-medium text-warn-fg"><Languages size={12} aria-hidden />번역할 곳 {b.to_translate}개</span>}
+          </div>
         </div>
         <StatusChip tone={st.tone}>{st.text}</StatusChip>
       </div>
@@ -39,6 +42,7 @@ export default function Home() {
   const { data: domains, error, loading, reload } = useFetch<Domain[]>("/domains", [version]);
   const { data: importable } = useFetch<string[]>("/domains/importable", [version]);
   const [busy, setBusy] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const run = async (name: string, replace: boolean) => {
     if (replace && !window.confirm(`${domainName(name)} 초안을 저장소의 domains/${name} 파일로 바꿀까요? 게시 이력은 남아요.`)) return;
@@ -59,13 +63,17 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-6xl px-8 py-8">
       <PageHeader title="어떤 상담봇을 다듬어 볼까요?"
-        description="상담봇은 업종 하나와 언어 하나로 이루어져요. 질문과 시나리오를 고친 뒤 검증하고 게시하면 엔진이 새 버전을 읽어요." />
+        description="상담봇은 업종 하나와 언어 하나로 이루어져요. 질문과 시나리오를 고친 뒤 검증하고 게시하면 엔진이 새 버전을 읽어요."
+        actions={domains && <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreating(true)}>새 상담봇</Button>} />
       {error && <ErrorState error={error} onRetry={reload} what="상담봇 목록" />}
       {loading && <LoadingBlock rows={3} />}
       {domains && bots.length === 0 && (
-        <EmptyState icon={<Download size={20} />} title="아직 상담봇이 없어요"
-          action={notImported[0] && <Button variant="primary" loading={busy === notImported[0]} onClick={() => run(notImported[0], false)}>{domainName(notImported[0])} 가져오기</Button>}>
-          저장소의 domains 폴더에 있는 업종을 가져오면 언어마다 상담봇이 하나씩 생겨요.
+        <EmptyState icon={<BotIcon size={20} />} title="아직 상담봇이 없어요"
+          action={<div className="flex flex-wrap justify-center gap-2">
+            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setCreating(true)}>새 상담봇 만들기</Button>
+            {notImported[0] && <Button loading={busy === notImported[0]} onClick={() => run(notImported[0], false)}>{domainName(notImported[0])} 가져오기</Button>}
+          </div>}>
+          업종과 언어를 골라 빈 상담봇부터 만들거나, 저장소의 domains 폴더에 있는 업종을 가져와 보세요.
         </EmptyState>
       )}
       {bots.length > 0 && (
@@ -76,9 +84,9 @@ export default function Home() {
       {(domains ?? []).filter((d) => d.bots.length).map((d) => (
         <section key={d.slug} className="mb-8" aria-labelledby={`dom-${d.slug}`}>
           <div className="mb-3 flex items-center gap-3">
-            <h2 id={`dom-${d.slug}`} className="text-[15px] font-semibold text-ink">{domainName(d.slug)}</h2>
+            <h2 id={`dom-${d.slug}`} className="text-[15px] font-semibold text-ink">{domainName(d.slug, d.title)}</h2>
             <span className="h-px flex-1 bg-line" />
-            <Button size="sm" variant="ghost" icon={<RefreshCw size={14} />} loading={busy === d.slug} onClick={() => run(d.slug, true)}>저장소 파일로 다시 가져오기</Button>
+            {(importable ?? []).includes(d.slug) && <Button size="sm" variant="ghost" icon={<RefreshCw size={14} />} loading={busy === d.slug} onClick={() => run(d.slug, true)}>저장소 파일로 다시 가져오기</Button>}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">{d.bots.map((b) => <BotCard key={b.slug} slug={b.slug} />)}</div>
         </section>
@@ -87,6 +95,7 @@ export default function Home() {
         <Notice tone="brand" title="가져올 수 있는 업종이 더 있어요"
           action={<div className="flex gap-2">{notImported.map((n) => <Button key={n} size="sm" loading={busy === n} onClick={() => run(n, false)}>{domainName(n)} 가져오기</Button>)}</div>} />
       )}
+      {creating && domains && <NewBot domains={domains} inRepo={notImported} onClose={() => setCreating(false)} />}
     </main>
   );
 }

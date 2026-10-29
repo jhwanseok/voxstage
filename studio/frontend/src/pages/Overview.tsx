@@ -1,7 +1,7 @@
-import { BookOpenText, GitBranch, PlugZap } from "lucide-react";
+import { BookOpenText, GitBranch, Languages, PlugZap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ApiError, api, type Bot, type BotDetail, type BotSettings, type EngineSettings, type OnExceed } from "../api";
+import { ApiError, api, type Bot, type BotDetail, type BotSettings, type EngineSettings, type OnExceed, type ToTranslate } from "../api";
 import { botName, domainName, langName, ON_EXCEED } from "../copy";
 import { useFetch, useShell, useUnsavedWarning } from "../hooks";
 import { paths } from "../paths";
@@ -16,6 +16,49 @@ function NextStep({ bot }: { bot: Bot }) {
   if (bot.has_unpublished_changes)
     return <Notice tone="ok" title="검증을 통과했어요">위의 <b>게시하기</b>를 누르면 엔진이 새 버전을 읽어요.</Notice>;
   return <Notice tone="idle" title={bot.last_published_number ? `${bot.last_published_number}번째 버전이 엔진에 나가 있어요` : "아직 게시한 버전이 없어요"}>초안이 마지막 게시와 같아요.</Notice>;
+}
+
+const linkCls = "text-sm font-semibold text-brand-700 underline-offset-2 hover:underline";
+
+/** A bot with nothing in it yet: the two places to start. Validation and 대화로 테스트 already work on it. */
+function EmptyBot({ bot }: { bot: Bot }) {
+  return (
+    <Notice tone="brand" title="아직 비어 있는 상담봇이에요"
+      action={<div className="flex gap-4">
+        <Link className={linkCls} to={paths.bot(bot.slug, "faq")}>질문 추가</Link>
+        <Link className={linkCls} to={paths.bot(bot.slug, "flows")}>시나리오 만들기</Link>
+      </div>}>
+      자주 묻는 질문이나 시나리오를 하나 넣어 보세요. 지금도 검증하고 대화로 테스트할 수 있지만, 어떤 말에도 도와드리기 어렵다는 기본 문구로 답해요.
+    </Notice>
+  );
+}
+
+/** What a copied bot still holds in its source's language; saving an item takes it off the list. */
+function Translate({ bot, left, onDone }: { bot: Bot; left: ToTranslate; onDone: () => void }) {
+  const { refresh } = useShell();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const total = left.faq.length + left.flows.length + left.notices.length;
+  if (!total) return null;
+  const from = bot.copied_from?.split("-").pop() ?? "";
+  const done = async () => {
+    if (!window.confirm("번역할 곳 표시를 모두 지울까요? 문구는 그대로 남아요.")) return;
+    setBusy(true);
+    try { await api.put(`/bots/${bot.slug}/translation`, {}); onDone(); refresh(); toast("번역할 곳 표시를 지웠어요"); }
+    catch (e) { toast((e as Error).message, "err"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Notice tone="warn" title={<span className="inline-flex items-center gap-1.5"><Languages size={15} aria-hidden />번역할 곳이 {total}개 남았어요</span>}
+      action={<Button size="sm" loading={busy} onClick={done}>모두 번역했어요</Button>}>
+      {langName(from)} 상담봇에서 복사한 문구예요. 질문이나 시나리오를 고쳐 저장하면 번역한 것으로 보고 목록에서 빠져요.
+      <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+        {left.faq.length > 0 && <li><Link className={linkCls} to={`${paths.bot(bot.slug, "faq")}?filter=translate`}>질문 {left.faq.length}개</Link></li>}
+        {left.flows.length > 0 && <li><Link className={linkCls} to={paths.bot(bot.slug, "flows")}>시나리오 {left.flows.length}개</Link></li>}
+        {left.notices.length > 0 && <li className="text-ink-2">고정 안내 {left.notices.length}개: 아직 스튜디오에서 고칠 수 없어요</li>}
+      </ul>
+    </Notice>
+  );
 }
 
 function Section({ title, description, children, tag }: { title: string; description: string; children: ReactNode; tag?: ReactNode }) {
@@ -103,7 +146,7 @@ function SettingsForm({ bot, initial, onSaved }: { bot: Bot; initial: BotSetting
           <Field label="이름"><Input value={s.title} onChange={(ev) => setS({ ...s, title: ev.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label="언어"><Input value={langName(s.lang)} disabled /></Field>
-            <Field label="업종"><Input value={domainName(s.domain)} disabled /></Field>
+            <Field label="업종"><Input value={domainName(s.domain, s.domain_title)} disabled /></Field>
           </div>
         </Section>
 
@@ -172,7 +215,8 @@ function SettingsForm({ bot, initial, onSaved }: { bot: Bot; initial: BotSetting
 
 export default function Overview({ bot }: { bot: Bot }) {
   const { version } = useShell();
-  const { data: detail } = useFetch<BotDetail>(`/bots/${bot.slug}`, [version]);
+  const { data: detail, reload: reloadDetail } = useFetch<BotDetail>(`/bots/${bot.slug}`, [version]);
+  const empty = detail ? detail.counts.faq === 0 && detail.counts.flows === 0 : false;
   const { data: settings, error, loading, reload, setData } = useFetch<BotSettings>(`/bots/${bot.slug}/settings`);
   const counts = detail?.counts;
   // imported bots are titled "bank (ko)"; the form shows the readable name, so a first save stores it
@@ -185,7 +229,11 @@ export default function Overview({ bot }: { bot: Bot }) {
   return (
     <main className="mx-auto max-w-5xl px-8 py-8">
       <PageHeader title="개요" description={`${botName(bot)}의 상태와 기본 설정이에요.`} />
-      <div className="mb-6"><NextStep bot={bot} /></div>
+      <div className="mb-6 grid gap-3">
+        {empty && <EmptyBot bot={bot} />}
+        {detail?.translate && <Translate bot={bot} left={detail.translate} onDone={reloadDetail} />}
+        <NextStep bot={bot} />
+      </div>
       <div className="mb-8 grid gap-3 sm:grid-cols-3">
         {tiles.map(({ to, icon: Icon, label, n }) => (
           <Link key={to} to={to} className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3.5 hover:border-brand-500">

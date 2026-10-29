@@ -4,7 +4,10 @@
 import { Keyboard, MessageSquare, RotateCcw, Send, ShieldCheck, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useBotActions } from "../actions";
-import { ApiError, api, type Bot } from "../api";
+import { Link } from "react-router-dom";
+import { ApiError, api, type Bot, type BotDetail } from "../api";
+import { useFetch } from "../hooks";
+import { paths } from "../paths";
 import { Button, cn, Disclosure, Field, IconButton, Input, Notice, Segmented, StatusChip, Tag } from "../ui";
 
 interface Started { id: string; draft_revision: number; shared_revision: number; stale: boolean; buttons: string[]; labels: Record<string, string> }
@@ -123,6 +126,8 @@ export default function ChatTest({ bot, onClose }: { bot: Bot; onClose: () => vo
   const bottom = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const ready = bot.validated && bot.valid;
+  const { data: detail } = useFetch<BotDetail>(`/bots/${bot.slug}`, [bot.draft_revision]);
+  const empty = detail ? detail.counts.faq === 0 && detail.counts.flows === 0 : false;
 
   const start = async () => {
     if (session) void api.del(`/bots/${bot.slug}/chat/${session.id}`).catch(() => undefined);
@@ -196,9 +201,15 @@ export default function ChatTest({ bot, onClose }: { bot: Bot; onClose: () => vo
             </div>
           )}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3" aria-live="polite">
-            {lines.length === 0 && (
+            {lines.length === 0 && (empty ? (
+              <Notice tone="brand" title="아직 질문과 시나리오가 없어요">
+                무엇을 말해도 도와드리기 어렵다는 기본 문구로 답해요. 그 문구를 들어 보거나,{" "}
+                <Link className="font-semibold text-brand-700 underline-offset-2 hover:underline" to={paths.bot(bot.slug, "faq")}>질문</Link>이나{" "}
+                <Link className="font-semibold text-brand-700 underline-offset-2 hover:underline" to={paths.bot(bot.slug, "flows")}>시나리오</Link>를 먼저 넣어 보세요.
+              </Notice>
+            ) : (
               <p className="py-6 text-center text-[13px] text-muted">고객이 되어 말을 걸어 보세요.<br />예: 시나리오의 시작하는 말이나 자주 묻는 질문</p>
-            )}
+            ))}
             <ol className="space-y-3">
               {lines.map((l, i) => l.who === "user" ? (
                 <li key={i} className="flex justify-end">

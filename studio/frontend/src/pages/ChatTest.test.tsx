@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatTest from "./ChatTest";
 
 const BOT = {
-  slug: "bank-ko", domain: "bank", lang: "ko", title: "bank (ko)", draft_revision: 3, shared_revision: 2,
+  slug: "bank-ko", domain: "bank", domain_title: "bank", copied_from: null, to_translate: 0, lang: "ko", title: "bank (ko)", draft_revision: 3, shared_revision: 2,
   last_published_number: 0, has_unpublished_changes: true, validated: true, valid: true,
 };
 const TURN = {

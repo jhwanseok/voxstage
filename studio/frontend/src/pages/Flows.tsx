@@ -66,6 +66,7 @@ export default function Flows({ bot }: { bot: Bot }) {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-ink">{f.id}</span>
                       {f.role === "verification" && <StatusChip tone="brand" icon={false}><UserCheck size={12} aria-hidden />본인 확인</StatusChip>}
+                      {f.to_translate && <StatusChip tone="warn">번역 필요</StatusChip>}
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1">
                       {f.role === "verification" ? <span className="text-[13px] text-muted">다른 시나리오가 부를 때 시작해요</span> : (

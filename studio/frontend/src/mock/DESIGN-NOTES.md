@@ -207,3 +207,62 @@ review: kept the approved direction, removed template tells such as middle-dot m
 and spent the one bold element on the scenario canvas, where `{slot}` placeholders are tinted inside the spoken
 sentence), then `design:design-critique`, `design:accessibility-review` and `design:ux-copy` for the review pass
 (findings below). ST4 used `design:design-critique`, `design:accessibility-review` and `design:ux-copy` again on the new screens (above).
+
+## 새 상담봇 만들기 (design memo, 2026-10-29)
+
+Owner request: a bot could only come from the repository's `domains/` folder, so a business or language that is not
+there could not be made on screen. The spec had **New bot** (screens.md 1, api.md `POST /bots`, data-model.md "Sibling
+bots") but nothing was built.
+
+**Engine facts that shape it** (read only): the FAQ loader takes `lang` from `voxstage/dataset.py` `LANGS` (now `en`,
+`ko`), so the language list comes from the engine and nothing else can be offered. `DomainPack.load` needs only
+`faq.yaml` (an empty `entries` list loads), but once `rules/config.yaml` exists it also needs `notices.yaml` with every
+situation wording and `rules/confirm.yaml`, `commands.yaml`, `corrections.yaml`, `confusions.yaml`. Those five are
+about the language, not the business (the three domains in the repository share them word for word per language), so
+the studio keeps one **language starter** per engine language in `studio_backend/starters/<lang>/` and every new bot
+gets it. A new bot therefore passes validation at once and its 기본 설정 can be saved without breaking it.
+
+**Flow**: 홈 → **새 상담봇** (header button; also the empty state) → one dialog, top to bottom:
+
+| Part | Choice | Rules |
+|---|---|---|
+| 업종 | an existing business, or **새 업종**: 업종 이름 (any text, e.g. 병원 예약) and 영문 ID (`[a-z][a-z0-9-]{1,39}`, filled from the name when it is ASCII) | The ID may not be one already in the studio or a not-yet-imported folder of `domains/` (that one is offered as 가져오기 instead) |
+| 언어 | the engine's languages | A language the business already has is shown disabled with "이미 있어요" (one bot per business and language, `UNIQUE(domain_id, lang)`) |
+| 시작 방식 | **빈 상담봇** or **다른 언어 상담봇 복사** (only for an existing business with another language) | Copy takes the sibling of the same business; 새 업종 has nothing to copy |
+| 기본 설정 | 이름, 기본 재질문 횟수, 상담사 연결 번호 | Same storage and checks as 개요 (`settings.check_engine` for the config, `check_studio_only` for the number); the rest stays on 개요 |
+
+After 만들기 the user lands on the new bot's 개요, which says what to do next.
+
+**What each start gives**
+
+| | 빈 상담봇 | 복사 |
+|---|---|---|
+| FAQ, scenarios | none | all of the sibling's, same ids, node ids, triggers, buttons and texts (so the engine's twin test still lines up) |
+| Scenario layout | none | copied (positions are not language) |
+| `rules/config.yaml` | engine defaults, plus the dialog's values | the sibling's numbers, plus the dialog's values |
+| notices.yaml | the starter's situation wording, no fixed notices | the sibling's fixed notices (to translate) + the starter's wording in the new language |
+| confirm, commands, corrections, confusions | starter of the new language | starter of the new language (the sibling's words are in the wrong language) |
+| hand-off number, 정책값 | the dialog's number | the sibling's, then the dialog's number |
+| Shared assets (API 연결, 속성 종류) | shared with the business as they are | same |
+| Not copied | | evaluation cases (`scenarios/`) and `faq_unanswerable.yaml`: test data written in the sibling's language |
+
+**번역할 곳**: a copy remembers what still holds the sibling's language in `bot.origin` (new column, migration 0004):
+`{copied_from, to_translate: {faq: [ids], flows: [ids], notices: [ids]}}`. Saving an FAQ entry or a scenario takes it
+off the list (deleting too); 개요 shows the remaining count with links and **모두 번역했어요** to clear it. The FAQ list
+and the scenario list tag each item **번역 필요**. Validation does not look at it: the engine does not know the language
+of a sentence.
+
+**Empty bot guidance**: 개요's next step for a bot with no FAQ and no scenario is "질문이나 시나리오를 하나 추가해
+보세요" with both links; 대화로 테스트 on such a bot opens with a note that every sentence will get the situation
+wording `flow.no_flow` (그 부분은 도와드리기 어렵습니다) until something is added (it still runs, so the wording can be heard).
+
+**API**: `GET /languages` (engine `LANGS` with display names left to the client), `POST /bots`
+`{domain, domain_title?, lang, title?, start: "empty" | "copy", copy_from?, settings?: {engine?, studio_only?}}` → `201`
+bot; `409 {reason: "exists" | "in_repo"}`, `422` for a bad ID, language, copy source or setting. `PUT /bots/{b}/translation`
+`{faq, flows, notices}` sets what is left to translate. Bot rows gain `domain_title` and `to_translate` (count).
+
+Built as above. Checked on 5710: 새 업종 병원 예약 (`clinic`) in Korean as an empty bot, 검증 passed and 대화로 테스트 answered
+with `flow.no_flow`; after one question and one scenario were added, the English bot was made as a copy (Korean disabled, the
+hand-off number taken from the sibling), 개요 listed 번역할 곳 2개, the FAQ list opened on 번역할 질문, and saving the
+translated question took it off. Not done: a bot cannot be deleted yet, and fixed notices to translate cannot be edited on
+screen until the ST3 안내 문구 screen exists (the card says so).

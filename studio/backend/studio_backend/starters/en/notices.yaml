@@ -1,0 +1,21 @@
+# Language starter (studio): situation wording every bot of this language starts with. No fixed notices.
+notices: {}
+
+wording:
+  fallback.miss: "I'm sorry, I didn't catch that. Could you ask it another way?"
+  fallback.exceed: "I'm sorry, I still can't help with that. Let me connect you to an agent."
+  ask.invalid: "Sorry, that doesn't look right."
+  ask.keypad_only: "For your security, please use the keypad for this one."
+  ask.exceed: "I'm sorry, I still can't get that. Let me connect you to an agent."
+  flow.attribute_missing: "I'm sorry, I can't answer that right now. Let me connect you to an agent."
+  flow.no_flow: "I can't help with that."
+  confirm.declined: "All right, I have not done it."
+  command.cancelled: "All right, I have cancelled that. What else can I help you with?"
+  command.agent: "I'll connect you to an agent now."
+  date.ambiguous: "Which date do you mean?"
+  readback: "{value}."
+  correction.offer: "Did you mean {value}?"
+  verify.locked: "I couldn't verify your identity, so I'll connect you to an agent."
+  call.failed: "I can't do that right now. Please try again later."
+  call.unconfirmed: "I can't confirm whether that went through. Please don't try again; I'll connect you to an agent."
+  call.exceed: "It still isn't working, so I'll connect you to an agent."
