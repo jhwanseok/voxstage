@@ -1,15 +1,16 @@
-/** Types, roles and call bindings (ADR 0014): reading and writing the file shapes, and what the editor may offer.
+/** Types, roles and call bindings (ADR 0014, engine R16a): reading and writing the file shapes, and what the editor may offer.
  *  The engine loader has the last word; nothing here is a second copy of its data-flow check. */
 import { edges, type FlowDraft } from "./flowEdit";
 
 export type Labels = Record<string, string>;
-export interface FieldSpec { type: string; length?: number; values?: string[]; label?: Labels; [k: string]: any }
-export interface TypeDef { label?: Labels; fields?: Record<string, string | FieldSpec>; scalar?: string; [k: string]: any }
-export interface RoleDef {
-  type: string; scope?: "flow" | "session"; label?: Labels; filled_by?: string;
-  default?: { from: string; ask?: string }; [k: string]: any;
-}
-export interface TypesDoc { types: Record<string, TypeDef>; roles: Record<string, RoleDef>; [k: string]: any }
+export interface FieldSpec { type: string; length?: number; choices?: string[] | Record<string, string>; label?: Labels; [k: string]: any }
+export interface TypeDef { label?: Labels; fields: Record<string, FieldSpec>; [k: string]: any }
+export interface RoleDef { type: string; label?: Labels; default?: { from: string }; [k: string]: any }
+/** `types.yaml`: records of scalar fields, and the one session role `caller` (filled by the identity check). */
+export interface TypesDoc { types: Record<string, TypeDef>; session_roles: Record<string, RoleDef>; [k: string]: any }
+export const SESSION_ROLE = "caller";
+/** Names a flow role cannot take (the engine's template names). */
+export const RESERVED = new Set(["slots", "customer", "policy", "result", SESSION_ROLE]);
 export interface TypeUse { role: string; scope: "flow" | "session"; bot?: string; flow?: string }
 export interface TypesResponse {
   domain: string; exists: boolean; revision: number; body: TypesDoc; usage: Record<string, TypeUse[]>;
@@ -19,12 +20,15 @@ export interface TypesResponse {
 export const TYPE_NAME = /^[A-Z][A-Za-z0-9]*$/;
 export const NAME = /^[a-z][a-z0-9_]*$/;
 
-/** `name: text` and `name: {type: text}` are one field; the short form is written back when nothing else is set. */
+/** A field as stored; an old short form (`name: text`) reads as `{type: text}`. */
 export const fieldSpec = (v: string | FieldSpec | undefined): FieldSpec => (typeof v === "string" ? { type: v } : { type: "text", ...(v ?? {}) });
-export function fieldOut(s: FieldSpec): string | FieldSpec {
+/** A field as written: always a map (the engine refuses the short form), empty keys dropped. */
+export function fieldOut(s: FieldSpec): FieldSpec {
   const o: FieldSpec = { ...s };
   Object.keys(o).forEach((k) => (o[k] === undefined || o[k] === "" || (k === "label" && !Object.keys(o.label ?? {}).length)) && delete o[k]);
-  return Object.keys(o).length === 1 ? o.type : o;
+  if (o.type !== "digits") delete o.length;
+  if (o.type !== "choice") delete o.choices;
+  return o;
 }
 
 export const labelOf = (o: { label?: Labels } | undefined, name: string, lang: string) => o?.label?.[lang] || name;
@@ -41,7 +45,7 @@ export function withLabel<T extends { label?: Labels }>(o: T, lang: string, text
 export interface RoleRef { name: string; def: RoleDef; scope: "flow" | "session" }
 export function rolesOf(header: Record<string, any>, doc: TypesDoc | null): RoleRef[] {
   const flow = Object.entries((header.roles ?? {}) as Record<string, RoleDef>).map(([name, def]) => ({ name, def, scope: "flow" as const }));
-  const session = Object.entries(doc?.roles ?? {}).map(([name, def]) => ({ name, def, scope: "session" as const }));
+  const session = Object.entries(doc?.session_roles ?? {}).map(([name, def]) => ({ name, def, scope: "session" as const }));
   return [...flow, ...session];
 }
 

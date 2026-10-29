@@ -1,6 +1,6 @@
 """Validation through the engine's own loader (ADR 0012): export to a temporary directory, then load it as the engine does.
 
-The studio only reads the engine here (`DomainPack.load`, `load_flows`, `FakeApiExecutor`). The loader raises text
+The studio only reads the engine here (`DomainPack.load`, `load_types`, `load_flows`, `FakeApiExecutor`). The loader raises text
 errors that name a file and often a node; they are mapped to report items and the full message is kept.
 """
 
@@ -12,6 +12,7 @@ import tempfile
 
 from voxstage.domain_pack import DomainPack
 from voxstage.rules.flows import load_flows
+from voxstage.rules.types import load_types
 from voxstage.tools import FakeApiExecutor
 
 
@@ -62,10 +63,18 @@ def validate_files(files: dict[str, str], domain: str, lang: str) -> list[dict]:
         except Exception as exc:
             items.append(_item(exc, root, domain, lang, f"{domain}/{lang}"))
             return items
+        types = None   # as the engine's build_manager reads it (ADR 0014)
+        types_path = os.path.join(root, domain, "types.yaml")
+        if os.path.exists(types_path):
+            try:
+                types = load_types(types_path)
+            except Exception as exc:
+                items.append(_item(exc, root, domain, lang, f"{domain}/types.yaml"))
+                return items
         flows_dir = os.path.join(pack.base_dir, "flows")
         if os.path.isdir(flows_dir):
             try:
-                load_flows(flows_dir, pack.tools_path, pack.sensitive_slots, pack.notices)
+                load_flows(flows_dir, pack.tools_path, pack.sensitive_slots, pack.notices, types)
             except Exception as exc:
                 items.append(_item(exc, root, domain, lang, f"{domain}/{lang}/flows"))
     return items

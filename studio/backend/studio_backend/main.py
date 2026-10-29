@@ -459,7 +459,7 @@ def types_out(session: Session, dom: Domain) -> dict:
     row = _types_row(session, dom)
     body = (row.body if row else None) or {}
     return {"domain": dom.slug, "exists": row is not None, "revision": row.revision if row else 0,
-            "body": {"types": {}, "roles": {}, **body}, "usage": datatypes.usage(body, domain_flows(session, dom)),
+            "body": {"types": {}, "session_roles": {}, **body}, "usage": datatypes.usage(body, domain_flows(session, dom)),
             "field_types": list(_engine_extractors()), "affects_bots": affected_bots(dom)}
 
 
@@ -479,7 +479,7 @@ def put_types(d: str, body: TypesIn, session: Session = Depends(get_session), us
     row = _types_row(session, dom)
     if row is not None:
         check_revision(row, body.revision, types_out(session, dom))
-    errs = datatypes.check_types(body.body)
+    errs = datatypes.check_types(body.body, _engine_extractors())
     if errs:
         raise HTTPException(422, {"message": "invalid type dictionary", "problems": errs})
     broken = datatypes.broken_by(row.body if row else None, body.body, domain_flows(session, dom))

@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from voxstage.domain_pack import DomainPack
 from voxstage.rules.flows import load_flows
+from voxstage.rules.types import load_types
 
 from conftest import DOMAINS
 
@@ -55,7 +56,8 @@ def test_faq_edit_revision_conflict_and_validation_publish(client):
     root = f"{export_root()}/bank-en"
     pack = DomainPack.load(root, "bank", "en")
     assert pack.answers[e["id"]] == "Changed answer."
-    load_flows(f"{pack.base_dir}/flows", pack.tools_path, pack.sensitive_slots, pack.notices)
+    load_flows(f"{pack.base_dir}/flows", pack.tools_path, pack.sensitive_slots, pack.notices,
+               load_types(f"{root}/bank/types.yaml"))   # as build_manager reads it (ADR 0014)
     assert client.post(f"{A}/bots/bank-en/publications", json={"note": "again"}).status_code == 409
     hist = client.get(f"{A}/bots/bank-en/publications").json()
     assert [h["number"] for h in hist] == [1] and hist[0]["file_count"] > 10

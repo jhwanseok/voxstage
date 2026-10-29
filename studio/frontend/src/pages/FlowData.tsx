@@ -5,13 +5,15 @@ import { Link } from "react-router-dom";
 import type { Bot, Tool } from "../api";
 import { EXTRACTORS } from "../copy";
 import {
-  bindingOf, callsBefore, defaultSteps, fieldOptions, fits, labelOf, NAME, paramNames, paramSpec, renameRoleRefs,
+  bindingOf, callsBefore, defaultSteps, fieldOptions, fits, labelOf, NAME, paramNames, paramSpec, renameRoleRefs, RESERVED,
   returnNames, rolesOf, setBinding, withLabel, type FieldSpec, type RoleDef, type Source, type TypesDoc,
 } from "../lib/datatypes";
 import type { FlowDraft } from "../lib/flowEdit";
 import { paths } from "../paths";
 import { Button, eul, Field, IconButton, Input, josa, Notice, Select, Tag } from "../ui";
 
+/** The values a choice stores: the words of a list, or the values of a word -> value map. */
+const choiceValues = (s: FieldSpec) => (Array.isArray(s.choices) ? s.choices : Object.values(s.choices ?? {})).map(String);
 const specText = (s: FieldSpec | null) => (s ? `${EXTRACTORS[s.type] ?? s.type}${s.length ? ` ${s.length}자리` : ""}` : "");
 
 /** "예약자의 이름" for a role path, the raw path when the role or field is gone. */
@@ -25,8 +27,8 @@ export function RolesSection({ bot, d, doc, setDraft, onAddDefaultStep }: {
   bot: Bot; d: FlowDraft; doc: TypesDoc | null; setDraft: (f: (x: FlowDraft) => FlowDraft) => void; onAddDefaultStep: (role: string) => void;
 }) {
   const roles: Record<string, RoleDef> = d.header.roles ?? {};
-  const records = Object.entries(doc?.types ?? {}).filter(([, t]) => t.fields);
-  const session = Object.entries(doc?.roles ?? {});
+  const records = Object.entries(doc?.types ?? {});
+  const session = Object.entries(doc?.session_roles ?? {});
   const setRoles = (next: Record<string, RoleDef>) => setDraft((x) => {
     const header = { ...x.header };
     if (Object.keys(next).length) header.roles = next; else delete header.roles;
@@ -40,7 +42,7 @@ export function RolesSection({ bot, d, doc, setDraft, onAddDefaultStep }: {
   }));
   const add = () => {
     let n = Object.keys(roles).length + 1;
-    while (roles[`role_${n}`] || doc?.roles[`role_${n}`]) n += 1;
+    while (roles[`role_${n}`]) n += 1;
     setRoles({ ...roles, [`role_${n}`]: { type: records[0][0] } });
   };
 
@@ -56,9 +58,8 @@ export function RolesSection({ bot, d, doc, setDraft, onAddDefaultStep }: {
         </Notice>
       )}
       {Object.entries(roles).map(([name, r]) => {
-        const sameType = [...Object.entries(roles).filter(([n, v]) => n !== name && v.type === r.type),
-                          ...session.filter(([, v]) => v.type === r.type)];
-        const idTaken = (to: string) => to !== name && (!!roles[to] || !!doc?.roles[to]);
+        const sameType = Object.entries(roles).filter(([n, v]) => n !== name && v.type === r.type);
+        const idTaken = (to: string) => to !== name && (!!roles[to] || RESERVED.has(to) || !!d.nodes[to]);
         const steps = defaultSteps(d, name);
         return (
           <div key={name} className="space-y-3 rounded-lg border border-line p-3">
@@ -78,21 +79,19 @@ export function RolesSection({ bot, d, doc, setDraft, onAddDefaultStep }: {
             </div>
             <label className="flex items-center gap-2 text-sm text-ink">
               <input type="checkbox" className="h-4 w-4 accent-[var(--brand-500)]" checked={!!r.default} disabled={!sameType.length && !r.default}
-                onChange={(e) => { const { default: _d, ...rest } = r; patch(name, e.target.checked ? { ...rest, default: { from: sameType[0][0], ask: "" } } : rest); }} />
+                onChange={(e) => { const { default: _d, ...rest } = r; patch(name, e.target.checked ? { ...rest, default: { from: sameType[0][0] } } : rest); }} />
               다른 사람과 같을 수 있어요
               {!sameType.length && !r.default && <span className="text-xs text-muted">(같은 종류가 하나 더 있어야 해요)</span>}
             </label>
             {r.default && (
               <div className="space-y-2 rounded-lg bg-sunken p-3">
                 <Field label="누구와 같은지">
-                  <Select value={r.default.from} onChange={(e) => patch(name, { ...r, default: { ...r.default!, from: e.target.value } })}>
+                  <Select value={r.default.from} onChange={(e) => patch(name, { ...r, default: { from: e.target.value } })}>
                     {!sameType.some(([n]) => n === r.default!.from) && <option value={r.default.from}>{r.default.from} (없음)</option>}
                     {sameType.map(([n, v]) => <option key={n} value={n}>{labelOf(v, n, bot.lang)}</option>)}
                   </Select>
                 </Field>
-                <Field label="물어볼 말" hint="예라고 하면 그 사람의 값을 그대로 쓰고, 아니오면 이 사람의 값을 물어요.">
-                  <Input value={r.default.ask ?? ""} placeholder="방문하실 분이 본인이신가요?" onChange={(e) => patch(name, { ...r, default: { ...r.default!, ask: e.target.value } })} />
-                </Field>
+                <p className="text-xs text-ink-2">예/아니오 확인 단계에서 같은 분인지 물어요. 예면 그 사람의 값을 그대로 쓰고, 아니오면 이어지는 단계에서 이 사람의 값을 물어요.</p>
                 {steps.length ? <p className="text-xs text-ok-fg">확인 단계가 있어요 ({steps.join(", ")})</p> : (
                   <Notice tone="warn" title="확인 단계가 없어요" action={<Button size="sm" onClick={() => onAddDefaultStep(name)}>확인 단계 추가</Button>}>
                     같은지 묻는 예/아니오 확인 단계가 있어야 게시할 수 있어요.
@@ -141,8 +140,7 @@ export function AskTarget({ d, doc, lang, b, onPatch }: {
       <Select value={value} onChange={(e) => {
         const o = opts.find((x) => `${x.role}.${x.field}` === e.target.value);
         if (!o) { onPatch({ slot: b.slot ?? b.field ?? "" }, ["role", "field"]); return; }
-        const drop = ["slot", ...(o.spec.length ? [] : ["length"]), ...(o.spec.type === "choice" ? [] : ["choices"])];
-        onPatch({ role: o.role, field: o.field, extractor: o.spec.type, ...(o.spec.length ? { length: o.spec.length } : {}) }, drop);
+        onPatch({ role: o.role, field: o.field }, ["slot", "extractor", "length", "choices"]);
       }}>
         <option value="">이름만 붙여 받기</option>
         {b.role && !known && <option value={value}>{value} (없음)</option>}
@@ -161,7 +159,7 @@ export function RoleDefaultField({ d, lang, doc, b, onPatch }: {
   if (!roles.length && !b.role_default) return null;
   const r = b.role_default ? (d.header.roles ?? {})[b.role_default] as RoleDef | undefined : undefined;
   const from = r?.default?.from;
-  const fromDef = from ? (d.header.roles?.[from] ?? doc?.roles[from]) : undefined;
+  const fromDef = from ? d.header.roles?.[from] : undefined;
   return (
     <Field label="같은 사람인지 확인" optional
       hint={r && from ? `예면 ${labelOf(fromDef, from, lang)}의 값을 ${labelOf(r, b.role_default, lang)}에 그대로 써요. 아니오면 이어지는 단계에서 물어요.` : "기본값이 있는 사람을 고르면 이 단계가 그 확인이 돼요."}
@@ -275,8 +273,8 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
             })()}
             {cur.kind === "const" && (
               <Field label="넣을 값" error={cur.value === "" ? "값을 넣어 주세요" : null}>
-                {spec?.type === "choice" && spec.values?.length
-                  ? <Select value={cur.value} onChange={(e) => set({ const: e.target.value })}><option value="">고르기</option>{spec.values.map((v) => <option key={String(v)} value={String(v)}>{String(v)}</option>)}</Select>
+                {spec?.type === "choice" && choiceValues(spec).length
+                  ? <Select value={cur.value} onChange={(e) => set({ const: e.target.value })}><option value="">고르기</option>{choiceValues(spec).map((v) => <option key={v} value={v}>{v}</option>)}</Select>
                   : <Input inputMode={spec && ["digits", "number"].includes(spec.type) ? "numeric" : undefined} maxLength={spec?.type === "digits" ? spec.length : undefined}
                       value={cur.value} onChange={(e) => set({ const: spec?.type === "number" && e.target.value !== "" && !isNaN(Number(e.target.value)) ? Number(e.target.value) : e.target.value })} />}
               </Field>
@@ -300,7 +298,7 @@ export function cardNote(body: Record<string, any>, header: Record<string, any>,
     const r = (header.roles ?? {})[body.role_default] as RoleDef | undefined;
     const from = r?.default?.from;
     if (!r || !from) return null;
-    return `${josa(labelOf(r, body.role_default, lang), "이", "가")} ${josa(labelOf(header.roles?.[from] ?? doc?.roles[from], from, lang), "과", "와")} 같은지 물어요`;
+    return `${josa(labelOf(r, body.role_default, lang), "이", "가")} ${josa(labelOf(header.roles?.[from], from, lang), "과", "와")} 같은지 물어요`;
   }
   if (body.type === "call" && body.tool) {
     const open = paramNames(tools.get(body.tool)?.body).filter((p) => bindingOf(body, p).kind === "none").length;

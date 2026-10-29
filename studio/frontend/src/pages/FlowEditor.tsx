@@ -655,7 +655,7 @@ function Editor({ bot, detail, tools, doc }: { bot: Bot; detail: FlowDetail; too
             </div>
           ) : (
             <FlowSettings bot={bot} flowId={flowId} d={d} doc={doc} onHeader={(h) => setD((x) => ({ ...x, header: h }))} setDraft={setD}
-              onAddDefaultStep={(role) => add("confirm", { role_default: role, prompt: d.header.roles?.[role]?.default?.ask ?? "" })}
+              onAddDefaultStep={(role) => add("confirm", { role_default: role })}
               onDeleted={() => { refresh(); toast("시나리오를 지웠어요"); nav(paths.bot(bot.slug, "flows")); }} />
           )}
         </div>

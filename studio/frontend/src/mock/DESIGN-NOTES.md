@@ -120,13 +120,14 @@ browser's OK / 취소 labels; the main chunk is over 500 kB (React Flow and dagr
 
 ## ST4 (2026-10-29): data types, roles and binding (ADR 0014)
 
-Built to the accepted ADR before the engine's A1 commit; keys follow the ADR text and are re-checked against A1.
+Built to the accepted ADR, then aligned to the engine's R16a commit (records only, one session role `caller`,
+`default: {from}`, the field gives an `ask` its extractor).
 
 | Screen | What the user sees | Why this shape |
 |---|---|---|
-| 데이터 (new menu, after 시나리오) | Two lists: 값의 종류 (types, each with its fields and "where it is used") and 통화 전체에서 쓰는 값 (session roles) | Shared by every language of the domain, like API 연결, and said so on the page; the type name and field names live under 개발 정보 or in a small 이름 box, the label is what is shown |
-| Type sheet | 표시 이름, 모양 (여러 값의 묶음 / 값 하나), one card per field: 표시 이름, 형식, 이름, 자릿수 only for digits, 보기 only for choice | No nesting (Q55): the field type list holds only the engine's extractors. A type in use cannot be deleted; removing a field a scenario uses asks first and names the scenario |
-| 시나리오 설정, 이 시나리오의 사람과 값 | One card per role: 표시 이름, 값의 종류, "다른 사람과 같을 수 있어요" with 누구와 같은지 and 물어볼 말 | The default question is an explicit step (P3); when it is missing the card says so and 확인 단계 추가 adds the `confirm` with `role_default` |
+| 데이터 (new menu, after 시나리오) | 값의 종류 (types, each with its fields and "where it is used") and 통화 전체에서 쓰는 값 (the 발신자, filled by the identity check) | Shared by every language of the domain, like API 연결, and said so on the page; the type name and field names live under 개발 정보 or in a small 이름 box, the label is what is shown |
+| Type sheet | 표시 이름, one card per field: 표시 이름, 형식, 이름, 자릿수 only for digits, 보기 only for choice | No nesting (Q55): the field type list holds only the engine's extractors. A type in use cannot be deleted; removing a field a scenario uses asks first and names the scenario |
+| 시나리오 설정, 이 시나리오의 사람과 값 | One card per role: 표시 이름, 값의 종류, "다른 사람과 같을 수 있어요" with 누구와 같은지 (another role of the scenario, same type) | The question is the explicit `confirm` step's own sentence (P3); when the step is missing the card says so and 확인 단계 추가 adds it |
 | 묻기 step | 받는 값: "예약자의 이름" instead of a free slot name when the flow has roles | The format comes from the type, so the extractor select is hidden |
 | API 호출 step | One card per parameter: 어디서 가져올까요 (사람과 값 / 앞 API 결과 / 직접 넣기 / 예전 방식), then the matching second input | Values whose type does not fit are not offered; an earlier result that exists only on some paths is listed disabled with the reason; a stored binding that no longer fits shows as an error in its row |
 

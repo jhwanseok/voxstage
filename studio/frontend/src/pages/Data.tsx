@@ -5,7 +5,7 @@ import { domainName, EXTRACTORS } from "../copy";
 import { useFetch, useShell, useUnsavedWarning } from "../hooks";
 import {
   fieldOut, fieldSpec, labelOf, NAME, TYPE_NAME, withLabel, type FieldSpec, type RoleDef, type TypeDef, type TypesDoc,
-  type TypesResponse, type TypeUse,
+  type TypesResponse, type TypeUse, SESSION_ROLE,
 } from "../lib/datatypes";
 import {
   Button, Disclosure, EmptyState, ErrorState, Field, IconButton, Input, LoadingBlock, Notice, PageHeader, Segmented, Select,
@@ -13,7 +13,6 @@ import {
 } from "../ui";
 
 const typeName = (t: string) => EXTRACTORS[t] ?? t;
-const LENGTH_KINDS = new Set(["digits", "text"]);
 
 function usageText(uses: TypeUse[] | undefined): string {
   if (!uses?.length) return "아직 쓰는 곳이 없어요";
@@ -48,22 +47,21 @@ function useSaveDoc(bot: Bot, data: TypesResponse | null, onSaved: () => void) {
 // --- one type ---
 
 interface FieldRow { key: string; id: string; spec: FieldSpec }
-interface TypeDraft { id: string; label: string; shape: "fields" | "scalar"; fields: FieldRow[]; scalar: string }
+interface TypeDraft { id: string; label: string; fields: FieldRow[] }
 
 let rowKey = 0;
 const nextKey = () => `f${++rowKey}`;
 
 function toTypeDraft(id: string, t: TypeDef | null, lang: string): TypeDraft {
   return {
-    id, label: t?.label?.[lang] ?? "", shape: t && "scalar" in t ? "scalar" : "fields", scalar: t?.scalar ?? "number",
+    id, label: t?.label?.[lang] ?? "",
     fields: Object.entries(t?.fields ?? {}).map(([fid, v]) => ({ key: nextKey(), id: fid, spec: fieldSpec(v) })),
   };
 }
 function toTypeDef(d: TypeDraft, prev: TypeDef | null, lang: string): TypeDef {
-  const { fields: _f, scalar: _s, label: _l, ...rest } = prev ?? {};
-  const base = withLabel({ ...rest, label: prev?.label } as TypeDef, lang, d.label);
-  return d.shape === "scalar" ? { ...base, scalar: d.scalar }
-    : { ...base, fields: Object.fromEntries(d.fields.map((f) => [f.id.trim(), fieldOut(f.spec)])) };
+  const { fields: _f, label: _l, ...rest } = prev ?? { fields: {} };
+  const base = withLabel({ ...rest, label: prev?.label, fields: {} } as TypeDef, lang, d.label);
+  return { ...base, fields: Object.fromEntries(d.fields.map((f) => [f.id.trim(), fieldOut(f.spec)])) };
 }
 
 function FieldEditor({ row, lang, fieldTypes, onChange, onRemove, idError, index, focus }: {
@@ -81,7 +79,7 @@ function FieldEditor({ row, lang, fieldTypes, onChange, onRemove, idError, index
         <Field label="형식">
           <Select value={s.type} onChange={(e) => {
             const type = e.target.value;
-            onChange({ ...row, spec: { ...s, type, length: LENGTH_KINDS.has(type) ? s.length : undefined, values: type === "choice" ? s.values ?? [] : undefined } });
+            onChange({ ...row, spec: { ...s, type, length: type === "digits" ? s.length : undefined, choices: type === "choice" ? s.choices ?? [] : undefined } });
           }}>
             {types.map((t) => <option key={t} value={t}>{typeName(t)}</option>)}
           </Select>
@@ -92,17 +90,23 @@ function FieldEditor({ row, lang, fieldTypes, onChange, onRemove, idError, index
         <Field label="이름" hint="파일과 시나리오에서 가리켜요." error={idError}>
           <Input className="font-mono text-[13px]" value={row.id} onChange={(e) => onChange({ ...row, id: e.target.value })} />
         </Field>
-        {(s.type === "digits" || (LENGTH_KINDS.has(s.type) && s.length != null)) && (
+        {s.type === "digits" && (
           <Field label="자릿수" optional hint="비우면 따지지 않아요.">
             <Input type="number" min={1} className="num" value={s.length ?? ""} onChange={(e) => set({ length: e.target.value === "" ? undefined : Number(e.target.value) })} />
           </Field>
         )}
       </div>
-      {s.type === "choice" && (
-        <Field label="보기" error={(s.values ?? []).length ? null : "보기를 하나 이상 넣어 주세요"}>
-          <WordsInput label={`${n}번째 필드 보기`} value={(s.values ?? []).map(String)} onChange={(values) => set({ values })} placeholder="저장할 값 입력 후 Enter" />
+      {s.type === "choice" && (Array.isArray(s.choices) || !s.choices ? (
+        <Field label="보기" hint="고객이 말하는 단어 그대로 저장해요." error={(s.choices as string[] | undefined)?.length ? null : "보기를 하나 이상 넣어 주세요"}>
+          <WordsInput label={`${n}번째 필드 보기`} value={((s.choices ?? []) as string[]).map(String)} onChange={(choices) => set({ choices })} placeholder="보기 입력 후 Enter" />
         </Field>
-      )}
+      ) : (
+        <div className="text-[13px]">
+          <div className="mb-1 font-medium text-ink">보기 (고객이 하는 말과 저장할 값)</div>
+          <ul className="space-y-0.5 text-ink-2">{Object.entries(s.choices).map(([w, v]) => <li key={w}>{w} <span className="text-muted">→</span> <code>{String(v)}</code></li>)}</ul>
+          <p className="mt-1 text-xs text-muted">말과 값이 다른 보기는 여기서 고칠 수 없어요. 저장해도 그대로 남아요.</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -125,7 +129,7 @@ function TypeEditor({ bot, doc, id, uses, fieldTypes, onClose, save }: {
     : isNew && doc.types[d.id] ? "이미 있는 이름이에요" : null;
   const fieldErr = (r: FieldRow) => !r.id ? "이름을 넣어 주세요" : !NAME.test(r.id) ? "영문 소문자, 숫자, 밑줄만 써 주세요"
     : d.fields.filter((x) => x.id === r.id).length > 1 ? "이름이 겹쳐요" : null;
-  const blocking = !d.id || !!idErr || (d.shape === "fields" && (!d.fields.length || d.fields.some((f) => fieldErr(f) || (f.spec.type === "choice" && !(f.spec.values ?? []).length))));
+  const blocking = !d.id || !!idErr || !d.fields.length || d.fields.some((f) => fieldErr(f) || (f.spec.type === "choice" && !Object.keys(f.spec.choices ?? {}).length));
 
   const submit = async (next: TypesDoc) => {
     setBusy(true); setErr("");
@@ -163,30 +167,19 @@ function TypeEditor({ bot, doc, id, uses, fieldTypes, onClose, save }: {
         <Field label="표시 이름" hint="화면과 고객에게 다시 읽어 줄 때 써요.">
           <Input data-autofocus={isNew || undefined} value={d.label} placeholder="예: 사람" onChange={(e) => setD({ ...d, label: e.target.value })} />
         </Field>
-        <div>
-          <div className="mb-1.5 text-sm font-medium text-ink">모양</div>
-          <Segmented label="모양" value={d.shape} onChange={(shape) => setD({ ...d, shape })}
-            options={[{ value: "fields", label: "여러 값의 묶음" }, { value: "scalar", label: "값 하나" }]} />
-          <p className="mt-1.5 text-xs text-muted">{d.shape === "fields" ? "사람처럼 이름, 전화번호를 함께 가지는 값이에요. 필드 안에 다른 묶음은 넣을 수 없어요." : "금액처럼 하나의 값이에요."}</p>
-        </div>
-        {d.shape === "fields" ? (
-          <div className="space-y-3">
+        <div className="space-y-3">
+          <div>
             <div className="text-sm font-medium text-ink">필드</div>
-            {d.fields.length === 0 && <p className="text-[13px] text-muted">필드를 하나 이상 넣어 주세요.</p>}
-            {d.fields.map((f, i) => (
-              <FieldEditor key={f.key} index={i} row={f} focus={f.key === added} lang={bot.lang} fieldTypes={fieldTypes} idError={fieldErr(f)}
-                onChange={(r) => setD({ ...d, fields: d.fields.map((x) => (x.key === f.key ? r : x)) })}
-                onRemove={() => setD({ ...d, fields: d.fields.filter((x) => x.key !== f.key) })} />
-            ))}
-            <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={addField}>필드 추가</Button>
+            <p className="mt-0.5 text-xs text-muted">사람처럼 여러 값을 함께 가지는 종류예요. 필드에는 값 하나만 넣을 수 있고, 다른 종류를 넣을 수는 없어요.</p>
           </div>
-        ) : (
-          <Field label="형식">
-            <Select value={d.scalar} onChange={(e) => setD({ ...d, scalar: e.target.value })}>
-              {(fieldTypes.includes(d.scalar) ? fieldTypes : [...fieldTypes, d.scalar]).map((t) => <option key={t} value={t}>{typeName(t)}</option>)}
-            </Select>
-          </Field>
-        )}
+          {d.fields.length === 0 && <p className="text-[13px] text-muted">필드를 하나 이상 넣어 주세요.</p>}
+          {d.fields.map((f, i) => (
+            <FieldEditor key={f.key} index={i} row={f} focus={f.key === added} lang={bot.lang} fieldTypes={fieldTypes} idError={fieldErr(f)}
+              onChange={(r) => setD({ ...d, fields: d.fields.map((x) => (x.key === f.key ? r : x)) })}
+              onRemove={() => setD({ ...d, fields: d.fields.filter((x) => x.key !== f.key) })} />
+          ))}
+          <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={addField}>필드 추가</Button>
+        </div>
         <Disclosure title="개발 정보" summary={d.id || "이름 없음"} defaultOpen={isNew}>
           <Field label="이름" hint={isNew ? "파일과 시나리오에서 이 종류를 가리켜요. 만든 뒤에는 바꿀 수 없어요." : "만든 뒤에는 바꿀 수 없어요."} error={idErr}>
             <Input className="font-mono text-[13px]" value={d.id} disabled={!isNew} placeholder="Person" onChange={(e) => setD({ ...d, id: e.target.value })} />
@@ -197,22 +190,20 @@ function TypeEditor({ bot, doc, id, uses, fieldTypes, onClose, save }: {
   );
 }
 
-// --- one call-wide value (session role) ---
+// --- the caller (the one session role, filled by the identity check) ---
 
-function SessionRoleEditor({ bot, doc, id, onClose, save }: {
-  bot: Bot; doc: TypesDoc; id: string | null; onClose: () => void; save: (doc: TypesDoc) => Promise<string | null>;
+function CallerEditor({ bot, doc, onClose, save }: {
+  bot: Bot; doc: TypesDoc; onClose: () => void; save: (doc: TypesDoc) => Promise<string | null>;
 }) {
-  const prev = id ? doc.roles[id] : null;
-  const records = Object.entries(doc.types).filter(([, t]) => t.fields);
-  const fresh = useMemo(() => ({ id: id ?? "", label: prev?.label?.[bot.lang] ?? "", type: prev?.type ?? records[0]?.[0] ?? "" }), [id, prev, bot.lang]); // eslint-disable-line react-hooks/exhaustive-deps
+  const prev = doc.session_roles[SESSION_ROLE] ?? null;
+  const records = Object.entries(doc.types);
+  const fresh = useMemo(() => ({ label: prev?.label?.[bot.lang] ?? "", type: prev?.type ?? records[0]?.[0] ?? "" }), [prev, bot.lang]); // eslint-disable-line react-hooks/exhaustive-deps
   const [d, setD] = useState(fresh);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const dirty = JSON.stringify(d) !== JSON.stringify(fresh);
-  useUnsavedWarning(dirty);
-  const isNew = id === null;
-  const close = () => { if (!dirty || window.confirm("저장하지 않은 변경이 있어요. 버리고 닫을까요?")) onClose(); };
-  const idErr = !d.id ? null : !NAME.test(d.id) ? "영문 소문자, 숫자, 밑줄만 써 주세요 (예: caller)" : isNew && doc.roles[d.id] ? "이미 있는 이름이에요" : null;
+  const dirty = JSON.stringify(d) !== JSON.stringify(fresh) || !prev;
+  useUnsavedWarning(dirty && !!prev);
+  const close = () => { if (!prev || JSON.stringify(d) === JSON.stringify(fresh) || window.confirm("저장하지 않은 변경이 있어요. 버리고 닫을까요?")) onClose(); };
 
   const submit = async (next: TypesDoc) => {
     setBusy(true); setErr("");
@@ -221,37 +212,31 @@ function SessionRoleEditor({ bot, doc, id, onClose, save }: {
     if (e) setErr(e);
   };
   const onSave = () => {
-    const role: RoleDef = withLabel({ ...(prev ?? {}), type: d.type, scope: "session" } as RoleDef, bot.lang, d.label);
-    void submit({ ...doc, roles: { ...doc.roles, [d.id]: role } });
+    const role: RoleDef = withLabel({ ...(prev ?? {}), type: d.type } as RoleDef, bot.lang, d.label);
+    void submit({ ...doc, session_roles: { ...doc.session_roles, [SESSION_ROLE]: role } });
   };
   const onDelete = () => {
-    if (!id || !window.confirm(`${eul(labelOf(prev ?? undefined, id, bot.lang))} 지울까요?`)) return;
-    const { [id]: _gone, ...roles } = doc.roles;
-    void submit({ ...doc, roles });
+    if (!prev || !window.confirm(`${eul(labelOf(prev, SESSION_ROLE, bot.lang))} 지울까요? 이 값을 넘기던 단계는 고쳐야 해요.`)) return;
+    const { [SESSION_ROLE]: _gone, ...session_roles } = doc.session_roles;
+    void submit({ ...doc, session_roles });
   };
 
   return (
-    <Sheet open onClose={close} subtitle={isNew ? "새 통화 전체 값" : "통화 전체 값 수정"} title={d.label || d.id || "새 통화 전체 값"} width={480}
+    <Sheet open onClose={close} subtitle="통화 전체 값" title={d.label || "발신자"} width={480}
       footer={<>
-        {!isNew && <Button variant="danger" icon={<Trash2 size={15} />} onClick={onDelete}>삭제</Button>}
-        <span className="flex-1 truncate text-right text-[13px]" role="status">{err ? <span className="font-medium text-err-fg">{err}</span> : dirty ? <span className="text-warn-fg">저장하지 않음</span> : null}</span>
+        {prev && <Button variant="danger" icon={<Trash2 size={15} />} onClick={onDelete}>삭제</Button>}
+        <span className="flex-1 truncate text-right text-[13px]" role="status">{err ? <span className="font-medium text-err-fg">{err}</span> : dirty && prev ? <span className="text-warn-fg">저장하지 않음</span> : null}</span>
         <Button onClick={close}>취소</Button>
-        <Button variant="primary" loading={busy} disabled={!dirty || !d.id || !!idErr || !d.type} onClick={onSave}>저장</Button>
+        <Button variant="primary" loading={busy} disabled={!dirty || !d.type} onClick={onSave}>저장</Button>
       </>}>
       <div className="space-y-6">
-        <p className="text-[13px] text-ink-2">통화가 끝날 때까지 모든 시나리오에서 같은 값을 써요. 본인 확인을 마친 고객처럼, 한 번 받으면 다시 묻지 않아요.</p>
-        <Field label="표시 이름"><Input data-autofocus={isNew || undefined} value={d.label} placeholder="예: 전화 건 사람" onChange={(e) => setD({ ...d, label: e.target.value })} /></Field>
-        <Field label="값의 종류" error={records.length ? null : "먼저 여러 값의 묶음인 값의 종류를 만들어 주세요"}>
+        <p className="text-[13px] text-ink-2">전화를 건 고객이에요. 본인 확인을 마치면 확인에 쓴 값이 이 값의 필드에 들어가고, 통화가 끝날 때까지 모든 시나리오에서 다시 묻지 않고 써요.</p>
+        <Field label="표시 이름"><Input data-autofocus value={d.label} placeholder="예: 발신자" onChange={(e) => setD({ ...d, label: e.target.value })} /></Field>
+        <Field label="값의 종류" hint="본인 확인에 쓰는 값과 같은 이름의 필드가 채워져요.">
           <Select value={d.type} onChange={(e) => setD({ ...d, type: e.target.value })}>
             {records.map(([tid, t]) => <option key={tid} value={tid}>{labelOf(t, tid, bot.lang)}</option>)}
           </Select>
         </Field>
-        {prev?.filled_by && <Notice tone="idle" title="채우는 곳">{`본인 확인(${prev.filled_by})이 이 값을 채워요. 이 설정은 파일에서 읽은 그대로 둬요.`}</Notice>}
-        <Disclosure title="개발 정보" summary={d.id || "이름 없음"} defaultOpen={isNew}>
-          <Field label="이름" hint="만든 뒤에는 바꿀 수 없어요." error={idErr}>
-            <Input className="font-mono text-[13px]" value={d.id} disabled={!isNew} placeholder="caller" onChange={(e) => setD({ ...d, id: e.target.value })} />
-          </Field>
-        </Disclosure>
       </div>
     </Sheet>
   );
@@ -262,11 +247,11 @@ function SessionRoleEditor({ bot, doc, id, onClose, save }: {
 export default function DataPage({ bot }: { bot: Bot }) {
   const { refresh } = useShell();
   const { data, error, loading, reload } = useFetch<TypesResponse>(`/domains/${bot.domain}/types`, [bot.shared_revision]);
-  const [open, setOpen] = useState<{ kind: "type" | "role"; id: string | null } | null>(null);
+  const [open, setOpen] = useState<{ kind: "type" | "caller"; id: string | null } | null>(null);
   const save = useSaveDoc(bot, data, () => { reload(); refresh(); setOpen(null); });
-  const doc = data?.body ?? { types: {}, roles: {} };
+  const doc: TypesDoc = { types: {}, session_roles: {}, ...data?.body };
   const types = Object.entries(doc.types);
-  const roles = Object.entries(doc.roles);
+  const caller = doc.session_roles[SESSION_ROLE];
   const fieldTypes = data?.field_types ?? Object.keys(EXTRACTORS);
 
   return (
@@ -294,7 +279,7 @@ export default function DataPage({ bot }: { bot: Bot }) {
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-ink">{labelOf(t, tid, bot.lang)}</div>
                           <div className="mt-0.5 truncate text-xs text-muted">
-                            {t.fields ? `필드 ${fields.length}개: ${fields.map(([f, v]) => labelOf(fieldSpec(v), f, bot.lang)).join(", ")}` : `값 하나, ${typeName(t.scalar ?? "")}`}
+                            필드 {fields.length}개: {fields.map(([f, v]) => labelOf(fieldSpec(v), f, bot.lang)).join(", ")}
                           </div>
                         </div>
                         <StatusChip tone={uses.length ? "brand" : "idle"} icon={false}>{usageText(uses)}</StatusChip>
@@ -307,38 +292,28 @@ export default function DataPage({ bot }: { bot: Bot }) {
           </section>
 
           <section aria-labelledby="roles-h">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <h2 id="roles-h" className="text-[15px] font-semibold text-ink">통화 전체에서 쓰는 값 <span className="num ml-1 text-muted">{roles.length}</span></h2>
-                <p className="mt-0.5 text-xs text-muted">통화가 끝날 때까지 모든 시나리오에서 써요. 한 시나리오 안에서만 쓰는 값은 시나리오 설정에서 정해요.</p>
-              </div>
-              <Button size="sm" icon={<Plus size={14} />} disabled={!types.some(([, t]) => t.fields)} onClick={() => setOpen({ kind: "role", id: null })}>추가</Button>
-            </div>
-            {roles.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line-strong/50 bg-surface px-5 py-6 text-center text-[13px] text-muted">
-                {types.some(([, t]) => t.fields) ? "아직 없어요. 본인 확인을 마친 고객처럼 여러 시나리오가 함께 쓰는 값을 넣어 보세요." : "값의 종류를 먼저 만들면 넣을 수 있어요."}
-              </p>
+            <h2 id="roles-h" className="text-[15px] font-semibold text-ink">통화 전체에서 쓰는 값</h2>
+            <p className="mb-3 mt-0.5 text-xs text-muted">본인 확인을 마친 발신자는 통화가 끝날 때까지 모든 시나리오에서 써요. 한 시나리오 안에서만 쓰는 사람과 값은 시나리오 설정에서 정해요.</p>
+            {caller ? (
+              <button type="button" onClick={() => setOpen({ kind: "caller", id: SESSION_ROLE })} className="flex w-full items-center gap-4 rounded-xl border border-line bg-surface px-5 py-3.5 text-left hover:bg-sunken/60">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700"><UserRound size={15} aria-hidden /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-ink">{labelOf(caller, SESSION_ROLE, bot.lang)}</div>
+                  <div className="mt-0.5 truncate text-xs text-muted">{labelOf(doc.types[caller.type], caller.type, bot.lang)}, 본인 확인이 채워요</div>
+                </div>
+              </button>
             ) : (
-              <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-                {roles.map(([rid, r]) => (
-                  <li key={rid}>
-                    <button type="button" onClick={() => setOpen({ kind: "role", id: rid })} className="flex w-full items-center gap-4 px-5 py-3.5 text-left hover:bg-sunken/60">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700"><UserRound size={15} aria-hidden /></span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-ink">{labelOf(r, rid, bot.lang)}</div>
-                        <div className="mt-0.5 truncate text-xs text-muted">{labelOf(doc.types[r.type], r.type, bot.lang)}{r.filled_by ? ", 본인 확인이 채워요" : ""}</div>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-line-strong/50 bg-surface px-5 py-4 text-[13px] text-muted">
+                {types.length ? "아직 정하지 않았어요. 본인 확인한 발신자의 값을 여러 시나리오에서 쓰려면 정해 주세요." : "값의 종류를 먼저 만들면 정할 수 있어요."}
+                <Button size="sm" icon={<Plus size={14} />} disabled={!types.length} onClick={() => setOpen({ kind: "caller", id: null })}>발신자 정하기</Button>
+              </div>
             )}
           </section>
         </div>
       )}
       {data && open?.kind === "type" && <TypeEditor key={open.id ?? "new"} bot={bot} doc={doc} id={open.id} uses={open.id ? data.usage[open.id] ?? [] : []}
         fieldTypes={fieldTypes} onClose={() => setOpen(null)} save={save} />}
-      {data && open?.kind === "role" && <SessionRoleEditor key={open.id ?? "new"} bot={bot} doc={doc} id={open.id} onClose={() => setOpen(null)} save={save} />}
+      {data && open?.kind === "caller" && <CallerEditor bot={bot} doc={doc} onClose={() => setOpen(null)} save={save} />}
     </main>
   );
 }

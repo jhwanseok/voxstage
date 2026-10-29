@@ -7,14 +7,15 @@ import { renameNode, type FlowDraft } from "./flowEdit";
 
 const DOC: TypesDoc = {
   types: { Person: { label: { ko: "사람" }, fields: { name: { type: "text", label: { ko: "이름" } }, last4: { type: "digits", length: 4 } } } },
-  roles: { caller: { type: "Person", scope: "session", label: { ko: "전화 건 사람" } } },
+  session_roles: { caller: { type: "Person", label: { ko: "전화 건 사람" } } },
 };
 
 describe("file shapes", () => {
   it("keeps the short field form when only the type is set", () => {
-    expect(fieldSpec("text")).toEqual({ type: "text" });
-    expect(fieldOut({ type: "text", length: undefined, label: {} })).toBe("text");
-    expect(fieldOut({ type: "digits", length: 4 })).toEqual({ type: "digits", length: 4 });
+    expect(fieldSpec("text")).toEqual({ type: "text" });   // an old short form still reads
+    expect(fieldOut({ type: "text", length: 4, label: {} })).toEqual({ type: "text" });   // always a map; length is for digits
+    expect(fieldOut({ type: "digits", length: 4, choices: ["a"] })).toEqual({ type: "digits", length: 4 });
+    expect(fieldOut({ type: "choice", choices: ["basic", "premium"] })).toEqual({ type: "choice", choices: ["basic", "premium"] });
   });
   it("sets one language's label and keeps the others", () => {
     expect(withLabel({ label: { en: "Booker" } }, "ko", "예약자")).toEqual({ label: { en: "Booker", ko: "예약자" } });
