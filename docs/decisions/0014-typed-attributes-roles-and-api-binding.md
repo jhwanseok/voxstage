@@ -1,6 +1,6 @@
 # 0014. Typed attributes, roles and API binding
 
-Status: proposed (draft for review; nothing here is decided until the owner answers the questions at the end)
+Status: accepted (2026-10-29; decisions A to D and P1 to P9 recorded in the decision sheet)
 Date: 2026-10-28
 Decided by: jhwanseok (options and analysis prepared with AI assistance)
 
