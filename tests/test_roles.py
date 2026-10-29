@@ -106,7 +106,7 @@ class LoaderTest(unittest.TestCase):
     def test_args_and_bind_are_exclusive_and_complete(self):
         with self.assertRaisesRegex(FlowError, "both `args` and `bind`"):
             load(FLOW_OK.replace("    bind:\n", "    args: {booker_phone: \"x\"}\n    bind:\n"))
-        with self.assertRaisesRegex(FlowError, "takes"):
+        with self.assertRaisesRegex(FlowError, "unbound"):
             load(FLOW_OK.replace("      booker_phone: {role: booker, field: phone_last4}\n", ""))
 
     def test_bad_bindings(self):
@@ -182,17 +182,17 @@ nodes:
     on_ok: book
   book:
     type: call
-    tool: book_visit
+    tool: get_transfer_fee
     bind:
-      booker_phone: {call: fee, field: currency}
-      visitor_phone: {call: fee, field: fee}
+      amount: {call: fee, field: fee}
+      grade: {const: basic}
     on_ok: done
   done: {type: end}
 """)
             m = build_manager(tmp, "bank", "en", FakeApiExecutor.from_yaml(os.path.join(tmp, "bank", "tools.yaml")))
             r = step(m, m.initial_state("t", {}), Utterance("book a visit", source="typed"))
             calls = r.trace["calls"]
-            self.assertEqual(calls[-1]["args"], {"booker_phone": "USD", "visitor_phone": "0"})
+            self.assertEqual(calls[-1]["args"], {"amount": "0", "grade": "basic"})
 
 
 if __name__ == "__main__":

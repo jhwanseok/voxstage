@@ -379,7 +379,39 @@ nodes:
 - `call`: every parameter of the tool is in `args` (a template, as before) or in `bind`, never both. A bound source
   without a value at run time is a missing attribute (R4-2): the apology wording and `HandOff("missing_attribute")`.
 - The loader checks names and fields (unknown role or field, a `call` binding to anything but another call node of
-  the flow). It does not yet check types, required parameters or that a value is collected on every path (R16b).
+  the flow); types, required parameters and collection are checked as below (R16b).
+
+## Typed API parameters and the check of the calls (R16b, ADR 0014)
+
+`tools.yaml` may type a tool. `params` is the old list of names, or a mapping; `returns` is the response schema:
+
+```yaml
+get_visit:
+  params:
+    account_last4: {type: digits, length: 4}              # type: text digits number choice date month_start day time_window duration
+    kind:          {type: choice, choices: [gold, basic]}
+    note:          {type: text, required: false}          # required defaults to true; an unbound optional one is left out
+  returns: {reference: text, branch: text, verified: boolean}   # boolean is allowed in returns only
+```
+
+The list form means "every name, required, untyped". For a typed tool, `rules[].when` must name declared params and
+`return` declared `returns` fields, with values of the declared types (checked when `tools.yaml` loads).
+
+After a flow compiles, the loader checks every `call` and reports all problems at once as `FlowCheckError`; its
+`.items` are `{code, node, parameter, role, field, path}`:
+
+| code | when | `role`, `field`, `path` |
+|---|---|---|
+| `unbound` | a required parameter is in neither `args` nor `bind`; or `{call, field}` names a field the earlier tool's `returns` lacks | `field` is null, or `<step>.<field>` |
+| `type_mismatch` | the source's type does not fit the parameter (role field or slot extractor, returned field, or a constant; digits length and choices count) | the source: `role`+`field`, a slot name in `field`, or `<step>.<field>` |
+| `not_collected` | on some path from `start` to the call the value is not yet collected | the source as above; `path` is one witness path of node ids ending at the call |
+
+A value is collected by an `ask` or a `form` slot of that role field or slot, by the `on_yes` edge of a `confirm` with
+`role_default` for that role, and a call result by the `on_ok` edge of that call; `caller` fields count for a tool with
+`requires: verified`. The search runs over the node graph (loops, `branch`, `goto`); `back` returns to an earlier node
+and `cancel` leaves the flow, so neither needs a rule. A branch condition is not evaluated, so a path that can never run
+is still reported. A flat slot that no `ask` or `form` of the flow fills (a capture) is not checked for collection.
+`args: {p: "{slot}"}` or `"{role.field}"` with nothing else in the text is checked like a `bind`.
 
 ## Not yet
 
