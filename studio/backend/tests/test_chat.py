@@ -31,7 +31,9 @@ def test_only_a_validated_draft_runs(client):
 def test_the_visitor_defaults_to_the_booker_turn_by_turn(client):
     """The engine's own case C14-002, typed: the roles, the default step and the bound call show in the turns."""
     client.post(f"{A}/bots/bank-ko/validate")
-    sid = client.post(f"{A}/bots/bank-ko/chat", json={}).json()["id"]
+    started = client.post(f"{A}/bots/bank-ko/chat", json={}).json()
+    sid = started["id"]
+    assert started["labels"]["visitor.phone_last4"] == "방문자의 휴대폰 번호 끝 네 자리"
     t1 = say(client, sid, "영업점 방문 예약을 하고 싶어요")
     assert t1["after"] == {"flow": "book_visit", "node": "ask_first"} and "휴대폰" in t1["reply"]
     t2 = say(client, sid, "5580", kind="digits")

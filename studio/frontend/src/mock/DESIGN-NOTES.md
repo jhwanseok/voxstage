@@ -191,6 +191,14 @@ each bot reply a folded **이 턴에서 일어난 일**: 시나리오 · 단계,
 넘긴 속성 and 결과, 재질문 횟수, 본인 확인; the raw trace under 개발 정보. Input: text box (Enter sends), a 말 / 키패드
 switch, and the scenario buttons as chips. When the draft changes the panel says so and offers 처음부터 다시.
 
+Built as above (`studio_backend/chat.py`, `src/pages/ChatTest.tsx`). Checked on 5710 with the engine's own case
+C14-002 typed into the panel: 영업점 방문 예약 → 휴대폰 끝 네 자리 (키패드 5580) → 본인이신가요 → 네 gives BV1001, and the last
+turn shows both role 속성, the `book_visit` call with each 넘긴 속성 and where it came from, and the returned 항목.
+Review: on a 1024 px screen the docked panel left no room for the scenario canvas, so below 1280 px it floats over the
+page instead (design-critique); the panel is a labelled `aside`, replies are announced through `aria-live`, Enter sends,
+the input keeps the focus after each turn (accessibility-review). Not done: a voice mode, a customer-data form in 시작 조건
+(only 기준 시각; 정책값 come from 개요), and showing the panel's current step on the canvas.
+
 ## Skills used
 
 Mockups: `claude-mem:design-is` (audit table above) and the `dataviz` rules for the home summary tiles.

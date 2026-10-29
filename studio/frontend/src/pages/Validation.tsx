@@ -17,7 +17,7 @@ function Where({ bot, file, flow, node }: { bot: Bot; file: string; flow: string
 }
 
 export default function Validation({ bot }: { bot: Bot }) {
-  const { validate, validating, openPublish } = useBotActions();
+  const { validate, validating, openPublish, openChat } = useBotActions();
   const { data: report, error, loading, reload } = useFetch<Report | null>(`/bots/${bot.slug}/validation`, [bot.validated, bot.draft_revision]);
   const run = async () => { await validate(); reload(); };
   const errors = (report?.items ?? []).filter((i) => i.severity === "error");
@@ -38,7 +38,8 @@ export default function Validation({ bot }: { bot: Bot }) {
           {!bot.validated && <Notice tone="warn" title="검증한 뒤에 초안이 바뀌었어요">아래 결과는 예전 초안 기준이에요. 다시 검증해 보세요.</Notice>}
           {report.ok ? (
             <Notice tone="ok" title="엔진이 이 상담봇을 그대로 읽을 수 있어요"
-              action={bot.validated && bot.has_unpublished_changes ? <Button size="sm" variant="primary" onClick={openPublish}>게시하기</Button> : undefined}>
+              action={bot.validated ? <span className="flex gap-1.5"><Button size="sm" onClick={openChat}>대화로 테스트</Button>
+                {bot.has_unpublished_changes && <Button size="sm" variant="primary" onClick={openPublish}>게시하기</Button>}</span> : undefined}>
               {warnings.length ? `참고할 점이 ${warnings.length}개 있어요.` : "참고할 점도 없어요."}
             </Notice>
           ) : (

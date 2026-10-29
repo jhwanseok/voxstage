@@ -702,7 +702,10 @@ def start_chat(b: str, body: ChatIn, session: Session = Depends(get_session)):
                       for btn in (f.header or {}).get("buttons") or []})
     s = chat.start(bot.slug, dom.slug, bot.lang, portable.export_bot(session, bot), flows, setup,
                    bot.draft_revision, dom.shared_revision)
-    return {**_chat_out(s, bot, dom), "buttons": buttons, "setup": setup}
+    row = _types_row(session, dom)
+    headers = [f.header or {} for f in session.scalars(select(Flow).where(Flow.bot_id == bot.id))]
+    return {**_chat_out(s, bot, dom), "buttons": buttons, "setup": setup,
+            "labels": datatypes.attribute_labels(row.body if row else None, headers, bot.lang)}
 
 
 @app.post(API + "/bots/{b}/chat/{sid}/turns")
