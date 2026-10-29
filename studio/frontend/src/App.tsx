@@ -1,5 +1,5 @@
 import {
-  AudioLines, BookOpenText, Database, GitBranch, History as HistoryIcon, LayoutDashboard, PlugZap, Rocket, ShieldCheck,
+  AudioLines, BookOpenText, Database, GitBranch, MessageSquare, History as HistoryIcon, LayoutDashboard, PlugZap, Rocket, ShieldCheck,
 } from "lucide-react";
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -18,6 +18,7 @@ import Overview from "./pages/Overview";
 import DataPage from "./pages/Data";
 import Tools from "./pages/Tools";
 import Validation from "./pages/Validation";
+import ChatTest from "./pages/ChatTest";
 
 // Design mockups (static data): /mock/home, /mock/faq, /mock/flow. Loaded lazily, kept as the design reference.
 const MockLayout = lazy(() => import("./mock/MockLayout"));
@@ -113,7 +114,7 @@ function Sidebar({ bot }: { bot?: Bot }) {
   );
 }
 
-function Frame({ bot, header, children }: { bot?: Bot; header: ReactNode; children: ReactNode }) {
+function Frame({ bot, header, children, side }: { bot?: Bot; header: ReactNode; children: ReactNode; side?: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-ground">
       <Sidebar bot={bot} />
@@ -128,7 +129,7 @@ function Frame({ bot, header, children }: { bot?: Bot; header: ReactNode; childr
             ))}
           </nav>
         )}
-        {children}
+        {side ? <div className="flex items-start"><div className="min-w-0 flex-1">{children}</div>{side}</div> : children}
       </div>
     </div>
   );
@@ -141,6 +142,7 @@ function BotShell() {
   const nav = useNavigate();
   const [publishing, setPublishing] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [chatting, setChatting] = useState(false);
   const bot = bots.find((b) => b.slug === slug);
   if (!bot) {
     return (
@@ -164,14 +166,16 @@ function BotShell() {
     } catch (e) { toast((e as Error).message, "err"); return null; }
     finally { setValidating(false); }
   };
-  const actions = { validate: () => validate(false), openPublish: () => setPublishing(true), validating };
+  const actions = { validate: () => validate(false), openPublish: () => setPublishing(true), validating, openChat: () => setChatting(true) };
   return (
-    <Frame bot={bot} header={
+    <Frame bot={bot} side={chatting ? <BotActionsContext.Provider value={actions}><ChatTest bot={bot} onClose={() => setChatting(false)} /></BotActionsContext.Provider> : undefined} header={
       <>
         <span className="truncate text-base font-semibold text-ink">{botName(bot)}</span>
         <span className="text-xs text-muted">{langName(bot.lang)}</span>
         <StatusChip tone={st.tone}>{st.text}</StatusChip>
         <span className="flex-1" />
+        <Button icon={<MessageSquare size={15} />} aria-pressed={chatting} onClick={() => setChatting((c) => !c)}
+          title={bot.valid ? undefined : bot.validated ? "고칠 곳을 고친 뒤 대화해 볼 수 있어요" : "검증한 뒤에 대화해 볼 수 있어요"}>대화로 테스트</Button>
         <Button icon={<ShieldCheck size={15} />} loading={validating} onClick={() => void validate()}>검증하기</Button>
         <Button variant="primary" icon={<Rocket size={15} />} onClick={() => setPublishing(true)}>게시하기</Button>
       </>

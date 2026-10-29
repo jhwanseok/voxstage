@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import datatypes, portable, service, settings, yamlio
+from . import chat, datatypes, portable, service, settings, yamlio
 from .db import get_session, session_scope
 from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile, Role, Tool, User, UserRole)
@@ -664,6 +664,68 @@ def delete_flow(b: str, flow_id: str, session: Session = Depends(get_session)):
         session.delete(lay)
     touch_bot(bot)
     session.commit()
+    return Response(status_code=204)
+
+
+# --- 대화로 테스트: the validated draft on typed text (studio_backend/chat.py) ---
+
+class ChatIn(BaseModel):
+    setup: dict[str, Any] | None = None
+
+
+class TurnIn(BaseModel):
+    kind: str = "text"
+    text: str
+
+
+def _chat_out(s: chat.ChatSession, bot: Bot, dom: Domain) -> dict:
+    return {"id": s.id, "draft_revision": s.draft_revision, "shared_revision": s.shared_revision,
+            "stale": (bot.draft_revision, dom.shared_revision) != (s.draft_revision, s.shared_revision)}
+
+
+@app.post(API + "/bots/{b}/chat", status_code=201)
+def start_chat(b: str, body: ChatIn, session: Session = Depends(get_session)):
+    """Only a draft that passed validation runs: the engine would refuse anything else at load."""
+    bot = get_bot(session, b)
+    dom = session.get(Domain, bot.domain_id)
+    status = service.bot_status(bot, dom)
+    if not status["validated"]:
+        raise HTTPException(409, {"message": "validate the draft first", "reason": "not_validated"})
+    if not status["valid"]:
+        raise HTTPException(409, {"message": "the draft has problems", "reason": "invalid"})
+    setup = dict(body.setup or {})
+    policy = (bot.studio_settings or {}).get("policy") or {}
+    if policy and "policy" not in setup:
+        setup["policy"] = policy
+    flows = {f.flow_id: f.nodes for f in session.scalars(select(Flow).where(Flow.bot_id == bot.id))}
+    buttons = sorted({btn for f in session.scalars(select(Flow).where(Flow.bot_id == bot.id))
+                      for btn in (f.header or {}).get("buttons") or []})
+    s = chat.start(bot.slug, dom.slug, bot.lang, portable.export_bot(session, bot), flows, setup,
+                   bot.draft_revision, dom.shared_revision)
+    row = _types_row(session, dom)
+    headers = [f.header or {} for f in session.scalars(select(Flow).where(Flow.bot_id == bot.id))]
+    return {**_chat_out(s, bot, dom), "buttons": buttons, "setup": setup,
+            "labels": datatypes.attribute_labels(row.body if row else None, headers, bot.lang)}
+
+
+@app.post(API + "/bots/{b}/chat/{sid}/turns")
+def chat_turn(b: str, sid: str, body: TurnIn, session: Session = Depends(get_session)):
+    bot = get_bot(session, b)
+    s = chat.get(sid, bot.slug)
+    if s is None:
+        raise HTTPException(404, "the test conversation ended; start again")
+    if body.kind not in ("text", "digits", "button") or not body.text.strip():
+        raise HTTPException(422, "kind is text, digits or button, with some text")
+    if body.kind == "digits" and not re.fullmatch(r"[0-9*#]+", body.text.strip()):
+        raise HTTPException(422, "digits: 0-9, * and # only")
+    return {**chat.turn(s, body.kind, body.text.strip()), **_chat_out(s, bot, session.get(Domain, bot.domain_id))}
+
+
+@app.delete(API + "/bots/{b}/chat/{sid}", status_code=204)
+def end_chat(b: str, sid: str, session: Session = Depends(get_session)):
+    bot = get_bot(session, b)
+    if chat.get(sid, bot.slug) is not None:
+        chat.end(sid)
     return Response(status_code=204)
 
 

@@ -159,3 +159,18 @@ def usage(doc: dict, flows: list[tuple[str, str, dict, dict]]) -> dict[str, list
             if isinstance(r, dict) and r.get("type") in out:
                 out[r["type"]].append({"role": rname, "scope": "flow", "bot": bot, "flow": fid})
     return out
+
+
+def attribute_labels(types_doc: dict | None, headers: list[dict], lang: str) -> dict[str, str]:
+    """`<role>.<field>` -> "예약자의 휴대폰 번호 끝 네 자리", for every role of the bot's flows and the session role."""
+    types = (types_doc or {}).get("types") or {}
+    roles = dict((types_doc or {}).get("session_roles") or {})
+    for h in headers:
+        roles.update({n: r for n, r in (h.get("roles") or {}).items() if isinstance(r, dict)})
+    out = {}
+    for rname, r in roles.items():
+        rl = ((r.get("label") or {}).get(lang)) or rname
+        for fname, f in ((types.get(r.get("type")) or {}).get("fields") or {}).items():
+            fl = ((f.get("label") or {}).get(lang) if isinstance(f, dict) else None) or fname
+            out[f"{rname}.{fname}"] = f"{rl}의 {fl}"
+    return out

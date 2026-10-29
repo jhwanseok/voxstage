@@ -3,7 +3,7 @@
 import { AlertCircle, CheckCircle2, CircleDashed, Info, Loader2, RotateCw, TriangleAlert, X } from "lucide-react";
 import {
   cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState,
-  type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes,
+  type ButtonHTMLAttributes, type ComponentProps, type ReactElement, type ReactNode, type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
 
@@ -87,7 +87,8 @@ export function Notice({ tone = "brand", title, children, action }: { tone?: Ton
 
 const control = "w-full rounded-lg border border-line-strong/60 bg-surface px-3 text-sm text-ink placeholder:text-muted outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-sunken disabled:text-muted aria-[invalid=true]:border-err-fg";
 
-export const Input = ({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) => <input {...p} className={cn(control, "h-9", className)} />;
+// React 19: `ref` is a plain prop, so the chat box can be focused from outside
+export const Input = ({ className, ...p }: ComponentProps<"input">) => <input {...p} className={cn(control, "h-9", className)} />;
 export const Textarea = ({ className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...p} className={cn(control, "py-2 leading-relaxed", className)} />;
 export const Select = ({ className, ...p }: SelectHTMLAttributes<HTMLSelectElement>) => <select {...p} className={cn(control, "h-9 pr-8", className)} />;
 
