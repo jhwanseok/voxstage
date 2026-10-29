@@ -49,11 +49,11 @@ export function RolesSection({ bot, d, doc, setDraft, onAddDefaultStep }: {
   return (
     <div className="space-y-3">
       <div>
-        <div className="text-sm font-semibold text-ink">이 시나리오의 사람과 값</div>
+        <div className="text-sm font-semibold text-ink">이 시나리오의 속성</div>
         <p className="mt-0.5 text-xs text-muted">이 시나리오 안에서만 써요. 예약자와 방문자처럼 같은 종류를 다른 이름으로 두 번 쓸 수 있어요.</p>
       </div>
       {!records.length && (
-        <Notice tone="idle" title="값의 종류가 아직 없어요">
+        <Notice tone="idle" title="속성 종류가 아직 없어요">
           <Link className="font-medium text-brand-700 underline" to={paths.bot(bot.slug, "data")}>데이터</Link>에서 사람 같은 종류를 먼저 만들어 주세요.
         </Notice>
       )}
@@ -70,7 +70,7 @@ export function RolesSection({ bot, d, doc, setDraft, onAddDefaultStep }: {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Field label="표시 이름"><Input value={r.label?.[bot.lang] ?? ""} placeholder="예: 방문자" onChange={(e) => patch(name, withLabel(r, bot.lang, e.target.value))} /></Field>
-              <Field label="값의 종류">
+              <Field label="속성 종류">
                 <Select value={r.type} onChange={(e) => { const { default: _d, ...rest } = r; patch(name, { ...rest, type: e.target.value }); }}>
                   {!records.some(([t]) => t === r.type) && <option value={r.type}>{r.type} (없음)</option>}
                   {records.map(([tid, t]) => <option key={tid} value={tid}>{labelOf(t, tid, bot.lang)}</option>)}
@@ -91,7 +91,7 @@ export function RolesSection({ bot, d, doc, setDraft, onAddDefaultStep }: {
                     {sameType.map(([n, v]) => <option key={n} value={n}>{labelOf(v, n, bot.lang)}</option>)}
                   </Select>
                 </Field>
-                <p className="text-xs text-ink-2">예/아니오 확인 단계에서 같은 분인지 물어요. 예면 그 사람의 값을 그대로 쓰고, 아니오면 이어지는 단계에서 이 사람의 값을 물어요.</p>
+                <p className="text-xs text-ink-2">예/아니오 확인 단계에서 같은 분인지 물어요. 예면 그 사람의 속성을 그대로 쓰고, 아니오면 이어지는 단계에서 이 사람의 속성을 물어요.</p>
                 {steps.length ? <p className="text-xs text-ok-fg">확인 단계가 있어요 ({steps.join(", ")})</p> : (
                   <Notice tone="warn" title="확인 단계가 없어요" action={<Button size="sm" onClick={() => onAddDefaultStep(name)}>확인 단계 추가</Button>}>
                     같은지 묻는 예/아니오 확인 단계가 있어야 게시할 수 있어요.
@@ -99,17 +99,17 @@ export function RolesSection({ bot, d, doc, setDraft, onAddDefaultStep }: {
                 )}
               </div>
             )}
-            <Field label="이름" hint="파일과 엔진 메시지에서 가리켜요. 바꾸면 묻는 단계와 넘길 값도 함께 바뀌어요."
+            <Field label="이름" hint="파일과 엔진 메시지에서 가리켜요. 바꾸면 묻는 단계와 넘길 속성도 함께 바뀌어요."
               error={null}>
               <RenameInput value={name} valid={(to) => NAME.test(to) && !idTaken(to)} onRename={(to) => rename(name, to)} />
             </Field>
           </div>
         );
       })}
-      <Button size="sm" variant="ghost" icon={<Plus size={14} />} disabled={!records.length} onClick={add}>사람이나 값 추가</Button>
+      <Button size="sm" variant="ghost" icon={<Plus size={14} />} disabled={!records.length} onClick={add}>속성 추가</Button>
       {session.length > 0 && (
         <p className="text-xs text-muted">
-          통화 전체에서 쓰는 값: {session.map(([n, v]) => labelOf(v, n, bot.lang)).join(", ")}. 고치려면 <Link className="font-medium text-brand-700 underline" to={paths.bot(bot.slug, "data")}>데이터</Link>로 가세요.
+          통화 전체에서 쓰는 속성: {session.map(([n, v]) => labelOf(v, n, bot.lang)).join(", ")}. 고치려면 <Link className="font-medium text-brand-700 underline" to={paths.bot(bot.slug, "data")}>데이터</Link>로 가세요.
         </p>
       )}
     </div>
@@ -135,7 +135,7 @@ export function AskTarget({ d, doc, lang, b, onPatch }: {
   const value = b.role ? `${b.role}.${b.field ?? ""}` : "";
   const known = opts.find((o) => `${o.role}.${o.field}` === value);
   return (
-    <Field label="받는 값" hint={known ? `형식은 값의 종류에서 정해요: ${specText(known.spec)}` : "이 시나리오의 사람과 값 중에서 고르거나, 이름만 붙여 받아요."}
+    <Field label="받을 속성" hint={known ? `형식은 속성 종류에서 정해요: ${specText(known.spec)}` : "이 시나리오의 속성 중에서 고르거나, 이름만 붙여 받아요."}
       error={b.role && !known ? `${josa(value, "이", "가")} 이 시나리오에 없어요` : null}>
       <Select value={value} onChange={(e) => {
         const o = opts.find((x) => `${x.role}.${x.field}` === e.target.value);
@@ -162,7 +162,7 @@ export function RoleDefaultField({ d, lang, doc, b, onPatch }: {
   const fromDef = from ? d.header.roles?.[from] : undefined;
   return (
     <Field label="같은 사람인지 확인" optional
-      hint={r && from ? `예면 ${labelOf(fromDef, from, lang)}의 값을 ${labelOf(r, b.role_default, lang)}에 그대로 써요. 아니오면 이어지는 단계에서 물어요.` : "기본값이 있는 사람을 고르면 이 단계가 그 확인이 돼요."}
+      hint={r && from ? `예면 ${labelOf(fromDef, from, lang)}의 속성을 ${labelOf(r, b.role_default, lang)}에 그대로 써요. 아니오면 이어지는 단계에서 물어요.` : "기본값이 있는 사람을 고르면 이 단계가 그 확인이 돼요."}
       error={b.role_default && !r?.default ? `${b.role_default}에 기본값이 없어요` : null}>
       <Select value={b.role_default ?? ""} onChange={(e) => (e.target.value ? onPatch({ role_default: e.target.value }) : onPatch({}, ["role_default"]))}>
         <option value="">확인하지 않음</option>
@@ -195,14 +195,14 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
   const opts = fieldOptions(d.header, doc, lang);
   const before = callsBefore(d, id);
   const toolOf = (step: string) => tools.find((t) => t.name === d.nodes[step]?.tool);
-  if (!params.length) return <p className="text-[13px] text-muted">이 API는 받는 값이 없어요.</p>;
+  if (!params.length) return <p className="text-[13px] text-muted">이 API는 받는 속성이 없어요.</p>;
   const unbound = params.filter((p) => bindingOf(b, p).kind === "none").length;
 
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between">
-        <div className="text-sm font-medium text-ink">넘길 값</div>
-        {unbound > 0 && <span className="text-xs font-medium text-warn-fg">연결 안 된 값 {unbound}개</span>}
+        <div className="text-sm font-medium text-ink">넘길 속성</div>
+        {unbound > 0 && <span className="text-xs font-medium text-warn-fg">연결 안 된 속성 {unbound}개</span>}
       </div>
       {params.map((p) => {
         const spec = paramSpec(tool.body, p);
@@ -212,7 +212,7 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
         let error: string | null = null;
         if (cur.kind === "role") {
           const o = opts.find((x) => x.role === cur.role && x.field === cur.field);
-          error = !o ? `${josa(`${cur.role}.${cur.field}`, "이", "가")} 지금은 없어요` : !fits(spec, o.spec) ? `형식이 맞지 않아요 (받는 쪽 ${specText(spec)}, 고른 값 ${specText(o.spec)})` : null;
+          error = !o ? `${josa(`${cur.role}.${cur.field}`, "이", "가")} 지금은 없어요` : !fits(spec, o.spec) ? `형식이 맞지 않아요 (받는 쪽 ${specText(spec)}, 고른 속성 ${specText(o.spec)})` : null;
         } else if (cur.kind === "call") {
           error = d.nodes[cur.call]?.type !== "call" ? `${cur.call} API 호출 단계가 지금은 없어요`
             : !before.always.includes(cur.call) ? (before.sometimes.includes(cur.call) ? "일부 경로에서만 이 결과가 있어요" : "이 단계보다 앞에서 부르지 않아요") : null;
@@ -235,38 +235,38 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
               {cur.kind === "none" && <Tag tone="warn">연결 안 됨</Tag>}
             </div>
             {cur.kind === "template" && <code className="block rounded bg-sunken px-2 py-1 text-xs text-ink-2">{cur.text}</code>}
-            <Field label="어디서 가져올까요" error={error}>
+            <Field label="가져올 속성" error={error}>
               <Select value={cur.kind === "template" ? "__template" : choice} onChange={(e) => onChoice(e.target.value)}>
                 {cur.kind === "template" && <option value="__template">지금 식 그대로 두기</option>}
                 <option value="">연결하지 않음</option>
                 {(roleOpts.length > 0 || cur.kind === "role") && (
-                  <optgroup label="사람과 값">
+                  <optgroup label="시나리오에서 수집한 속성">
                     {cur.kind === "role" && !roleOpts.some((o) => choice === `role:${o.role}.${o.field}`) && <option value={choice}>{cur.role}.{cur.field} (맞지 않음)</option>}
                     {roleOpts.map((o) => <option key={`${o.role}.${o.field}`} value={`role:${o.role}.${o.field}`}>{o.label}</option>)}
                   </optgroup>
                 )}
                 {(before.always.length + before.sometimes.length > 0 || cur.kind === "call") && (
-                  <optgroup label="앞 API 결과">
+                  <optgroup label="API로 얻은 속성">
                     {cur.kind === "call" && !before.always.includes(cur.call) && !before.sometimes.includes(cur.call) && <option value={choice}>{cur.call} (없음)</option>}
                     {before.always.map((c) => <option key={c} value={`call:${c}`}>{d.nodes[c].tool || c} 결과 ({c})</option>)}
                     {before.sometimes.map((c) => <option key={c} value={`call:${c}`} disabled={choice !== `call:${c}`}>{d.nodes[c].tool || c} 결과 ({c}): 일부 경로에서만 불러요</option>)}
                   </optgroup>
                 )}
-                <option value="const">직접 넣기</option>
-                <option value="slot">받은 값의 이름으로 (예전 방식)</option>
+                <option value="const">고정값</option>
+                <option value="slot">이름으로 받은 속성 (예전 방식)</option>
               </Select>
             </Field>
             {cur.kind === "call" && (() => {
               const rets = returnNames(toolOf(cur.call)?.body);
               return rets.length ? (
-                <Field label="결과 중 어떤 값">
+                <Field label="결과 중 어떤 항목">
                   <Select value={cur.field} onChange={(e) => set({ call: cur.call, field: e.target.value })}>
                     {!rets.includes(cur.field) && <option value={cur.field}>{cur.field || "고르기"}</option>}
                     {rets.map((r) => <option key={r} value={r}>{r}</option>)}
                   </Select>
                 </Field>
               ) : (
-                <Field label="결과 중 어떤 값" hint="API 응답에 있는 이름이에요." error={cur.field ? null : "이름을 넣어 주세요"}>
+                <Field label="결과 중 어떤 항목" hint="API 응답에 있는 이름이에요." error={cur.field ? null : "이름을 넣어 주세요"}>
                   <Input className="font-mono text-[13px]" value={cur.field} onChange={(e) => set({ call: cur.call, field: e.target.value })} />
                 </Field>
               );
@@ -280,7 +280,7 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
               </Field>
             )}
             {cur.kind === "legacy" && (
-              <Field label="받은 값의 이름" hint="앞 단계에서 이 이름으로 받은 값을 넘겨요. 사람과 값을 쓰면 엔진이 게시 전에 형식과 경로를 검사해요.">
+              <Field label="받은 속성의 이름" hint="앞 단계에서 이 이름으로 받은 속성을 넘겨요. 시나리오의 속성을 쓰면 엔진이 게시 전에 형식과 경로를 검사해요.">
                 <Input className="font-mono text-[13px]" value={cur.slot} onChange={(e) => onNode({ ...b, args: { ...(b.args ?? {}), [p]: `{${e.target.value}}` } })} />
               </Field>
             )}
@@ -302,7 +302,7 @@ export function cardNote(body: Record<string, any>, header: Record<string, any>,
   }
   if (body.type === "call" && body.tool) {
     const open = paramNames(tools.get(body.tool)?.body).filter((p) => bindingOf(body, p).kind === "none").length;
-    return open ? `연결 안 된 값 ${open}개` : null;
+    return open ? `연결 안 된 속성 ${open}개` : null;
   }
   return null;
 }

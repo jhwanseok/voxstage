@@ -139,6 +139,30 @@ found that every sheet re-ran its focus trap on each render and threw the focus 
 (also on the FAQ and API sheets). Fixed in `useFocusTrap`, regression test `src/ui/sheet.test.tsx`; a new field takes
 the focus.
 
+### Terms (owner feedback, 2026-10-29)
+
+The owner calls what a scenario collects or an API returns a **속성**, not a 값. Rule now: the collected or stored
+thing is a 속성, a slot of a type is a 항목, a binding picks the 가져올 속성 or a 고정값; only a value the user types
+(a constant, a stored choice, the values the identity check reads) keeps 값.
+
+| Before | After |
+|---|---|
+| 값의 종류 (heading, button, sheet title, select label) | 속성 종류 |
+| 필드, 필드 추가, 필드 n개 | 항목, 항목 추가, 항목 n개 |
+| 통화 전체에서 쓰는 값 / 통화 전체 값 | 통화 전체에서 쓰는 속성 / 통화 전체 속성 |
+| 상담봇이 고객에게서 받는 값의 모양이에요 | 상담봇이 고객에게서 수집하는 속성의 모양이에요 |
+| 이 시나리오의 사람과 값 / 사람이나 값 추가 | 이 시나리오의 속성 / 속성 추가 |
+| 받는 값 (묻기 단계) | 받을 속성 |
+| 넘길 값 / 연결 안 된 값 n개 / 이 API는 받는 값이 없어요 | 넘길 속성 / 연결 안 된 속성 n개 / 이 API는 받는 속성이 없어요 |
+| 어디서 가져올까요 | 가져올 속성 |
+| 사람과 값 / 앞 API 결과 (source groups) | 시나리오에서 수집한 속성 / API로 얻은 속성 |
+| 직접 넣기 | 고정값 (its input stays 넣을 값) |
+| 받은 값의 이름으로 (예전 방식) / 받은 값의 이름 | 이름으로 받은 속성 (예전 방식) / 받은 속성의 이름 |
+| 결과 중 어떤 값 | 결과 중 어떤 항목 |
+| 이 변경으로 시나리오에서 쓰던 값이 사라져요 | ... 쓰던 속성이 사라져요 |
+
+The tables above this section keep the words used when they were written.
+
 ## Skills used
 
 Mockups: `claude-mem:design-is` (audit table above) and the `dataviz` rules for the home summary tiles.
