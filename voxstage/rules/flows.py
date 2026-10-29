@@ -24,6 +24,7 @@ from typing import Callable
 import yaml
 
 from ..domain_pack import Pattern, parse_pattern
+from ..tools import _signature, value_fits
 from .expr import Expr, ExprError, MissingAttribute, compile_expr
 from .formatters import FORMATTERS
 
@@ -33,6 +34,33 @@ EXTRACTORS = ("text", "digits", "number", "choice", "date", "month_start", "day"
 
 class FlowError(ValueError):
     """A flow file is malformed. The message names the file and node."""
+
+
+class FlowCheckError(FlowError):
+    """The calls of a flow cannot work (R16b, ADR 0014 P1). `.items` lists every problem as
+    `{code, node, parameter, role, field, path}`; `code` is `unbound`, `type_mismatch` or `not_collected`, and for
+    `not_collected` `path` is one witness path of node ids from `start` to the call on which the value is not collected.
+    The message is built from the items."""
+
+    def __init__(self, file: str, items: list):
+        self.file, self.items = file, items
+        super().__init__(f"{file}: {len(items)} problem(s) with the calls:\n"
+                         + "\n".join("  - " + _describe(i) for i in items))
+
+
+def _source_name(item: dict) -> str:
+    return f"{item['role']}.{item['field']}" if item["role"] else str(item["field"])
+
+
+def _describe(item: dict) -> str:
+    where = f"node {item['node']}, parameter `{item['parameter']}`"
+    if item["code"] == "unbound":
+        if item["field"]:
+            return f"{where}: unbound: `{_source_name(item)}` is not a field the earlier call returns"
+        return f"{where}: unbound: required, but `args` and `bind` do not give it a value"
+    if item["code"] == "type_mismatch":
+        return f"{where}: type_mismatch: `{_source_name(item)}` does not fit the parameter's type"
+    return f"{where}: not_collected: `{_source_name(item)}` is not collected on the path {' -> '.join(item['path'])}"
 
 
 @dataclass(frozen=True)
@@ -366,11 +394,28 @@ def _call(raw, ctx):
     both = sorted(set(args) & set(bind))
     if both:
         raise FlowError(f"{ctx.where}: parameters {both} are in both `args` and `bind`")
-    if set(args) | set(bind) != set(ctx.tools[tool]):
-        raise FlowError(f"{ctx.where}: tool `{tool}` takes {list(ctx.tools[tool])}, got {sorted(set(args) | set(bind))}")
+    unknown = sorted((set(args) | set(bind)) - set(ctx.tools[tool]))
+    if unknown:
+        raise FlowError(f"{ctx.where}: tool `{tool}` takes {list(ctx.tools[tool])}, got {unknown}")
     bound = {param: _binding(spec, param, ctx) for param, spec in bind.items()}
+    arg_sources = {k: src for k, v in args.items() if (src := _arg_source(v, ctx)) is not None}
     return {"tool": tool, "args": {k: ctx.template(str(v), f"args.{k}") for k, v in args.items()}, "bind": bound,
+            "arg_sources": arg_sources,
             "on_ok": ctx.need(raw, "on_ok"), "on_error": raw.get("on_error")}   # none: `call.failed`, end (R12-2)
+
+
+_PLACEHOLDER = re.compile(r"^\{\s*(\w+)(?:\.(\w+))?\s*\}$")
+
+
+def _arg_source(text, ctx):
+    """`args: {p: "{slot}"}` or `"{role.field}"` with nothing else in the text reads as a binding (P2)."""
+    m = _PLACEHOLDER.match(str(text).strip())
+    if not m:
+        return None
+    a, b = m.groups()
+    if b is None:
+        return ("slot", a, None) if a in ctx.names and a not in ctx.roles and a not in ctx.session_roles else None
+    return ("role", a, b) if a in ctx.roles or a in ctx.session_roles else None
 
 
 def _binding(spec, param: str, ctx) -> tuple:
@@ -462,7 +507,11 @@ def _end(raw, ctx):
 def tool_params(tools_path: str) -> dict:
     with open(tools_path, encoding="utf-8") as f:
         spec = yaml.safe_load(f)
-    return {name: tuple(body.get("params") or ()) for name, body in spec["tools"].items()}
+    out = {}
+    for name, body in spec["tools"].items():
+        out[name] = _signature(name, body or {})   # a tuple of the param names, with the typed spec on it (R16b)
+        out[name].requires = (body or {}).get("requires")
+    return out
 
 
 def risky_tools(tools_path: str) -> frozenset:
@@ -596,6 +645,9 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
                         f"{sorted(set(role_defaults) - asked)}")
     _validate_graph(flow)
     _check_risky_calls(flow, risky)
+    items = check_calls(flow, tools, roles, session_roles)
+    if items:
+        raise FlowCheckError(path, items)
     return flow
 
 
@@ -621,6 +673,134 @@ def _flow_roles(raw, types, path: str, slot_names: frozenset) -> tuple:
                 raise FlowError(f"{where}: `default` is {{from: <another role of the same type>}}")
             defaults[role] = source
     return roles, defaults
+
+
+def _fits_type(src: dict, param: dict) -> bool:
+    """Can a value read as `src` ({extractor, length, choices}) be passed to a parameter typed `param`."""
+    want, kind = param.get("type"), src["extractor"]
+    if want in (None, "text"):
+        return True
+    if kind == "boolean":
+        return False
+    if want == "number":
+        return kind in ("number", "digits")
+    if want == "digits":
+        return kind == "digits" and (param.get("length") is None or src.get("length") == param["length"])
+    if want == "choice":
+        return kind == "choice" and {v for _, v in src.get("choices", ())} <= set(param.get("choices", ()))
+    return kind == want
+
+
+def _edges_of(node) -> list:
+    """(target, label) of a node's edges; `yes` and `ok` are the edges that carry something."""
+    if node.type == "confirm":
+        return [(node.data["on_yes"], "yes"), (node.data["on_no"], "no")]
+    if node.type == "call":
+        return [(t, lab) for t, lab in ((node.data["on_ok"], "ok"), (node.data["on_error"], "error")) if t is not None]
+    return [(t, None) for t in NODE_TYPES[node.type].edges(node.data)]
+
+
+def _collects(node, key: tuple) -> bool:
+    kind, a, b = key
+    if kind not in ("role", "slot"):
+        return False
+    slot = f"{a}.{b}" if kind == "role" else a
+    if node.type == "ask":
+        return node.data["slot"] == slot
+    if node.type == "form":
+        return any(s["slot"] == slot for s in node.data["slots"])
+    return False
+
+
+def _collection_witness(flow: Flow, target: str, key: tuple):
+    """A path of node ids from start to `target` on which `key` is not collected, or None when every path collects it.
+    An ask or form of the value collects it when passed; a `confirm` with `role_default` collects the role on its yes
+    edge; a call's result is there on its ok edge. A search over the graph, so loops, branch and goto are covered."""
+    kind, a, b = key
+    parent, queue = {flow.start: None}, [flow.start]
+    while queue:
+        n = queue.pop(0)
+        if n == target:
+            path = []
+            while n is not None:
+                path.append(n)
+                n = parent[n]
+            return path[::-1]
+        node = flow.nodes[n]
+        if _collects(node, key):
+            continue
+        for t, label in _edges_of(node):
+            if kind == "call" and n == a and label == "ok":
+                continue
+            if kind == "role" and node.type == "confirm" and node.data["role_default"] == a and label == "yes":
+                continue
+            if t not in parent:
+                parent[t] = n
+                queue.append(t)
+    return None
+
+
+def check_calls(flow: Flow, tools: dict, roles: dict, session_roles: dict) -> list:
+    """Every problem of the calls of a flow, each as `{code, node, parameter, role, field, path}` (R16b, ADR 0014)."""
+    items = []
+
+    def item(code, node, param, role=None, field=None, path=()):
+        items.append({"code": code, "node": node, "parameter": param, "role": role, "field": field, "path": list(path)})
+
+    filled = {s for n in flow.nodes.values() if n.type in ("ask", "form")
+              for s in ([n.data["slot"]] if n.type == "ask" else [x["slot"] for x in n.data["slots"]])}
+    captured = dict(flow.captures)
+    for node in flow.nodes.values():
+        if node.type != "call":
+            continue
+        sig = tools[node.data["tool"]]
+        params = getattr(sig, "params", None) or {p: {"type": None, "required": True} for p in sig}
+        sources = {**{p: s for p, s in node.data["arg_sources"].items()}, **node.data["bind"]}
+        for p, spec in params.items():
+            if spec["required"] and p not in sources and p not in node.data["args"]:
+                item("unbound", node.id, p)
+        for p, key in sources.items():
+            spec = params.get(p) or {"type": None}
+            kind, a, b = key
+            if kind == "const":
+                if not value_fits(a, spec):
+                    item("type_mismatch", node.id, p, None, a)
+                continue
+            if kind == "call":
+                returns = getattr(tools[flow.nodes[a].data["tool"]], "returns", None)
+                if returns is not None and b not in returns:
+                    item("unbound", node.id, p, None, f"{a}.{b}")
+                    continue
+                src = {"extractor": returns[b]["type"] or "text", "length": returns[b]["length"],
+                       "choices": tuple((c, c) for c in returns[b]["choices"])} if returns is not None else None
+                witness = _collection_witness(flow, node.id, key)
+                if witness:
+                    item("not_collected", node.id, p, None, f"{a}.{b}", witness)
+                if src is not None and not _fits_type(src, spec):
+                    item("type_mismatch", node.id, p, None, f"{a}.{b}")
+                continue
+            if kind == "role" and a in session_roles:   # the identity gate fills it before a protected tool runs
+                if sig.requires != "verified":
+                    item("not_collected", node.id, p, a, b, [flow.start, node.id] if flow.start != node.id else [node.id])
+                src = session_roles[a].fields[b].spec if b in session_roles[a].fields else None
+            elif kind == "role":
+                src = roles[a].fields[b].spec if a in roles and b in roles[a].fields else None
+                witness = _collection_witness(flow, node.id, key)
+                if witness:
+                    item("not_collected", node.id, p, a, b, witness)
+            else:   # a flat slot; only one the flow itself asks is checked, a capture may fill it from the first words
+                src = captured.get(a)
+                if a in filled:
+                    witness = _collection_witness(flow, node.id, key)
+                    if witness:
+                        item("not_collected", node.id, p, None, a, witness)
+                    src = next((n.data if n.type == "ask" else next(x for x in n.data["slots"] if x["slot"] == a)
+                                for n in flow.nodes.values()
+                                if (n.type == "ask" and n.data["slot"] == a)
+                                or (n.type == "form" and any(x["slot"] == a for x in n.data["slots"]))), None)
+            if src is not None and not _fits_type(src, spec):
+                item("type_mismatch", node.id, p, a if kind == "role" else None, b if kind == "role" else a)
+    return items
 
 
 def _check_risky_calls(flow: Flow, risky: frozenset) -> None:

@@ -4,7 +4,9 @@ tools:
   get_balance:
     retry: 1                    # a timeout is tried once more (R12-1)
     requires: verified          # caller must pass verify_identity first (R13-1)
-    params: [account_last4]
+    params:
+      account_last4: {type: digits, length: 4}
+    returns: {balance: number, currency: text}
     rules:
       - when: {account_last4: "0000"}
         error: timeout            # used by the API-failure case (C10)
@@ -16,7 +18,10 @@ tools:
       error: not_found
   get_transfer_fee:
     retry: 1                    # a timeout is tried once more (R12-1)
-    params: [amount, grade]
+    params:
+      amount: number
+      grade: text
+    returns: {fee: number, currency: text}
     rules:
       - when: {grade: gold}
         return: {fee: 0, currency: USD}
@@ -25,20 +30,30 @@ tools:
     default:
       error: not_found
   make_transfer:
-    params: [amount, to_account]
+    params:
+      amount: number
+      to_account: {type: choice, choices: [savings, checking]}
+    returns: {reference: text}
     risky: true           # moves money: a flow must confirm before calling it (R7-12)
     rules: []
     default:              # every transfer is accepted (R7-6); no failure rule yet
       return: {reference: TR1001}
   schedule_transfer:
-    params: [amount, date, to_account]
+    params:
+      amount: number
+      date: date
+      to_account: {type: choice, choices: [savings, checking]}
+    returns: {reference: text}
     risky: true           # moves money later: confirm first (R7-12, R11-3)
     rules: []
     default:
       return: {reference: TS1001}
   verify_identity:
     verifies: true
-    params: [account_last4, pin]
+    params:
+      account_last4: {type: digits, length: 4}
+      pin: {type: digits, length: 4}
+    returns: {verified: boolean}
     rules:
       - when: {account_last4: "4821", pin: "2468"}
         return: {verified: true}
@@ -47,13 +62,18 @@ tools:
     default:
       error: invalid_credentials
   book_visit:
-    params: [booker_phone, visitor_phone]
+    params:
+      booker_phone: {type: digits, length: 4}
+      visitor_phone: {type: digits, length: 4}
+    returns: {reference: text}
     rules: []
     default:
       return: {reference: BV1001}
   get_visit:
     requires: verified          # the caller's own booking: after the identity check (R13-1)
-    params: [account_last4]
+    params:
+      account_last4: {type: digits, length: 4}
+    returns: {reference: text, branch: text}
     rules:
       - when: {account_last4: "4821"}
         return: {reference: BV0420, branch: Downtown}

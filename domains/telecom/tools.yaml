@@ -3,7 +3,9 @@
 tools:
   get_data_usage:
     retry: 1                    # a timeout is tried once more (R12-1)
-    params: [line_last4]
+    params:
+      line_last4: {type: digits, length: 4}
+    returns: {used_gb: number, limit_gb: number}
     rules:
       - when: {line_last4: "0000"}
         error: timeout            # used by the API-failure case (C10)
@@ -13,7 +15,10 @@ tools:
       error: not_found
   get_plan_price:
     retry: 1                    # a timeout is tried once more (R12-1)
-    params: [plan, contract]
+    params:
+      plan: text
+      contract: text
+    returns: {monthly_price: number, currency: text}
     rules:
       - when: {plan: plus, contract: yearly}
         return: {monthly_price: 20, currency: USD}
@@ -24,40 +29,57 @@ tools:
   get_bill:
     retry: 1                    # a timeout is tried once more (R12-1)
     requires: verified          # caller must pass verify_identity first (R13-1)
-    params: [account_last4]
+    params:
+      account_last4: {type: digits, length: 4}
+    returns: {amount_due: number, currency: text, due_date: date}
     rules:
       - when: {account_last4: "5580"}
         return: {amount_due: 45, currency: USD, due_date: "2026-10-20"}
     default:
       error: not_found
   change_bill_date:
-    params: [bill_day, effective_from]
+    params:
+      bill_day: day
+      effective_from: month_start
+    returns: {status: text}
     risky: true           # changes billing: confirm first (R7-12, R11-3)
     rules: []
     default:
       return: {status: changed}
   set_data_plan:
-    params: [plan_gb]
+    params:
+      plan_gb: number
+    returns: {status: text}
     risky: true           # changes the plan: confirm first (R7-12, R9-4)
     rules: []
     default:
       return: {status: changed}
   add_feature:
-    params: [line_last4, feature, duration_days]
+    params:
+      line_last4: {type: digits, length: 4}
+      feature: text
+      duration_days: duration
+    returns: {status: text}
     risky: true           # adds a paid feature: confirm first (R7-12, R10-5)
     rules: []
     default:
       return: {status: added}
   verify_identity:
     verifies: true
-    params: [account_last4, pin]
+    params:
+      account_last4: {type: digits, length: 4}
+      pin: {type: digits, length: 4}
+    returns: {verified: boolean}
     rules:
       - when: {account_last4: "5580", pin: "1357"}
         return: {verified: true}
     default:
       error: invalid_credentials
   register_line_user:
-    params: [holder_phone, user_phone]
+    params:
+      holder_phone: {type: digits, length: 4}
+      user_phone: {type: digits, length: 4}
+    returns: {reference: text}
     rules: []
     default:
       return: {reference: LU3001}

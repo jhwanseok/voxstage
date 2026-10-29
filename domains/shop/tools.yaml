@@ -4,7 +4,9 @@ tools:
   get_order_status:
     retry: 1                    # a timeout is tried once more (R12-1)
     requires: verified          # caller must pass verify_identity first (R13-1)
-    params: [order_id]
+    params:
+      order_id: digits
+    returns: {status: text, eta: date}
     rules:
       - when: {order_id: "9999"}
         error: timeout            # used by the API-failure case (C10)
@@ -18,7 +20,9 @@ tools:
       error: not_found
   get_shipping_fee:
     retry: 1                    # a timeout is tried once more (R12-1)
-    params: [tier]
+    params:
+      tier: text
+    returns: {fee: number, currency: text}
     rules:
       - when: {tier: gold}
         return: {fee: 0, currency: USD}
@@ -27,32 +31,49 @@ tools:
     default:
       error: not_found
   update_address:
-    params: [order_id, address]
+    params:
+      order_id: digits
+      address: text
+    returns: {status: text}
     risky: true           # changes the order: a flow must confirm before calling it (R7-12, R8-6)
     rules: []
     default:
       return: {status: updated}
   schedule_delivery:
-    params: [quantity, delivery_date, delivery_window]
+    params:
+      quantity: number
+      delivery_date: date
+      delivery_window: time_window
+    returns: {status: text}
     risky: true           # books a delivery: confirm first (R7-12, R11-3)
     rules: []
     default:
       return: {status: scheduled}
   update_quantity:
-    params: [order_id, quantity]
+    params:
+      order_id: digits
+      quantity: number
+    returns: {status: text}
     risky: true           # changes the order: confirm first (R7-12, R9-4)
     rules: []
     default:
       return: {status: updated}
   create_return:
-    params: [order_id, item, size]
+    params:
+      order_id: digits
+      item: text
+      size: text
+    returns: {reference: text}
     risky: true           # opens a return: confirm first (R7-12, R10-6)
     rules: []
     default:
       return: {reference: RT1001}
   verify_identity:
     verifies: true
-    params: [order_id, zip_code]
+    params:
+      order_id: digits
+      zip_code: digits
+    returns: {verified: boolean}
     rules:
       - when: {order_id: "1001", zip_code: "12345"}
         return: {verified: true}
@@ -61,7 +82,10 @@ tools:
     default:
       error: invalid_credentials
   authorize_pickup:
-    params: [orderer_phone, picker_phone]
+    params:
+      orderer_phone: {type: digits, length: 4}
+      picker_phone: {type: digits, length: 4}
+    returns: {reference: text}
     rules: []
     default:
       return: {reference: PK2001}
