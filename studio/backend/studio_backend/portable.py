@@ -15,10 +15,11 @@ from . import yamlio
 from .models import (Bot, Domain, DomainFile, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Tool)
 
 # settings files: kind -> path inside the domain directory (shared) or the language directory (per bot)
-SHARED_SETTINGS = {"sensitive_slots": "sensitive_slots.yaml", "readback_slots": "readback_slots.yaml"}
+SHARED_SETTINGS = {"sensitive_slots": "sensitive_slots.yaml", "readback_slots": "readback_slots.yaml",
+                   "types": "types.yaml"}   # ADR 0014: type dictionary and session roles
 BOT_SETTINGS = {"config": "rules/config.yaml", "confirm": "rules/confirm.yaml", "commands": "rules/commands.yaml",
                 "corrections": "rules/corrections.yaml", "confusions": "rules/confusions.yaml"}
-FLOW_HEADER_ORDER = ("triggers", "buttons", "role", "captures", "interrupts", "carry", "prefill", "verification")
+FLOW_HEADER_ORDER = ("triggers", "buttons", "role", "roles", "captures", "interrupts", "carry", "prefill", "verification")
 
 
 class ImportError_(ValueError):

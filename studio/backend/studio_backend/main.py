@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import portable, service, settings, yamlio
+from . import datatypes, portable, service, settings, yamlio
 from .db import get_session, session_scope
 from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile, Role, Tool, User, UserRole)
@@ -437,6 +437,68 @@ def delete_tool(d: str, name: str, force: bool = False, session: Session = Depen
     return Response(status_code=204)
 
 
+# --- type dictionary and session roles (types.yaml, shared by the bots of a domain; ADR 0014) ---
+
+class TypesIn(BaseModel):
+    body: dict[str, Any]
+    revision: int | None = None
+    force: bool = False
+
+
+def _types_row(session: Session, dom: Domain) -> DomainSetting | None:
+    return session.scalar(select(DomainSetting).where(DomainSetting.domain_id == dom.id, DomainSetting.kind == "types"))
+
+
+def domain_flows(session: Session, dom: Domain) -> list[tuple[str, str, dict, dict]]:
+    return [(bot.slug, f.flow_id, f.header or {}, f.nodes or {})
+            for bot in sorted(dom.bots, key=lambda x: x.slug)
+            for f in session.scalars(select(Flow).where(Flow.bot_id == bot.id).order_by(Flow.flow_id))]
+
+
+def types_out(session: Session, dom: Domain) -> dict:
+    row = _types_row(session, dom)
+    body = (row.body if row else None) or {}
+    return {"domain": dom.slug, "exists": row is not None, "revision": row.revision if row else 0,
+            "body": {"types": {}, "roles": {}, **body}, "usage": datatypes.usage(body, domain_flows(session, dom)),
+            "field_types": list(_engine_extractors()), "affects_bots": affected_bots(dom)}
+
+
+def _engine_extractors() -> tuple[str, ...]:
+    from voxstage.rules.flows import EXTRACTORS   # read only: the field types are the engine's extractors
+    return EXTRACTORS
+
+
+@app.get(API + "/domains/{d}/types")
+def get_types(d: str, session: Session = Depends(get_session)):
+    return types_out(session, get_domain(session, d))
+
+
+@app.put(API + "/domains/{d}/types")
+def put_types(d: str, body: TypesIn, session: Session = Depends(get_session), user: User = Depends(current_user)):
+    dom = get_domain(session, d)
+    row = _types_row(session, dom)
+    if row is not None:
+        check_revision(row, body.revision, types_out(session, dom))
+    errs = datatypes.check_types(body.body)
+    if errs:
+        raise HTTPException(422, {"message": "invalid type dictionary", "problems": errs})
+    broken = datatypes.broken_by(row.body if row else None, body.body, domain_flows(session, dom))
+    if broken and not body.force:
+        raise HTTPException(409, {"message": "scenarios use what this change removes", "uses": broken})
+    doc = {k: v for k, v in body.body.items() if v not in ({}, None)}
+    if not doc:
+        if row is not None:
+            session.delete(row)
+    elif row is None:
+        session.add(DomainSetting(domain_id=dom.id, kind="types", body=doc, updated_by=user.id))
+    else:
+        row.body, row.updated_by = doc, user.id
+        row.revision += 1
+    touch_domain(session, dom)
+    session.commit()
+    return types_out(session, dom)
+
+
 # --- flows (viewer in ST1) ---
 
 def layout_out(session: Session, bot: Bot, flow_id: str) -> dict:
@@ -543,6 +605,15 @@ def check_flow_shape(body: FlowIn) -> None:
         raise HTTPException(422, f"unknown flow keys {sorted(set(body.header) - FLOW_HEADER_KEYS)}")
 
 
+def check_flow_roles(session: Session, bot: Bot, header: dict | None) -> None:
+    if header is None or "roles" not in header:
+        return
+    row = _types_row(session, session.get(Domain, bot.domain_id))
+    errs = datatypes.check_flow_roles(header["roles"], row.body if row else None)
+    if errs:
+        raise HTTPException(422, {"message": "invalid roles", "problems": errs})
+
+
 @app.put(API + "/bots/{b}/flows/{flow_id}")
 def update_flow(b: str, flow_id: str, body: FlowIn, session: Session = Depends(get_session),
                 user: User = Depends(current_user)):
@@ -550,6 +621,7 @@ def update_flow(b: str, flow_id: str, body: FlowIn, session: Session = Depends(g
     f = _flow(session, bot, flow_id)
     check_revision(f, body.revision, {"revision": f.revision})
     check_flow_shape(body)
+    check_flow_roles(session, bot, body.header)
     order = [n for n in (body.node_order or f.node_order) if n in body.nodes]
     order += [n for n in body.nodes if n not in order]
     if body.header is not None:
