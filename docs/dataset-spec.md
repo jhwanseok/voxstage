@@ -41,6 +41,7 @@ load time with the file name.
 | C11 | Block information before identity check | |
 | C12 | Policy-change impact | measured by regressions after a change |
 | C13 | Interaction of two features | a pair of earlier capabilities in one conversation (R15) |
+| C14 | Roles and typed API binding | the same type used for two roles in one conversation, and a value the identity check proved reused by a later call (ADR 0014, R16a) |
 
 ## FAQ entry
 

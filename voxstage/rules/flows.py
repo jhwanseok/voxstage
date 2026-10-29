@@ -18,7 +18,7 @@ from __future__ import annotations
 import glob
 import os
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
 import yaml
@@ -188,6 +188,7 @@ class Flow:
     role: str | None = None   # "verification": the identity check run before a protected tool (R13)
     prefill: tuple = ()   # of (slot, attribute): empty slots taken from `customer.<attribute>` at the start (R13)
     max_attempts: int | None = None   # the flow's own limit of failed identity checks (R13-2); None: the config's
+    roles: tuple = ()   # of (role, type name, default source role or None): the flow's people and values (ADR 0014)
 
 
 @dataclass(frozen=True)
@@ -216,6 +217,10 @@ class CompileCtx:
     tools: dict   # tool name -> tuple of param names
     sensitive: frozenset = frozenset()   # slots that only the keypad may fill (R3-1)
     notices: tuple = ()                  # the registry's Notice objects, in priority order (R5)
+    roles: dict = field(default_factory=dict)          # flow role -> RecordType (ADR 0014)
+    role_defaults: dict = field(default_factory=dict)  # flow role -> the role it can default to
+    session_roles: dict = field(default_factory=dict)  # session role -> RecordType (`caller`)
+    call_steps: frozenset = frozenset()                # ids of the `call` nodes of this flow
 
     @property
     def where(self) -> str:
@@ -239,6 +244,17 @@ class CompileCtx:
 def _say(raw, ctx):
     ctx.only(raw, {"text", "next"})
     return {"text": ctx.template(ctx.need(raw, "text"), "text"), "next": ctx.need(raw, "next")}
+
+
+def role_field(role, fld, ctx):
+    """The FieldType of `role.field` for a flow role (not the session role), or a load error."""
+    if role not in ctx.roles:
+        raise FlowError(f"{ctx.where}: unknown role `{role}` (this flow has {sorted(ctx.roles)})")
+    ft = ctx.roles[role].fields.get(fld)
+    if ft is None:
+        raise FlowError(f"{ctx.where}: role `{role}` ({ctx.roles[role].name}) has no field `{fld}` "
+                        f"(fields: {sorted(ctx.roles[role].fields)})")
+    return ft
 
 
 def extractor_spec(raw: dict, where: str) -> dict:
@@ -267,8 +283,15 @@ def extractor_spec(raw: dict, where: str) -> dict:
 @register_node_type("ask", edges=lambda d: [d["next"]], waits=True)
 def _ask(raw, ctx):
     """Asks for a slot and waits. If the slot is already filled (a capture, or an earlier answer) the ask is skipped."""
-    ctx.only(raw, {"slot", "prompt", "extractor", "length", "choices", "interruptible", "next"})
-    spec = extractor_spec(raw, ctx.where)
+    ctx.only(raw, {"slot", "role", "field", "prompt", "extractor", "length", "choices", "interruptible", "next"})
+    if "role" in raw or "field" in raw:   # a field of a role: the slot is `<role>.<field>` (ADR 0014)
+        if "slot" in raw:
+            raise FlowError(f"{ctx.where}: an ask has `slot` or `role` and `field`, not both")
+        field_spec = role_field(raw.get("role"), raw.get("field"), ctx).spec
+        spec = extractor_spec(raw, ctx.where) if "extractor" in raw else dict(field_spec)
+        raw = {**raw, "slot": f"{raw['role']}.{raw['field']}"}
+    else:
+        spec = extractor_spec(raw, ctx.where)
     interruptible = raw.get("interruptible", True)
     if not isinstance(interruptible, bool):
         raise FlowError(f"{ctx.where}: `interruptible` is true or false")
@@ -282,10 +305,15 @@ def _ask(raw, ctx):
 @register_node_type("confirm", edges=lambda d: [d["on_yes"], d["on_no"]], waits=True)
 def _confirm(raw, ctx):
     """Asks yes or no before a risky action (R7-12). Never interruptible, no FAQ side question. The keys are
-    `on_yes` and `on_no` because YAML reads a bare `yes:` or `no:` key as a boolean."""
-    ctx.only(raw, {"prompt", "on_yes", "on_no"})
+    `on_yes` and `on_no` because YAML reads a bare `yes:` or `no:` key as a boolean. With `role_default: <role>` it asks
+    whether the role is the same person as its default source (ADR 0014): yes copies the source's fields."""
+    ctx.only(raw, {"prompt", "on_yes", "on_no", "role_default"})
+    role = raw.get("role_default")
+    if role is not None and role not in ctx.role_defaults:
+        raise FlowError(f"{ctx.where}: `role_default: {role}` needs a role with a `default` "
+                        f"(roles with one: {sorted(ctx.role_defaults)})")
     return {"prompt": ctx.template(ctx.need(raw, "prompt"), "prompt"), "on_yes": ctx.need(raw, "on_yes"),
-            "on_no": ctx.need(raw, "on_no")}
+            "on_no": ctx.need(raw, "on_no"), "role_default": role}
 
 
 @register_node_type("form", edges=lambda d: [d["next"]], waits=True)
@@ -326,15 +354,47 @@ def _form(raw, ctx):
 
 @register_node_type("call", edges=lambda d: [n for n in (d["on_ok"], d["on_error"]) if n is not None])
 def _call(raw, ctx):
-    ctx.only(raw, {"tool", "args", "on_ok", "on_error"})
+    """Each parameter of the tool comes from `args` (a template, the old form) or from `bind` (ADR 0014): a role field
+    `{role: r, field: f}`, a field of an earlier call `{call: step, field: f}`, or `{const: value}`."""
+    ctx.only(raw, {"tool", "args", "bind", "on_ok", "on_error"})
     tool = ctx.need(raw, "tool")
     if tool not in ctx.tools:
         raise FlowError(f"{ctx.where}: unknown tool `{tool}` (known: {sorted(ctx.tools)})")
-    args = ctx.need(raw, "args", dict)
-    if set(args) != set(ctx.tools[tool]):
-        raise FlowError(f"{ctx.where}: tool `{tool}` takes {list(ctx.tools[tool])}, got {sorted(args)}")
-    return {"tool": tool, "args": {k: ctx.template(str(v), f"args.{k}") for k, v in args.items()},
+    args, bind = raw.get("args") or {}, raw.get("bind") or {}
+    if not isinstance(args, dict) or not isinstance(bind, dict):
+        raise FlowError(f"{ctx.where}: `args` and `bind` map parameter names")
+    both = sorted(set(args) & set(bind))
+    if both:
+        raise FlowError(f"{ctx.where}: parameters {both} are in both `args` and `bind`")
+    if set(args) | set(bind) != set(ctx.tools[tool]):
+        raise FlowError(f"{ctx.where}: tool `{tool}` takes {list(ctx.tools[tool])}, got {sorted(set(args) | set(bind))}")
+    bound = {param: _binding(spec, param, ctx) for param, spec in bind.items()}
+    return {"tool": tool, "args": {k: ctx.template(str(v), f"args.{k}") for k, v in args.items()}, "bind": bound,
             "on_ok": ctx.need(raw, "on_ok"), "on_error": raw.get("on_error")}   # none: `call.failed`, end (R12-2)
+
+
+def _binding(spec, param: str, ctx) -> tuple:
+    where = f"{ctx.where}.bind.{param}"
+    if not isinstance(spec, dict) or len(spec) not in (1, 2):
+        raise FlowError(f"{where}: one of {{role, field}}, {{call, field}} or {{const}}")
+    if set(spec) == {"role", "field"}:
+        role, fld = spec["role"], spec["field"]
+        if role in ctx.session_roles:
+            if fld not in ctx.session_roles[role].fields:
+                raise FlowError(f"{where}: session role `{role}` has no field `{fld}` "
+                                f"(fields: {sorted(ctx.session_roles[role].fields)})")
+        else:
+            role_field(role, fld, replace(ctx, node_id=f"{ctx.node_id}.bind.{param}"))
+        return ("role", role, fld)
+    if set(spec) == {"call", "field"}:
+        step, fld = spec["call"], spec["field"]
+        if step not in ctx.call_steps or step == ctx.node_id or not isinstance(fld, str) or not fld:
+            raise FlowError(f"{where}: `call` names another call node of this flow (calls: "
+                            f"{sorted(ctx.call_steps - {ctx.node_id})}) and `field` a returned field")
+        return ("call", step, fld)
+    if set(spec) == {"const"} and isinstance(spec["const"], (str, int, float)) and not isinstance(spec["const"], bool):
+        return ("const", str(spec["const"]), None)
+    raise FlowError(f"{where}: one of {{role, field}}, {{call, field}} or {{const}}")
 
 
 @register_node_type("branch", edges=lambda d: [n for _, n in d["cases"]] + [d["else"]])
@@ -433,7 +493,7 @@ VERIFICATION = "verification"   # the one flow role (R13): started by the gate, 
 
 
 def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notices: tuple = (),
-              risky: frozenset = frozenset()) -> Flow:
+              risky: frozenset = frozenset(), types=None) -> Flow:
     with open(path, encoding="utf-8") as f:
         try:
             raw = yaml.safe_load(f)
@@ -449,9 +509,9 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
                             f"no triggers, buttons, interrupts or captures")
     elif not isinstance(raw, dict) or not {"id", "triggers", "start", "nodes"} <= set(raw) \
             or set(raw) - {"id", "triggers", "start", "nodes", "buttons", "captures", "interrupts", "carry",
-                           "prefill", "verification"}:
+                           "prefill", "verification", "roles"}:
         raise FlowError(f"{path}: needs id, triggers, start and nodes "
-                        f"(and optionally buttons, captures, interrupts, carry, prefill, verification)")
+                        f"(and optionally buttons, captures, interrupts, carry, prefill, verification, roles)")
     raw_captures = raw.get("captures") or {}
     if not isinstance(raw_captures, dict):
         raise FlowError(f"{path}: `captures` must map slot names to extractors")
@@ -485,11 +545,16 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
         | frozenset(raw_captures) \
         | frozenset(spec["slot"] for n in raw_nodes.values() if isinstance(n, dict) and n.get("type") == "form"
                     for spec in (n.get("slots") or []) if isinstance(spec, dict) and isinstance(spec.get("slot"), str))
+    roles, role_defaults = _flow_roles(raw.get("roles"), types, path, names)
+    session_roles = {r: types.types[t] for r, t in types.session_roles.items()} if types else {}
+    names = names | frozenset(roles) | frozenset(session_roles)
+    call_steps = frozenset(n for n, b in raw_nodes.items() if isinstance(b, dict) and b.get("type") == "call")
     nodes = {}
     for node_id, body in raw_nodes.items():
         if not isinstance(body, dict) or body.get("type") not in NODE_TYPES:
             raise FlowError(f"{path}: node {node_id}: type must be one of {sorted(NODE_TYPES)}")
-        ctx = CompileCtx(path, flow_id, node_id, names, tools, sensitive, notices)
+        ctx = CompileCtx(path, flow_id, node_id, names, tools, sensitive, notices, roles, role_defaults, session_roles,
+                         call_steps)
         nodes[node_id] = Node(node_id, body["type"], NODE_TYPES[body["type"]].compile(body, ctx))
     try:
         triggers = None if role else parse_pattern(path, {"id": flow_id, **(raw["triggers"] or {})})
@@ -523,10 +588,39 @@ def load_flow(path: str, tools: dict, sensitive: frozenset = frozenset(), notice
         raise FlowError(f"{path}: `verification` is {{max_attempts: N}} with N >= 1")
     flow = Flow(flow_id, triggers, raw["start"], nodes, path, names, tuple(buttons), tuple(captures),
                 interrupts, tuple(carry), role, tuple((k, v.split(".", 1)[1]) for k, v in prefill.items()),
-                own["max_attempts"] if own else None)
+                own["max_attempts"] if own else None,
+                tuple((r, roles[r].name, role_defaults.get(r)) for r in roles))
+    asked = {n.data["role_default"] for n in nodes.values() if n.type == "confirm" and n.data["role_default"]}
+    if asked != set(role_defaults):
+        raise FlowError(f"{path}: roles with a `default` need a confirm node with `role_default`: "
+                        f"{sorted(set(role_defaults) - asked)}")
     _validate_graph(flow)
     _check_risky_calls(flow, risky)
     return flow
+
+
+def _flow_roles(raw, types, path: str, slot_names: frozenset) -> tuple:
+    """(role -> RecordType, role -> default source role) of the flow header's `roles:` (ADR 0014)."""
+    if raw is None:
+        return {}, {}
+    if types is None:
+        raise FlowError(f"{path}: `roles` needs the domain's types.yaml")
+    if not isinstance(raw, dict) or not raw:
+        raise FlowError(f"{path}: `roles` maps role names to {{type, default}}")
+    roles, defaults = {}, {}
+    for role, body in raw.items():
+        where = f"{path}: role {role}"
+        if not isinstance(body, dict) or set(body) - {"type", "default", "label"} or body.get("type") not in types.types:
+            raise FlowError(f"{where}: needs `type`, one of {sorted(types.types)} (and optionally default, label)")
+        if role in slot_names or role in types.session_roles or role in ("slots", "customer", "policy", "result"):
+            raise FlowError(f"{where}: the name is already a slot or a reserved name")
+        roles[role] = types.types[body["type"]]
+        if "default" in body:
+            source = body["default"].get("from") if isinstance(body["default"], dict) else None
+            if set(body["default"]) != {"from"} or source not in raw or source == role                     or raw[source].get("type") != body["type"]:
+                raise FlowError(f"{where}: `default` is {{from: <another role of the same type>}}")
+            defaults[role] = source
+    return roles, defaults
 
 
 def _check_risky_calls(flow: Flow, risky: frozenset) -> None:
@@ -583,11 +677,12 @@ def _validate_graph(flow: Flow) -> None:
     # every slot used in a template must be filled by an ask node of this flow (checked when compiling names)
 
 
-def load_flows(flows_dir: str, tools_path: str, sensitive: frozenset = frozenset(), notices: tuple = ()) -> dict:
+def load_flows(flows_dir: str, tools_path: str, sensitive: frozenset = frozenset(), notices: tuple = (),
+               types=None) -> dict:
     tools, risky = tool_params(tools_path), risky_tools(tools_path)
     flows, owner = {}, {}
     for path in sorted(glob.glob(os.path.join(flows_dir, "*.yaml"))):
-        flow = load_flow(path, tools, sensitive, notices, risky)
+        flow = load_flow(path, tools, sensitive, notices, risky, types)
         flows[flow.id] = flow
         for b in flow.buttons:
             if b in owner:

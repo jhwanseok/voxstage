@@ -142,11 +142,11 @@ class FloorAndCeilingTest(unittest.TestCase):
                 self.assertEqual(total["passed"], total["total"], (lang, mode, [r["id"] for r in oracle["results"] if not r["passed"]][:3]))
                 self.assertEqual(total["total"], null["summary"]["overall"]["total"])
 
-    def test_base_case_counts_are_80_per_language(self):
+    def test_base_case_counts_are_85_per_language(self):
         for lang in ("en", "ko"):
             cases = build_cases(ROOT, lang)
             base = [c for c in cases if c.source in ("base", "question")]
-            self.assertEqual(len(base), 80, lang)   # 72 and the 8 interaction cases of R15
+            self.assertEqual(len(base), 85, lang)   # 72, the 8 interaction cases of R15 and the 5 role cases of R16a
 
 
 class ReportTest(unittest.TestCase):

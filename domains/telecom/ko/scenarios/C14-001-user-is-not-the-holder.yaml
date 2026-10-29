@@ -1,0 +1,24 @@
+id: telecom.C14.001
+lang: ko
+domain: telecom
+capability: C14
+title: "회선 사용자가 명의자와 다르면 API에는 사용자의 번호가 간다"
+tags: [roles, binding]
+turns:
+  - user: {kind: utterance, text: 가족을 회선 사용자로 등록하고 싶어요}
+    expect:
+      flow: line_user_registration
+      reply_contains_any: [휴대폰]
+  - user: {kind: dtmf, digits: "5580"}
+    expect:
+      slots: {holder.phone_last4: "5580"}
+      reply_contains_any: [본인]
+  - user: {kind: utterance, text: 아니요}
+    expect:
+      tool_calls: []
+      reply_contains_any: [사용하실 분]
+  - user: {kind: dtmf, digits: "7310"}
+    expect:
+      tool_calls:
+        - {name: register_line_user, args: {holder_phone: "5580", user_phone: "7310"}}
+      reply_contains: ["7310", LU3001]

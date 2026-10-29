@@ -348,6 +348,39 @@ with the v1 threshold written into the texts. `python -m voxstage.policy_impact`
 C12 under v1 and v2 for both variants, and shows the flow files and lines a move to v2 must edit and how many replies
 still say the old threshold after the single edit the C12 case points to.
 
+## Types, roles and call binding (R16a, ADR 0014)
+
+`domains/<domain>/types.yaml` (optional) holds the domain's records and its session role. A field is a scalar read by one
+of the extractors (`type: digits`, `length: 4`, `choice` with `choices`, ...); records do not nest; `label: {en: ..., ko: ...}`
+is the display name and is not used by the engine. The only session role is `caller` (a type); the identity check fills
+it with the fields of that type that the verifying call's arguments carry, and it holds for the rest of the call.
+
+```yaml
+# flow header
+roles:
+  booker:  {type: Person}
+  visitor: {type: Person, default: {from: booker}}   # needs a confirm node with role_default: visitor
+nodes:
+  ask_first:   {type: ask, role: booker, field: phone_last4, prompt: "...", next: same_person}
+  same_person: {type: confirm, role_default: visitor, prompt: "Is the visitor you?", on_yes: book, on_no: ask_second}
+  book:
+    type: call
+    tool: book_visit
+    bind:
+      booker_phone:  {role: booker, field: phone_last4}      # or {role: caller, field: account_last4}
+      visitor_phone: {call: lookup, field: id}               # a field returned by an earlier call node
+      branch:        {const: downtown}
+```
+
+- A role field is stored as the slot `<role>.<field>` and read as `{visitor.phone_last4}`; an `ask` with `role` and
+  `field` takes the field's extractor unless it names its own. Corrections and read-back of role fields come with S2-2.
+- `confirm` with `role_default: <role>`: yes copies the source role's fields (no "declined" wording is said); no goes on
+  to the asks. A role with `default` and no such node, or such a node for a role without `default`, is a load error.
+- `call`: every parameter of the tool is in `args` (a template, as before) or in `bind`, never both. A bound source
+  without a value at run time is a missing attribute (R4-2): the apology wording and `HandOff("missing_attribute")`.
+- The loader checks names and fields (unknown role or field, a `call` binding to anything but another call node of
+  the flow). It does not yet check types, required parameters or that a value is collected on every path (R16b).
+
 ## Not yet
 
 (nothing in the rule engine; R15 closes S1.)

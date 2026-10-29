@@ -1,0 +1,16 @@
+# Look up the caller's own booking (R16a, ADR 0014): the account comes from the session role `caller`, which the
+# identity check filled, so the caller is not asked for it twice.
+id: visit_status
+triggers: {all_of: [[visit, appointment], [my]], none_of: [book, reserve, make]}
+start: lookup
+nodes:
+  lookup:
+    type: call
+    tool: get_visit
+    bind:
+      account_last4: {role: caller, field: account_last4}
+    on_ok: say_visit
+    on_error: say_none
+  say_visit: {type: say, text: "Your visit at the {result.branch} branch is tomorrow at ten. Your reference is {result.reference}.", next: done}
+  say_none: {type: say, text: "I can't find a booking for you.", next: done}
+  done: {type: end}

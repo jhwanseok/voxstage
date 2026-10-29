@@ -18,6 +18,7 @@ from voxstage.rules.expr import ExprError, compile_expr
 from voxstage.rules.flows import FlowError, compile_template, load_flow, load_flows, tool_params
 from voxstage.rules.interpreter import VERIFIED, FlowManager, build_manager
 from voxstage.rules.tokenize import kiwi_available
+from voxstage.rules.types import load_types
 from voxstage.tools import FakeApiExecutor
 from voxstage.turn import ButtonPress, Dtmf, Utterance
 
@@ -377,8 +378,10 @@ class TwinFlowsTest(unittest.TestCase):
         for domain in dataset.DOMAINS:
             def load(lang):
                 pack = DomainPack.load(ROOT, domain, lang)
+                types_path = os.path.join(ROOT, domain, "types.yaml")
                 return load_flows(os.path.join(ROOT, domain, lang, "flows"), pack.tools_path,
-                                  pack.sensitive_slots, pack.notices)
+                                  pack.sensitive_slots, pack.notices,
+                                  load_types(types_path) if os.path.exists(types_path) else None)
             en, ko = load("en"), load("ko")
             self.assertEqual(sorted(en), sorted(ko), domain)
             for fid, fe in en.items():
