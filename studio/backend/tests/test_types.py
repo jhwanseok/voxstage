@@ -143,6 +143,15 @@ def test_removing_a_type_or_field_a_scenario_uses_needs_force(client):
     assert put(client, no_field, force=True).status_code == 200
 
 
+def test_removing_a_session_role_a_step_reads_needs_force(client):
+    put(client, DOC)
+    flow_with_roles(client, {}, {"lookup": {"type": "call", "tool": "get_balance", "on_ok": "say_balance", "on_error": "say_fail",
+                                            "bind": {"account_last4": {"role": "caller", "field": "last4"}}}})
+    r = put(client, {"types": DOC["types"], "roles": {}})
+    assert r.status_code == 409
+    assert r.json()["detail"]["uses"] == [{"bot": "bank-ko", "flow": "balance_inquiry", "node": "lookup", "role": "caller"}]
+
+
 def test_clearing_the_dictionary_drops_the_file(client):
     put(client, DOC)
     assert put(client, {"types": {}, "roles": {}}).status_code == 200

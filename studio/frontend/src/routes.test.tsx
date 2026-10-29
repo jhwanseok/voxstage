@@ -40,7 +40,9 @@ beforeEach(() => {
     const body = url.endsWith("/api/v1/bots") ? [BOT]
       : url.endsWith("/bots/bank-ko") ? { ...BOT, counts: { faq: 0, flows: 0, tools: 0 } }
       : url.endsWith("/settings") ? settings
-      : url.endsWith("/validation") ? null : [];
+      : url.endsWith("/validation") ? null
+      : url.endsWith("/types") ? { domain: "bank", exists: false, revision: 0, body: { types: {}, roles: {} }, usage: {}, field_types: ["text"], affects_bots: ["bank-ko"] }
+      : [];
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));
 });
@@ -69,7 +71,7 @@ describe("menu links are absolute", () => {
   // the reported case: clicking a menu item (e.g. "API 연결") again and again grew the address
   it.each([
     ["/mock/home", ["API 연결", "자주 묻는 질문", "API 연결", "API 연결", "개요"], "/mock/home"],
-    ["/b/bank-ko/overview", ["API 연결", "API 연결", "자주 묻는 질문", "게시 이력", "API 연결"], "/b/bank-ko/tools"],
+    ["/b/bank-ko/overview", ["API 연결", "데이터", "API 연결", "데이터", "게시 이력", "데이터"], "/b/bank-ko/data"],
   ])("from %s, clicking %j ends at %s", async (start, clicks, end) => {
     const { findAllByText } = render(<MemoryRouter initialEntries={[start]}><App /><Spy /></MemoryRouter>);
     where = ""; moves = 0;

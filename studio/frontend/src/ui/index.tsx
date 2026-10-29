@@ -193,6 +193,10 @@ export function Disclosure({ title, summary, children, defaultOpen = false, badg
 
 function useFocusTrap(active: boolean, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
+  // the owner passes a new onClose on every render; reading it through a ref keeps the effect (and the initial
+  // focus) to opening and closing, so typing in a sheet does not throw the focus back to the first field
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     if (!active) return;
     const back = document.activeElement as HTMLElement | null;
@@ -201,7 +205,7 @@ function useFocusTrap(active: boolean, onClose: () => void) {
       .filter((el) => !el.hasAttribute("disabled"));
     (node?.querySelector<HTMLElement>("[data-autofocus]") ?? items()[0])?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); }
+      if (e.key === "Escape") { e.stopPropagation(); close.current(); }
       if (e.key !== "Tab") return;
       const list = items();
       if (!list.length) return;
@@ -211,7 +215,7 @@ function useFocusTrap(active: boolean, onClose: () => void) {
     };
     document.addEventListener("keydown", onKey, true);
     return () => { document.removeEventListener("keydown", onKey, true); back?.focus?.(); };
-  }, [active, onClose]);
+  }, [active]);
   return ref;
 }
 
@@ -287,9 +291,14 @@ export function EmptyState({ icon, title, children, action }: { icon?: ReactNode
 
 /** 을 or 를 after a Korean word, from its last syllable (a final consonant takes 을). */
 export function eul(word: string): string {
+  return josa(word, "을", "를");
+}
+
+/** A word with the particle its last syllable takes: josa("예약자", "이", "가") is "예약자가". */
+export function josa(word: string, afterConsonant: string, afterVowel: string): string {
   const c = word.trim().charCodeAt(word.trim().length - 1);
-  if (c < 0xac00 || c > 0xd7a3) return `${word}을(를)`;
-  return `${word}${(c - 0xac00) % 28 ? "을" : "를"}`;
+  if (c < 0xac00 || c > 0xd7a3) return `${word}${afterConsonant}(${afterVowel})`;
+  return `${word}${(c - 0xac00) % 28 ? afterConsonant : afterVowel}`;
 }
 
 export function ErrorState({ error, onRetry, what = "내용" }: { error: Error; onRetry?: () => void; what?: string }) {

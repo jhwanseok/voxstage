@@ -27,7 +27,7 @@ export const ON_EXCEED = { handoff: "상담사에게 연결", end_call: "통화 
 
 export const EXTRACTORS: Record<string, string> = {
   text: "말 그대로", number: "숫자", digits: "숫자 자리(키패드 포함)", choice: "보기 중 하나", date: "날짜",
-  month_start: "달의 첫날", day: "날짜의 일", time_window: "시간대(오전·오후·저녁)",
+  month_start: "달의 첫날", day: "날짜의 일", time_window: "시간대(오전·오후·저녁)", duration: "기간",
 };
 
 export function when(iso: string): string {

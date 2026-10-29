@@ -1,5 +1,5 @@
 import {
-  AudioLines, BookOpenText, GitBranch, History as HistoryIcon, LayoutDashboard, PlugZap, Rocket, ShieldCheck,
+  AudioLines, BookOpenText, Database, GitBranch, History as HistoryIcon, LayoutDashboard, PlugZap, Rocket, ShieldCheck,
 } from "lucide-react";
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -15,6 +15,7 @@ import Flows from "./pages/Flows";
 import History from "./pages/History";
 import Home from "./pages/Home";
 import Overview from "./pages/Overview";
+import DataPage from "./pages/Data";
 import Tools from "./pages/Tools";
 import Validation from "./pages/Validation";
 
@@ -28,6 +29,7 @@ const MENU: { section: BotSection; label: string; icon: typeof LayoutDashboard }
   { section: "overview", label: "개요", icon: LayoutDashboard },
   { section: "faq", label: "자주 묻는 질문", icon: BookOpenText },
   { section: "flows", label: "시나리오", icon: GitBranch },
+  { section: "data", label: "데이터", icon: Database },
   { section: "tools", label: "API 연결", icon: PlugZap },
   { section: "validation", label: "검증", icon: ShieldCheck },
   { section: "history", label: "게시 이력", icon: HistoryIcon },
@@ -181,6 +183,7 @@ function BotShell() {
         <Route path="faq" element={<FaqPage bot={bot} />} />
         <Route path="flows" element={<Flows bot={bot} />} />
         <Route path="flows/:flowId" element={<FlowEditor bot={bot} />} />
+        <Route path="data" element={<DataPage bot={bot} />} />
         <Route path="tools" element={<Tools bot={bot} />} />
         <Route path="validation" element={<Validation bot={bot} />} />
         <Route path="history" element={<History bot={bot} />} />

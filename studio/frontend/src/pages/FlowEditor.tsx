@@ -11,12 +11,15 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useBotActions } from "../actions";
 import { ApiError, api, type Bot, type FlowDetail, type Item, type Report, type Tool } from "../api";
 import { EXTRACTORS, ON_EXCEED } from "../copy";
+import { paramNames } from "../lib/datatypes";
 import { useFetch, useShell, useUnsavedWarning } from "../hooks";
 import { autoLayout, START_ID } from "../lib/graph";
 import {
   addNode, connect, edges as draftEdges, exits, KINDS, localProblems, removeNode, renameNode, VALID_ID, type FlowDraft, type Kind,
 } from "../lib/flowEdit";
+import type { TypesDoc, TypesResponse } from "../lib/datatypes";
 import { paths } from "../paths";
+import { AskTarget, BindingForm, cardNote, RoleDefaultField, RolesSection } from "./FlowData";
 import {
   Button, cn, Disclosure, ErrorState, Field, IconButton, Input, LoadingBlock, Notice, Select, StatusChip, Textarea, useToast,
   WordsInput,
@@ -66,7 +69,7 @@ function headline(b: Record<string, any>, tools: Map<string, Tool>): ReactNode {
   }
 }
 
-interface CardData extends Record<string, unknown> { nid: string; body: Record<string, any>; tools: Map<string, Tool>; engine: number; local: number; isStart: boolean }
+interface CardData extends Record<string, unknown> { nid: string; body: Record<string, any>; tools: Map<string, Tool>; engine: number; local: number; isStart: boolean; note: string | null }
 
 function StepCard({ data, selected }: NodeProps<Node<CardData>>) {
   if (!data.body) return null;
@@ -87,6 +90,7 @@ function StepCard({ data, selected }: NodeProps<Node<CardData>>) {
           {risky && <span className="inline-flex items-center gap-0.5 rounded bg-err-bg px-1.5 py-0.5 text-[11px] font-semibold text-err-fg"><ShieldAlert size={11} aria-hidden />되돌릴 수 없음</span>}
         </div>
         <div className="mt-2 line-clamp-3 text-[14px] font-semibold leading-snug text-ink">{headline(data.body, data.tools)}</div>
+        {data.note && <div className={cn("mt-1 text-xs", data.note.startsWith("연결 안 된") ? "font-medium text-warn-fg" : "text-ink-2")}>{data.note}</div>}
         {(data.engine > 0 || data.local > 0) && (
           <div className={cn("mt-1.5 text-xs font-medium", data.engine ? "text-err-fg" : "text-warn-fg")}>
             {data.engine ? `엔진 검사 문제 ${data.engine}개` : `확인할 곳 ${data.local}개`}
@@ -187,8 +191,9 @@ function PairsEditor({ rows, onChange, left, right }: { rows: [string, string][]
 
 const TEMPLATE_HINT = "중괄호로 감싼 이름(예: {amount})은 앞에서 받은 값으로 바뀌어요.";
 
-function NodeForm({ d, id, tools, problems, onPatch, onConnect, onRemove, onRename, onMakeStart }: {
-  d: FlowDraft; id: string; tools: Tool[]; problems: { text: string; engine: boolean }[];
+function NodeForm({ d, id, tools, doc, lang, problems, onPatch, onNode, onConnect, onRemove, onRename, onMakeStart }: {
+  d: FlowDraft; id: string; tools: Tool[]; doc: TypesDoc | null; lang: string; problems: { text: string; engine: boolean }[];
+  onNode: (body: Record<string, any>) => void;
   onPatch: (patch: Record<string, any>, drop?: string[]) => void; onConnect: (handle: string, to: string | null) => void;
   onRemove: () => void; onRename: (to: string) => void; onMakeStart: () => void;
 }) {
@@ -219,9 +224,11 @@ function NodeForm({ d, id, tools, problems, onPatch, onConnect, onRemove, onRena
       {(b.type === "ask" || b.type === "confirm") && (
         <Field label="고객에게 하는 말" hint={TEMPLATE_HINT}><Textarea rows={3} value={b.prompt ?? ""} onChange={(e) => onPatch({ prompt: e.target.value })} /></Field>
       )}
+      {b.type === "confirm" && <RoleDefaultField d={d} lang={lang} doc={doc} b={b} onPatch={onPatch} />}
       {b.type === "confirm" && <p className="rounded-lg bg-sunken px-3 py-2 text-xs text-ink-2">고객은 예/아니오로 답하거나 키패드 1, 2를 눌러요. 되돌릴 수 없는 API는 이 단계의 "예" 다음에만 부를 수 있어요.</p>}
 
-      {b.type === "ask" && (
+      {b.type === "ask" && <AskTarget d={d} doc={doc} lang={lang} b={b} onPatch={onPatch} />}
+      {b.type === "ask" && !b.role && (
         <>
           <div className="grid grid-cols-2 gap-3">
             <Field label="받은 값의 이름" hint="문장에서 {이름}으로 써요.">
@@ -238,6 +245,10 @@ function NodeForm({ d, id, tools, problems, onPatch, onConnect, onRemove, onRena
               <Input type="number" className="num w-28" value={b.length ?? ""} onChange={(e) => set("length")(e.target.value === "" ? "" : Number(e.target.value))} />
             </Field>
           )}
+        </>
+      )}
+      {b.type === "ask" && (
+        <>
           {b.extractor === "choice" && (
             <div>
               <div className="mb-1.5 text-sm font-medium text-ink">보기</div>
@@ -256,22 +267,20 @@ function NodeForm({ d, id, tools, problems, onPatch, onConnect, onRemove, onRena
       {b.type === "call" && (
         <>
           <Field label="부를 API">
-            <Select value={b.tool ?? ""} onChange={(e) => onPatch({ tool: e.target.value, args: Object.fromEntries(((tools.find((t) => t.name === e.target.value)?.body.params ?? []) as string[]).map((p) => [p, b.args?.[p] ?? `{${p}}`])) })}>
+            <Select value={b.tool ?? ""} onChange={(e) => {
+              // keep what is bound for params the new API also takes; the rest shows as "연결 안 됨"
+              const keep = new Set(paramNames(tools.find((t) => t.name === e.target.value)?.body));
+              const pick = (o: Record<string, any> | undefined) => Object.fromEntries(Object.entries(o ?? {}).filter(([p]) => keep.has(p)));
+              const args = pick(b.args), bind = pick(b.bind);
+              onPatch({ tool: e.target.value, ...(Object.keys(args).length ? { args } : {}), ...(Object.keys(bind).length ? { bind } : {}) },
+                [...(Object.keys(args).length ? [] : ["args"]), ...(Object.keys(bind).length ? [] : ["bind"])]);
+            }}>
               <option value="">고르기</option>
               {tools.map((t) => <option key={t.name} value={t.name}>{t.name}{t.body.risky ? " (되돌릴 수 없음)" : ""}</option>)}
             </Select>
           </Field>
           {tool?.body.risky && <Notice tone="warn" title="되돌릴 수 없는 API예요">예/아니오 확인 단계의 "예"에서만 이어질 수 있어요. 엔진이 게시 전에 검사해요.</Notice>}
-          {tool && (tool.body.params ?? []).length > 0 && (
-            <div className="space-y-3">
-              <div className="text-sm font-medium text-ink">넘길 값</div>
-              {(tool.body.params as string[]).map((p) => (
-                <Field key={p} label={<code className="text-[13px]">{p}</code>}>
-                  <Input className="font-mono text-[13px]" value={b.args?.[p] ?? ""} onChange={(e) => onPatch({ args: { ...(b.args ?? {}), [p]: e.target.value } })} />
-                </Field>
-              ))}
-            </div>
-          )}
+          {tool && <BindingForm d={d} id={id} tool={tool} tools={tools} doc={doc} lang={lang} onNode={onNode} />}
         </>
       )}
 
@@ -355,7 +364,10 @@ function NodeForm({ d, id, tools, problems, onPatch, onConnect, onRemove, onRena
   );
 }
 
-function FlowSettings({ bot, flowId, d, onHeader, onDeleted }: { bot: Bot; flowId: string; d: FlowDraft; onHeader: (h: Record<string, any>) => void; onDeleted: () => void }) {
+function FlowSettings({ bot, flowId, d, doc, onHeader, setDraft, onAddDefaultStep, onDeleted }: {
+  bot: Bot; flowId: string; d: FlowDraft; doc: TypesDoc | null; onHeader: (h: Record<string, any>) => void;
+  setDraft: (f: (x: FlowDraft) => FlowDraft) => void; onAddDefaultStep: (role: string) => void; onDeleted: () => void;
+}) {
   const h = d.header;
   const t = h.triggers ?? {};
   const setT = (patch: Record<string, any>) => {
@@ -364,9 +376,11 @@ function FlowSettings({ bot, flowId, d, onHeader, onDeleted }: { bot: Bot; flowI
     onHeader({ ...h, triggers: next });
   };
   const groups: string[][] = (t.all_of ?? []).map((g: any) => (Array.isArray(g) ? g : [g]));
-  const rest = Object.fromEntries(Object.entries(h).filter(([k]) => !["triggers", "buttons", "role"].includes(k)));
+  const rest = Object.fromEntries(Object.entries(h).filter(([k]) => !["triggers", "buttons", "role", "roles"].includes(k)));
   return (
     <div className="space-y-5 p-5">
+      <RolesSection bot={bot} d={d} doc={doc} setDraft={setDraft} onAddDefaultStep={onAddDefaultStep} />
+      <div className="border-t border-line" />
       {h.role === "verification" ? (
         <Notice tone="brand" title="본인 확인 시나리오예요">고객의 말로 시작하지 않고, 본인 확인이 필요한 시나리오가 부를 때 시작해요.</Notice>
       ) : (
@@ -408,7 +422,7 @@ function FlowSettings({ bot, flowId, d, onHeader, onDeleted }: { bot: Bot; flowI
 const toDraft = (f: FlowDetail["flow"]): FlowDraft => ({ start: f.start ?? null, nodes: f.nodes, order: f.node_order, header: f.header });
 const edgeColor = (h: string) => (h === "yes" || h === "ok" ? "var(--ok-fg)" : h === "no" || h === "error" ? "var(--err-fg)" : "var(--edge)");
 
-function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: Tool[] }) {
+function Editor({ bot, detail, tools, doc }: { bot: Bot; detail: FlowDetail; tools: Tool[]; doc: TypesDoc | null }) {
   const flowId = detail.flow.id;
   const rf = useReactFlow();
   const nav = useNavigate();
@@ -461,7 +475,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
       const card = (id: string): Node => ({
         id, type: "step", position: old.get(id)?.position ?? placed.current[id] ?? initialPositions[id] ?? { x: 0, y: 0 },
         measured: old.get(id)?.measured,
-        data: { nid: id, body: d.nodes[id], tools: toolMap, isStart: d.start === id,
+        data: { nid: id, body: d.nodes[id], tools: toolMap, isStart: d.start === id, note: cardNote(d.nodes[id], d.header, doc, bot.lang, toolMap),
                 engine: engineItems.filter((i) => i.node_id === id).length, local: local.filter((p) => p.node === id).length },
       });
       return [
@@ -470,7 +484,7 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
         ...d.order.filter((id) => d.nodes[id]).map(card),
       ];
     });
-  }, [d, initialPositions, toolMap, JSON.stringify(engineItems), local]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d, initialPositions, toolMap, doc, JSON.stringify(engineItems), local]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (detail.layout.viewport && detail.layout.direction === "TB") rf.setViewport(detail.layout.viewport);
@@ -501,10 +515,12 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
   const onConnect = (c: Connection) => { if (c.source && c.target && c.target !== START_ID) link(c.source, c.sourceHandle ?? "next", c.target); };
   const onReconnect = (old: Edge, c: Connection) => { if (c.target && c.target !== START_ID) link(old.source, old.sourceHandle ?? "next", c.target); };
 
-  const add = (kind: Kind) => {
+  const add = (kind: Kind, init: Record<string, any> = {}) => {
     setAdding(false);
     const after = sel && d.nodes[sel] ? sel : null;
-    const { draft, id } = addNode(d, kind, after);
+    const made = addNode(d, kind, after);
+    const id = made.id;
+    const draft = { ...made.draft, nodes: { ...made.draft.nodes, [id]: { ...made.draft.nodes[id], ...init } } };
     const anchor = after ? rfNodes.find((n) => n.id === after)?.position : null;
     const position = anchor ? { x: anchor.x + 40, y: anchor.y + 200 } : rf.screenToFlowPosition({ x: window.innerWidth / 2 - 300, y: window.innerHeight / 2 });
     placed.current[id] = position;
@@ -620,7 +636,8 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
         <div id="flow-panel" className="min-h-0 flex-1 overflow-y-auto" role="tabpanel" aria-labelledby={`tab-${tab}`}>
           {flowLevel.length > 0 && <div className="px-5 pt-5"><Notice tone="warn" title="시나리오 전체">{flowLevel.join(" ")}</Notice></div>}
           {tab === "node" && sel && d.nodes[sel] ? (
-            <NodeForm d={d} id={sel} tools={tools} problems={panelProblems}
+            <NodeForm d={d} id={sel} tools={tools} doc={doc} lang={bot.lang} problems={panelProblems}
+              onNode={(body) => setD((x) => ({ ...x, nodes: { ...x.nodes, [sel]: body } }))}
               onPatch={(patch, drop = []) => setD((x) => { const b = { ...x.nodes[sel], ...patch }; drop.forEach((k) => delete b[k]); return { ...x, nodes: { ...x.nodes, [sel]: b } }; })}
               onConnect={(h, to) => link(sel, h, to)} onRemove={() => remove(sel)} onMakeStart={() => setD((x) => ({ ...x, start: sel }))}
               onRename={(to) => { const p = rfNodes.find((n) => n.id === sel)?.position; if (p) placed.current[to] = p; setD((x) => renameNode(x, sel, to)); setSel(to); }} />
@@ -637,7 +654,8 @@ function Editor({ bot, detail, tools }: { bot: Bot; detail: FlowDetail; tools: T
               </ul>
             </div>
           ) : (
-            <FlowSettings bot={bot} flowId={flowId} d={d} onHeader={(h) => setD((x) => ({ ...x, header: h }))}
+            <FlowSettings bot={bot} flowId={flowId} d={d} doc={doc} onHeader={(h) => setD((x) => ({ ...x, header: h }))} setDraft={setD}
+              onAddDefaultStep={(role) => add("confirm", { role_default: role, prompt: d.header.roles?.[role]?.default?.ask ?? "" })}
               onDeleted={() => { refresh(); toast("시나리오를 지웠어요"); nav(paths.bot(bot.slug, "flows")); }} />
           )}
         </div>
@@ -655,9 +673,10 @@ export default function FlowEditor({ bot }: { bot: Bot }) {
   const { flowId } = useParams();
   const { data: detail, error, loading, reload } = useFetch<FlowDetail>(`/bots/${bot.slug}/flows/${flowId}`);
   const { data: tools } = useFetch<Tool[]>(`/domains/${bot.domain}/tools`);
+  const { data: types, error: typesError } = useFetch<TypesResponse>(`/domains/${bot.domain}/types`, [bot.shared_revision]);
   if (error) return <main className="p-8"><ErrorState error={error} onRetry={reload} what="시나리오" />
     <p className="mt-4"><Link className="text-sm font-medium text-brand-700" to={paths.bot(bot.slug, "flows")}>시나리오 목록으로</Link></p></main>;
-  if (loading || !detail || !tools) return <main className="p-8"><LoadingBlock rows={6} label="시나리오를 불러오는 중" /></main>;
-  return <ReactFlowProvider><Editor key={`${bot.slug}/${flowId}`} bot={bot} detail={detail} tools={tools} /></ReactFlowProvider>;
+  if (loading || !detail || !tools || (!types && !typesError)) return <main className="p-8"><LoadingBlock rows={6} label="시나리오를 불러오는 중" /></main>;
+  return <ReactFlowProvider><Editor key={`${bot.slug}/${flowId}`} bot={bot} detail={detail} tools={tools} doc={types?.body ?? null} /></ReactFlowProvider>;
 }
 

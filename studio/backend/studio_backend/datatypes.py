@@ -142,11 +142,18 @@ def references(flow_header: dict, nodes: dict, types_doc: dict | None) -> list[t
 
 
 def broken_by(old: dict | None, new: dict, flows: list[tuple[str, str, dict, dict]]) -> list[dict]:
-    """Uses in flows that a new dictionary would leave dangling: a removed type that a flow role holds, or a
-    removed field that a flow asks or binds. `flows` holds (bot slug, flow id, header, nodes)."""
+    """Uses in flows that a new dictionary would leave dangling: a removed type that a flow role holds, a removed
+    field that a flow asks or binds, or a removed session role that a step reads. `flows` holds (bot slug, flow id, header, nodes)."""
     new_types = new.get("types") or {}
+    gone_roles = set((old or {}).get("roles") or {}) - set(new.get("roles") or {})
     out = []
     for bot, fid, header, nodes in flows:
+        for nid, n in nodes.items():
+            if not isinstance(n, dict):
+                continue
+            used = {n.get("role")} | {s.get("role") for s in (n.get("bind") or {}).values() if isinstance(s, dict)}
+            for rname in sorted(r for r in used if r in gone_roles and r not in (header.get("roles") or {})):
+                out.append({"bot": bot, "flow": fid, "node": nid, "role": rname})
         for rname, r in (header.get("roles") or {}).items():
             if isinstance(r, dict) and r.get("type") not in new_types:
                 out.append({"bot": bot, "flow": fid, "role": rname, "type": r.get("type")})

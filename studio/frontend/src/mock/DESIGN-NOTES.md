@@ -118,6 +118,26 @@ Regression tests: `src/routes.test.tsx` (redirect targets, and repeated clicks o
 Open (not done here): strings are not yet in one i18n dictionary (checklist item); window.confirm dialogs keep the
 browser's OK / 취소 labels; the main chunk is over 500 kB (React Flow and dagre, a lazy split is possible).
 
+## ST4 (2026-10-29): data types, roles and binding (ADR 0014)
+
+Built to the accepted ADR before the engine's A1 commit; keys follow the ADR text and are re-checked against A1.
+
+| Screen | What the user sees | Why this shape |
+|---|---|---|
+| 데이터 (new menu, after 시나리오) | Two lists: 값의 종류 (types, each with its fields and "where it is used") and 통화 전체에서 쓰는 값 (session roles) | Shared by every language of the domain, like API 연결, and said so on the page; the type name and field names live under 개발 정보 or in a small 이름 box, the label is what is shown |
+| Type sheet | 표시 이름, 모양 (여러 값의 묶음 / 값 하나), one card per field: 표시 이름, 형식, 이름, 자릿수 only for digits, 보기 only for choice | No nesting (Q55): the field type list holds only the engine's extractors. A type in use cannot be deleted; removing a field a scenario uses asks first and names the scenario |
+| 시나리오 설정, 이 시나리오의 사람과 값 | One card per role: 표시 이름, 값의 종류, "다른 사람과 같을 수 있어요" with 누구와 같은지 and 물어볼 말 | The default question is an explicit step (P3); when it is missing the card says so and 확인 단계 추가 adds the `confirm` with `role_default` |
+| 묻기 step | 받는 값: "예약자의 이름" instead of a free slot name when the flow has roles | The format comes from the type, so the extractor select is hidden |
+| API 호출 step | One card per parameter: 어디서 가져올까요 (사람과 값 / 앞 API 결과 / 직접 넣기 / 예전 방식), then the matching second input | Values whose type does not fit are not offered; an earlier result that exists only on some paths is listed disabled with the reason; a stored binding that no longer fits shows as an error in its row |
+
+Labels (Q54) are written into the files per language; the other language's label is kept when one is edited.
+
+Review pass: design-critique found the field card too tall (length shown for every text field) and moved 자릿수 next to
+이름; ux-copy fixed particles after labels with a `josa()` helper ("방문자가 예약자와 같은지 물어요"); accessibility-review
+found that every sheet re-ran its focus trap on each render and threw the focus back to the first field while typing
+(also on the FAQ and API sheets). Fixed in `useFocusTrap`, regression test `src/ui/sheet.test.tsx`; a new field takes
+the focus.
+
 ## Skills used
 
 Mockups: `claude-mem:design-is` (audit table above) and the `dataviz` rules for the home summary tiles.
@@ -125,4 +145,4 @@ Real screens: `design:design-system` (tokens and component table, `src/ui/DESIGN
 review: kept the approved direction, removed template tells such as middle-dot meta strings and monospace ids on cards,
 and spent the one bold element on the scenario canvas, where `{slot}` placeholders are tinted inside the spoken
 sentence), then `design:design-critique`, `design:accessibility-review` and `design:ux-copy` for the review pass
-(findings below).
+(findings below). ST4 used `design:design-critique`, `design:accessibility-review` and `design:ux-copy` again on the new screens (above).

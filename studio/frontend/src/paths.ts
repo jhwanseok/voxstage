@@ -1,7 +1,7 @@
 /** Every in-app address, always absolute. Links and redirects use these and never a relative `to`: inside a splat
  *  route ("*") React Router v7 resolves a relative path against the whole URL, so `to="home"` stacked segments
  *  (/mock/api/home/home/...). `src/routes.test.tsx` holds the regression test. */
-export type BotSection = "overview" | "faq" | "flows" | "tools" | "validation" | "history";
+export type BotSection = "overview" | "faq" | "flows" | "data" | "tools" | "validation" | "history";
 
 export const paths = {
   home: () => "/",
