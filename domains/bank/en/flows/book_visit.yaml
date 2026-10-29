@@ -1,0 +1,22 @@
+# Book a branch visit (R16a, ADR 0014): the person who books and the person who visits can differ. The question "is the visitor you" is the explicit node `same_person`; a yes copies the booker's fields to the visitor.
+id: book_visit
+triggers: {all_of: [[book, reserve, make], [visit, appointment]]}
+roles:
+  booker: {type: Person, label: {en: Booker}}
+  visitor: {type: Person, default: {from: booker}, label: {en: Visitor}}
+start: ask_first
+nodes:
+  ask_first: {type: ask, role: booker, field: phone_last4, prompt: "Which phone number is the booking under? Please enter the last four digits.", next: same_person}
+  same_person: {type: confirm, role_default: visitor, prompt: "Is the person visiting the branch you?", on_yes: call, on_no: ask_second}
+  ask_second: {type: ask, role: visitor, field: phone_last4, prompt: "Please enter the last four digits of the visitor's phone number.", next: call}
+  call:
+    type: call
+    tool: book_visit
+    bind:
+      booker_phone: {role: booker, field: phone_last4}
+      visitor_phone: {role: visitor, field: phone_last4}
+    on_ok: say_done
+    on_error: say_fail
+  say_done: {type: say, text: "Your visit is booked for tomorrow at ten for the number ending in {visitor.phone_last4}. Your reference is {result.reference}.", next: done}
+  say_fail: {type: say, text: "I'm unable to book that right now. Please try again later.", next: done}
+  done: {type: end}

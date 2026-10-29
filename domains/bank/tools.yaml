@@ -46,3 +46,16 @@ tools:
         return: {verified: true}   # passes, so the C10 timeout comes after the check (R13-3)
     default:
       error: invalid_credentials
+  book_visit:
+    params: [booker_phone, visitor_phone]
+    rules: []
+    default:
+      return: {reference: BV1001}
+  get_visit:
+    requires: verified          # the caller's own booking: after the identity check (R13-1)
+    params: [account_last4]
+    rules:
+      - when: {account_last4: "4821"}
+        return: {reference: BV0420, branch: Downtown}
+    default:
+      error: not_found

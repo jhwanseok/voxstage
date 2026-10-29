@@ -8,6 +8,7 @@ without touching this loop.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional
@@ -23,6 +24,7 @@ from .faq import FaqRuleManager
 from .flows import (VERIFICATION, Flow, FlowError, Node, compile_template, gate_tools, load_flows, retry_tools,
                     risky_tools, verification_flow)
 from .matching import Matcher
+from .types import SESSION_ROLE, load_types
 from .tokenize import Tokenizer, for_lang
 
 ASK_MISSES = "ask_misses"   # consecutive unusable answers at the current ask (R3)
@@ -37,13 +39,15 @@ FORM_SAID = "form_said"     # say_when_ready items already said, per form node (
 DATE_CHOICES = "date_choices"   # the two readings of an ambiguous date, asked at the current ask (R11-2)
 GATED = "gated"             # the flow stopped at a protected call while the caller is checked (R13)
 VERIFIED = "verified"       # the caller passed the identity check; holds for the call (R13-2)
+CALLER = "caller"           # the session role: the fields the identity check proved (ADR 0014, decision B)
+CALLS = "calls"             # the data each `call` step of the running flow returned, by step id (ADR 0014)
 LOCKED = "verification_locked"   # too many failed checks: no protected call for the rest of the call (R13-2)
 FAILURES = "verify_failures"     # failed identity checks in this call
 TOOL_FAILURES = "tool_failures"  # system errors of tools in this call, after retries (R12-4)
 TIMEOUT = "timeout"              # the system error: retried, counted, unknown outcome for a risky tool (R12)
 RUNTIME = (ASK_MISSES, PARKED, ASKED, DATE_CHOICES, READBACK, CORRECTIONS, OFFER, FORM_SLOT, FORM_SAID, "result",
-           "faq_misses", GATED)   # VERIFIED, LOCKED, FAILURES and TOOL_FAILURES belong to the call, kept by `cancel`
-FRESH = {ASKED: [], FORM_SAID: {}, FORM_SLOT: None}   # what a flow that starts begins with   # meta written while talking; `cancel` clears it
+           "faq_misses", GATED, CALLS)   # VERIFIED, LOCKED, FAILURES and TOOL_FAILURES belong to the call, kept by `cancel`
+FRESH = {ASKED: [], FORM_SAID: {}, FORM_SLOT: None, CALLS: {}}   # what a flow that starts begins with   # meta written while talking; `cancel` clears it
 MAX_NODES_PER_TURN = 100   # a safety net; load-time validation already rules out loops that never wait
 
 
@@ -73,7 +77,14 @@ class Run:
     trace: dict = field(default_factory=dict)
 
     def env(self) -> dict:
-        return {**self.slots, "slots": self.slots, "customer": self.meta.get("customer", {}),
+        roles: dict = {}
+        for key, value in self.slots.items():   # `visitor.name` is the field `name` of the role `visitor` (ADR 0014)
+            if "." in key:
+                role, fld = key.split(".", 1)
+                roles.setdefault(role, {})[fld] = value
+        if self.meta.get(CALLER):
+            roles[SESSION_ROLE] = self.meta[CALLER]
+        return {**self.slots, **roles, "slots": self.slots, "customer": self.meta.get("customer", {}),
                 "policy": self.meta.get("policy", {}), "result": self.meta.get("result", {}),
                 "_lang": self.manager.pack.lang}
 
@@ -145,17 +156,36 @@ def run_confirm(run: Run, node: Node):
     return Wait(node.id)
 
 
+def call_args(run: Run, node: Node) -> dict:
+    """The arguments of a call: templates of `args`, and the sources of `bind` (ADR 0014). A source with no value
+    yet is a missing attribute, like a template field with none (R4-2)."""
+    env = run.env()
+    args = {k: t.render(env) for k, t in node.data["args"].items()}
+    for param, (kind, a, b) in node.data["bind"].items():
+        if kind == "const":
+            args[param] = a
+            continue
+        source = env.get(a) if kind == "role" else (run.meta.get(CALLS) or {}).get(a)
+        if not isinstance(source, dict) or b not in source:
+            raise MissingAttribute(f"`{a}.{b}` has no value yet")
+        args[param] = str(source[b])
+    return args
+
+
 @handler("call")
 def run_call(run: Run, node: Node):
     manager, tool = run.manager, node.data["tool"]
     if tool in manager.protected and not run.meta.get(VERIFIED):   # not before the check, in any flow (R13-1)
         return manager.gate(run, node)
-    args = {k: t.render(run.env()) for k, t in node.data["args"].items()}
+    args = call_args(run, node)
     result = manager.call_tool(run, tool, args)
     run.meta["result"] = dict(result.data) if result.ok else {"error": result.error}
+    if result.ok:
+        run.meta[CALLS] = {**(run.meta.get(CALLS) or {}), node.id: dict(result.data)}
     if tool == manager.verifier and run.flow.role == VERIFICATION:
         if result.ok:
             run.meta[VERIFIED] = True
+            run.meta[CALLER] = {f: args[f] for f in manager.caller_fields if f in args}
         elif result.error != TIMEOUT:   # a system error says nothing about the caller (R12)
             locked = manager.failed_check(run, node)
             if locked is not None:
@@ -271,8 +301,11 @@ class FlowManager(DialogueManager):
     name = "flows"
 
     def __init__(self, pack: DomainPack, tools: ToolExecutor, flows: Optional[dict] = None,
-                 tokenizer: Optional[Tokenizer] = None, faq: Optional[FaqRuleManager] = None):
-        self.pack, self.tools = pack, tools
+                 tokenizer: Optional[Tokenizer] = None, faq: Optional[FaqRuleManager] = None, types=None):
+        self.pack, self.tools, self.types = pack, tools, types
+        # the fields of the session role `caller` that the identity check fills (ADR 0014, decision B)
+        self.caller_fields = (tuple(types.fields_of(types.session_roles[SESSION_ROLE]))
+                              if types and SESSION_ROLE in types.session_roles else ())
         self.tok = tokenizer or for_lang(pack.lang)
         self.flows = flows if flows is not None else (pack.flows or {})
         for flow in self.flows.values():
@@ -500,10 +533,17 @@ class FlowManager(DialogueManager):
                 return self._take_other_slots(flow, state, changed)
         answer = self.confirm_answer(turn_input)
         run = Run(self, flow, dict(state.slots), {**state.meta}, trace={"flow": flow.id, "confirm": answer})
+        role = node.data["role_default"]
         if answer == "yes":
+            if role:   # the same person: copy the source role's fields (ADR 0014)
+                source = {r: d for r, _, d in flow.roles}[role]
+                run.slots.update({f"{role}.{k.split('.', 1)[1]}": v for k, v in state.slots.items()
+                                  if k.startswith(source + ".")})
+                run.trace["role_default"] = {"role": role, "from": source}
             return self._run(run, state, node.data["on_yes"])
         if answer == "no":   # the risky tool is not called
-            run.out.append(self.pack.wording.get("confirm.declined", "All right, I have not done it."))
+            if not role:
+                run.out.append(self.pack.wording.get("confirm.declined", "All right, I have not done it."))
             return self._run(run, state, node.data["on_no"])
         return self._unusable(flow, node, state, run, False)
 
@@ -775,8 +815,10 @@ class FlowManager(DialogueManager):
 
 def build_manager(domains_dir: str, domain: str, lang: str, tools: ToolExecutor) -> FlowManager:
     pack = DomainPack.load(domains_dir, domain, lang)
-    flows = load_flows(f"{pack.base_dir}/flows", pack.tools_path, pack.sensitive_slots, pack.notices)
-    return FlowManager(pack, tools, flows)
+    types_path = os.path.join(domains_dir, domain, "types.yaml")
+    types = load_types(types_path) if os.path.exists(types_path) else None
+    flows = load_flows(f"{pack.base_dir}/flows", pack.tools_path, pack.sensitive_slots, pack.notices, types)
+    return FlowManager(pack, tools, flows, types=types)
 
 
 def default_factory(ctx):

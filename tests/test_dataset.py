@@ -128,7 +128,7 @@ class ShippedDataTest(unittest.TestCase):
             self.assertEqual(counts[("bank", "C00")], 8, lang)
             self.assertEqual(counts[("bank", "C08")], 2, lang)
             self.assertEqual(counts[("telecom", "C01")], 1, lang)
-            self.assertEqual(sum(counts.values()), 3 * (8 + 16) + 8, lang)  # 24 cases per domain, 8 interaction cases (C13, R15)
+            self.assertEqual(sum(counts.values()), 3 * (8 + 16) + 8 + 5, lang)  # 24 cases per domain, 8 interaction cases (C13, R15), 5 role cases (C14, R16a)
             self.assertIn("C05", dataset.format_coverage(counts))
 
 

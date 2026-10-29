@@ -1,0 +1,24 @@
+id: bank.C14.001
+lang: ko
+domain: bank
+capability: C14
+title: "예약하는 분과 방문하는 분이 다르면 API에는 방문자의 번호가 간다"
+tags: [roles, binding]
+turns:
+  - user: {kind: utterance, text: 영업점 방문 예약을 하고 싶어요}
+    expect:
+      flow: book_visit
+      reply_contains_any: [휴대폰]
+  - user: {kind: dtmf, digits: "5580"}
+    expect:
+      slots: {booker.phone_last4: "5580"}
+      reply_contains_any: [본인]
+  - user: {kind: utterance, text: 아니요}
+    expect:
+      tool_calls: []
+      reply_contains_any: [방문하실 분]
+  - user: {kind: dtmf, digits: "7310"}
+    expect:
+      tool_calls:
+        - {name: book_visit, args: {booker_phone: "5580", visitor_phone: "7310"}}
+      reply_contains: ["7310", BV1001]

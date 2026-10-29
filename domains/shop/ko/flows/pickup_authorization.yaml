@@ -1,0 +1,22 @@
+# 다른 분이 주문을 수령 (R16a, ADR 0014): 주문자와 수령인은 같은 타입의 두 가지 쓰임이다.
+id: pickup_authorization
+triggers: {all_of: [[수령], [대신, 다른, 친구]]}
+roles:
+  orderer: {type: Person, label: {ko: 주문자}}
+  picker: {type: Person, default: {from: orderer}, label: {ko: 수령인}}
+start: ask_first
+nodes:
+  ask_first: {type: ask, role: orderer, field: phone_last4, prompt: "주문하신 휴대폰 번호 끝 네 자리를 눌러 주세요.", next: same_person}
+  same_person: {type: confirm, role_default: picker, prompt: "직접 수령하실 건가요?", on_yes: call, on_no: ask_second}
+  ask_second: {type: ask, role: picker, field: phone_last4, prompt: "수령하실 분의 휴대폰 번호 끝 네 자리를 눌러 주세요.", next: call}
+  call:
+    type: call
+    tool: authorize_pickup
+    bind:
+      orderer_phone: {role: orderer, field: phone_last4}
+      picker_phone: {role: picker, field: phone_last4}
+    on_ok: say_done
+    on_error: say_fail
+  say_done: {type: say, text: "끝자리 {picker.phone_last4} 번호의 분이 주문을 수령하실 수 있습니다. 접수 번호는 {result.reference}입니다.", next: done}
+  say_fail: {type: say, text: "지금은 설정할 수 없습니다. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

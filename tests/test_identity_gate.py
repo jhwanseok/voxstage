@@ -44,7 +44,7 @@ class ToolKeysTest(unittest.TestCase):
 
     def test_the_domains(self):
         found = {d: gate_tools(os.path.join(ROOT, d, "tools.yaml")) for d in ("bank", "shop", "telecom")}
-        self.assertEqual(found, {"bank": (frozenset({"get_balance"}), "verify_identity"),
+        self.assertEqual(found, {"bank": (frozenset({"get_balance", "get_visit"}), "verify_identity"),
                                  "shop": (frozenset({"get_order_status"}), "verify_identity"),
                                  "telecom": (frozenset({"get_bill"}), "verify_identity")})
 

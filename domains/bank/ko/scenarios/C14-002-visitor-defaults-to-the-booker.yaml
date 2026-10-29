@@ -1,0 +1,19 @@
+id: bank.C14.002
+lang: ko
+domain: bank
+capability: C14
+title: "방문하실 분이 본인이라고 답하면 방문자가 예약자가 되고 방문자 번호는 묻지 않는다"
+tags: [roles, binding]
+turns:
+  - user: {kind: utterance, text: 영업점 방문 예약을 하고 싶어요}
+    expect:
+      flow: book_visit
+      reply_contains_any: [휴대폰]
+  - user: {kind: dtmf, digits: "5580"}
+    expect:
+      reply_contains_any: [본인]
+  - user: {kind: utterance, text: 네}
+    expect:
+      tool_calls:
+        - {name: book_visit, args: {booker_phone: "5580", visitor_phone: "5580"}}
+      reply_contains: ["5580", BV1001]

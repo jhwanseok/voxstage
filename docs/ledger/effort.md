@@ -106,3 +106,9 @@ One row per domain and language each time a step is measured. Every rule counts 
 | R15 | e87db02 | shop | ko | 130 | 56 | 8 | 0 | 1355 | 229 | 45 | 487 |
 | R15 | e87db02 | telecom | en | 102 | 50 | 8 | 0 | 1355 | 229 | 50 | 487 |
 | R15 | e87db02 | telecom | ko | 102 | 50 | 8 | 0 | 1355 | 229 | 49 | 487 |
+| R16a | d34936c | bank | en | 123 | 52 | 8 | 0 | 1483 | 308 | 45 | 487 |
+| R16a | d34936c | bank | ko | 123 | 52 | 8 | 0 | 1483 | 308 | 44 | 487 |
+| R16a | d34936c | shop | en | 151 | 63 | 8 | 0 | 1483 | 308 | 47 | 487 |
+| R16a | d34936c | shop | ko | 151 | 63 | 8 | 0 | 1483 | 308 | 46 | 487 |
+| R16a | d34936c | telecom | en | 123 | 57 | 8 | 0 | 1483 | 308 | 51 | 487 |
+| R16a | d34936c | telecom | ko | 123 | 57 | 8 | 0 | 1483 | 308 | 50 | 487 |

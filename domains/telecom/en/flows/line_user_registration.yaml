@@ -1,0 +1,22 @@
+# Register a family member as a line user (R16a, ADR 0014): the account holder and the user are two uses of one type.
+id: line_user_registration
+triggers: {all_of: [[register, add], [family, member]]}
+roles:
+  holder: {type: Person, label: {en: Account holder}}
+  user: {type: Person, default: {from: holder}, label: {en: Line user}}
+start: ask_first
+nodes:
+  ask_first: {type: ask, role: holder, field: phone_last4, prompt: "Which phone number is the account under? Please enter the last four digits.", next: same_person}
+  same_person: {type: confirm, role_default: user, prompt: "Will the line be used by you?", on_yes: call, on_no: ask_second}
+  ask_second: {type: ask, role: user, field: phone_last4, prompt: "Please enter the last four digits of the phone number of the person who will use the line.", next: call}
+  call:
+    type: call
+    tool: register_line_user
+    bind:
+      holder_phone: {role: holder, field: phone_last4}
+      user_phone: {role: user, field: phone_last4}
+    on_ok: say_done
+    on_error: say_fail
+  say_done: {type: say, text: "The number ending in {user.phone_last4} is registered as the line user. Your reference is {result.reference}.", next: done}
+  say_fail: {type: say, text: "I'm unable to register that right now. Please try again later.", next: done}
+  done: {type: end}

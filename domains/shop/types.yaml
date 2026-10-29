@@ -1,0 +1,7 @@
+# People the shop flows collect (ADR 0014, R16a). Language-neutral; `label` is the display name per language.
+# People are told apart by the last four digits of their phone number, which the keypad can carry in both languages.
+types:
+  Person:
+    label: {en: Person, ko: 사람}
+    fields:
+      phone_last4: {type: digits, length: 4, label: {en: Last four digits of the phone number, ko: 휴대폰 번호 끝 네 자리}}

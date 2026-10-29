@@ -1,0 +1,21 @@
+id: bank.C14.003
+lang: en
+domain: bank
+capability: C14
+title: "The account proved by the identity check is used for the lookup; the caller is not asked for it again"
+tags: [roles, binding, verification]
+turns:
+  - user: {kind: utterance, text: When is my branch visit}
+    expect:
+      flow: identity_check
+      tool_calls: []
+      reply_contains_any: [account, digits]
+  - user: {kind: dtmf, digits: "4821"}
+    expect:
+      reply_contains_any: [PIN]
+  - user: {kind: dtmf, digits: "2468"}
+    expect:
+      tool_calls:
+        - {name: verify_identity, args: {account_last4: "4821", pin: "2468"}}
+        - {name: get_visit, args: {account_last4: "4821"}}
+      reply_contains: [Downtown, BV0420]

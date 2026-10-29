@@ -60,3 +60,8 @@ tools:
         return: {verified: true}   # passes, so the C10 timeout comes after the check (R13-3)
     default:
       error: invalid_credentials
+  authorize_pickup:
+    params: [orderer_phone, picker_phone]
+    rules: []
+    default:
+      return: {reference: PK2001}

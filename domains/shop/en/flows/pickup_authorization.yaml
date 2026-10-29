@@ -1,0 +1,22 @@
+# Someone else picks up the order (R16a, ADR 0014): the orderer and the picker are two uses of one type.
+id: pickup_authorization
+triggers: {all_of: [[friend, relative], [pick, collect]]}
+roles:
+  orderer: {type: Person, label: {en: Orderer}}
+  picker: {type: Person, default: {from: orderer}, label: {en: Picker}}
+start: ask_first
+nodes:
+  ask_first: {type: ask, role: orderer, field: phone_last4, prompt: "Which phone number is the order under? Please enter the last four digits.", next: same_person}
+  same_person: {type: confirm, role_default: picker, prompt: "Will you pick the order up yourself?", on_yes: call, on_no: ask_second}
+  ask_second: {type: ask, role: picker, field: phone_last4, prompt: "Please enter the last four digits of the phone number of the person picking it up.", next: call}
+  call:
+    type: call
+    tool: authorize_pickup
+    bind:
+      orderer_phone: {role: orderer, field: phone_last4}
+      picker_phone: {role: picker, field: phone_last4}
+    on_ok: say_done
+    on_error: say_fail
+  say_done: {type: say, text: "The person with the number ending in {picker.phone_last4} may pick up the order. Your reference is {result.reference}.", next: done}
+  say_fail: {type: say, text: "I'm unable to set that up right now. Please try again later.", next: done}
+  done: {type: end}

@@ -1,0 +1,22 @@
+# 영업점 방문 예약 (R16a, ADR 0014): 예약하는 분과 방문하는 분이 다를 수 있다. "방문자가 본인인지" 묻는 것은 명시 노드 `same_person`이고, 예라고 하면 예약자의 값이 방문자에게 복사된다.
+id: book_visit
+triggers: {all_of: [[예약], [방문, 지점, 영업점]]}
+roles:
+  booker: {type: Person, label: {ko: 예약자}}
+  visitor: {type: Person, default: {from: booker}, label: {ko: 방문자}}
+start: ask_first
+nodes:
+  ask_first: {type: ask, role: booker, field: phone_last4, prompt: "예약하실 휴대폰 번호 끝 네 자리를 눌러 주세요.", next: same_person}
+  same_person: {type: confirm, role_default: visitor, prompt: "방문하실 분이 본인이신가요?", on_yes: call, on_no: ask_second}
+  ask_second: {type: ask, role: visitor, field: phone_last4, prompt: "방문하실 분의 휴대폰 번호 끝 네 자리를 눌러 주세요.", next: call}
+  call:
+    type: call
+    tool: book_visit
+    bind:
+      booker_phone: {role: booker, field: phone_last4}
+      visitor_phone: {role: visitor, field: phone_last4}
+    on_ok: say_done
+    on_error: say_fail
+  say_done: {type: say, text: "내일 오전 열 시로 방문 예약이 되었습니다. 방문하실 번호는 끝자리 {visitor.phone_last4}입니다. 예약 번호는 {result.reference}입니다.", next: done}
+  say_fail: {type: say, text: "지금은 예약을 할 수 없습니다. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

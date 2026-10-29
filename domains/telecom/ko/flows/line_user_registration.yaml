@@ -1,0 +1,22 @@
+# 가족을 회선 사용자로 등록 (R16a, ADR 0014): 명의자와 사용자는 같은 타입의 두 가지 쓰임이다.
+id: line_user_registration
+triggers: {all_of: [[등록, 추가], [가족]]}
+roles:
+  holder: {type: Person, label: {ko: 명의자}}
+  user: {type: Person, default: {from: holder}, label: {ko: 회선 사용자}}
+start: ask_first
+nodes:
+  ask_first: {type: ask, role: holder, field: phone_last4, prompt: "명의자의 휴대폰 번호 끝 네 자리를 눌러 주세요.", next: same_person}
+  same_person: {type: confirm, role_default: user, prompt: "본인이 사용하실 회선인가요?", on_yes: call, on_no: ask_second}
+  ask_second: {type: ask, role: user, field: phone_last4, prompt: "회선을 사용하실 분의 휴대폰 번호 끝 네 자리를 눌러 주세요.", next: call}
+  call:
+    type: call
+    tool: register_line_user
+    bind:
+      holder_phone: {role: holder, field: phone_last4}
+      user_phone: {role: user, field: phone_last4}
+    on_ok: say_done
+    on_error: say_fail
+  say_done: {type: say, text: "끝자리 {user.phone_last4} 번호가 회선 사용자로 등록되었습니다. 접수 번호는 {result.reference}입니다.", next: done}
+  say_fail: {type: say, text: "지금은 등록할 수 없습니다. 잠시 후 다시 시도해 주세요.", next: done}
+  done: {type: end}

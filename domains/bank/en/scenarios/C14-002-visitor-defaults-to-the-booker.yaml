@@ -1,0 +1,19 @@
+id: bank.C14.002
+lang: en
+domain: bank
+capability: C14
+title: "A yes to 'is the visitor you' makes the visitor the booker, and the visitor's number is not asked"
+tags: [roles, binding]
+turns:
+  - user: {kind: utterance, text: I'd like to book a branch visit}
+    expect:
+      flow: book_visit
+      reply_contains_any: [phone]
+  - user: {kind: dtmf, digits: "5580"}
+    expect:
+      reply_contains_any: [you]
+  - user: {kind: utterance, text: "Yes"}
+    expect:
+      tool_calls:
+        - {name: book_visit, args: {booker_phone: "5580", visitor_phone: "5580"}}
+      reply_contains: ["5580", BV1001]

@@ -37,6 +37,7 @@ CAPABILITIES = {
     "C11": "Block information before identity check",
     "C12": "Policy-change impact",
     "C13": "Interaction of two features",
+    "C14": "Roles and typed API binding",
 }
 
 INPUT_KINDS = {

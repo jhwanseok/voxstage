@@ -1,0 +1,24 @@
+id: shop.C14.001
+lang: en
+domain: shop
+capability: C14
+title: "The person who picks up the order is not the orderer: the picker's number goes to the API"
+tags: [roles, binding]
+turns:
+  - user: {kind: utterance, text: A friend will collect my order}
+    expect:
+      flow: pickup_authorization
+      reply_contains_any: [phone]
+  - user: {kind: dtmf, digits: "5580"}
+    expect:
+      slots: {orderer.phone_last4: "5580"}
+      reply_contains_any: [yourself]
+  - user: {kind: utterance, text: "No"}
+    expect:
+      tool_calls: []
+      reply_contains_any: [picking]
+  - user: {kind: dtmf, digits: "7310"}
+    expect:
+      tool_calls:
+        - {name: authorize_pickup, args: {orderer_phone: "5580", picker_phone: "7310"}}
+      reply_contains: ["7310", PK2001]
