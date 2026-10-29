@@ -264,5 +264,15 @@ bot; `409 {reason: "exists" | "in_repo"}`, `422` for a bad ID, language, copy so
 Built as above. Checked on 5710: 새 업종 병원 예약 (`clinic`) in Korean as an empty bot, 검증 passed and 대화로 테스트 answered
 with `flow.no_flow`; after one question and one scenario were added, the English bot was made as a copy (Korean disabled, the
 hand-off number taken from the sibling), 개요 listed 번역할 곳 2개, the FAQ list opened on 번역할 질문, and saving the
-translated question took it off. Not done: a bot cannot be deleted yet, and fixed notices to translate cannot be edited on
+translated question took it off. Not done: fixed notices to translate cannot be edited on
 screen until the ST3 안내 문구 screen exists (the card says so).
+
+### 상담봇 삭제 (owner request, 2026-10-30)
+
+At the bottom of 개요, a 상담봇 삭제 band (red outline, out of the way of the form). The dialog lists what goes, from
+`GET /bots/<b>/delete-impact`: the FAQ and scenario counts with the defaults, the publications and the files the engine
+read (`studio/exports/<bot>/`), and, when it is the domain's last bot, the domain itself with its API 연결 and 속성 종류.
+삭제 stays disabled until the bot's name is typed, because nothing can be undone (a repository domain can be imported
+again). Then the home page and a toast. A copy whose source is deleted keeps working; its 번역할 곳 card keeps the
+source's language name. Checked on 5710: the English 병원 bot, then the Korean one, which took `clinic` with it.
+

@@ -172,6 +172,23 @@ def create_bot(body: NewBotIn, session: Session = Depends(get_session), user: Us
     return one_bot(bot.slug, session)
 
 
+@app.get(f"{API}/bots/{{b}}/delete-impact")
+def bot_delete_impact(b: str, session: Session = Depends(get_session)):
+    return bots.delete_impact(session, get_bot(session, b))
+
+
+@app.delete(f"{API}/bots/{{b}}")
+def delete_bot(b: str, session: Session = Depends(get_session), user: User = Depends(require_role("admin"))):
+    """The bot, its draft, layout and publications, its export directory and its test conversations; the domain
+    too when this was its last bot. Cannot be undone (a repository domain can be imported again)."""
+    bot = get_bot(session, b)
+    out = bots.delete_bot(session, bot)
+    session.commit()
+    chat.end_bot(b)
+    service.remove_export_dir(b)
+    return out
+
+
 class TranslateIn(BaseModel):
     faq: list[str] = Field(default_factory=list)
     flows: list[str] = Field(default_factory=list)

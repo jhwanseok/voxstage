@@ -144,3 +144,8 @@ def flow_graph(flow) -> dict:
         for handle, label, target in _edges(n, flow.nodes[n] or {}):
             edges.append({"id": f"{n}:{handle}", "from": n, "to": target, "label": label, "handle": handle})
     return {"start": flow.start, "nodes": nodes, "edges": edges}
+
+
+def remove_export_dir(bot_slug: str) -> None:
+    """A deleted bot's `studio/exports/<bot>/` goes too, so the engine cannot load a bot the studio no longer has."""
+    shutil.rmtree(os.path.join(export_root(), bot_slug), ignore_errors=True)

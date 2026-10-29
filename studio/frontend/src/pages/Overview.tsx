@@ -1,11 +1,11 @@
-import { BookOpenText, GitBranch, Languages, PlugZap } from "lucide-react";
+import { BookOpenText, GitBranch, Languages, PlugZap, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError, api, type Bot, type BotDetail, type BotSettings, type EngineSettings, type OnExceed, type ToTranslate } from "../api";
 import { botName, domainName, langName, ON_EXCEED } from "../copy";
 import { useFetch, useShell, useUnsavedWarning } from "../hooks";
 import { paths } from "../paths";
-import { Button, cn, ErrorState, Field, Input, LoadingBlock, Notice, PageHeader, Select, StatusChip, useToast } from "../ui";
+import { Button, cn, Dialog, ErrorState, eul, Field, Input, LoadingBlock, Notice, PageHeader, Select, StatusChip, useToast } from "../ui";
 
 /** What to do next, from the bot status, with the one button that does it. */
 function NextStep({ bot }: { bot: Bot }) {
@@ -58,6 +58,50 @@ function Translate({ bot, left, onDone }: { bot: Bot; left: ToTranslate; onDone:
         {left.notices.length > 0 && <li className="text-ink-2">고정 안내 {left.notices.length}개: 아직 스튜디오에서 고칠 수 없어요</li>}
       </ul>
     </Notice>
+  );
+}
+
+interface Impact { faq: number; flows: number; publications: number; last_of_domain: boolean; domain_tools: number }
+
+/** Deleting cannot be undone, so the dialog says what goes and asks for the bot's name. */
+export function DeleteBot({ bot, name, onClose }: { bot: Bot; name: string; onClose: () => void }) {
+  const { refresh } = useShell();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const { data: impact } = useFetch<Impact>(`/bots/${bot.slug}/delete-impact`);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const business = domainName(bot.domain, bot.domain_title);
+  const remove = async () => {
+    setBusy(true); setError("");
+    try {
+      await api.del(`/bots/${bot.slug}`);
+      toast(`${eul(name)} 삭제했어요`);
+      refresh();
+      navigate(paths.home());
+    } catch (e) { setError((e as Error).message); setBusy(false); }
+  };
+  return (
+    <Dialog open onClose={onClose} title="상담봇을 삭제할까요?"
+      footer={<>
+        <Button onClick={onClose}>취소</Button>
+        <Button variant="danger" icon={<Trash2 size={15} />} loading={busy} disabled={typed.trim() !== name || !impact} onClick={remove}>삭제</Button>
+      </>}>
+      <p className="text-sm text-ink-2">삭제하면 되돌릴 수 없어요. 아래 내용이 함께 사라져요.</p>
+      {impact ? (
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink-2">
+          <li>질문 <b className="num">{impact.faq}</b>개, 시나리오 <b className="num">{impact.flows}</b>개와 기본 설정</li>
+          <li>게시 이력 <b className="num">{impact.publications}</b>개와 엔진이 읽던 게시 파일</li>
+          {impact.last_of_domain && <li>{business}의 마지막 상담봇이라 업종도 함께 지워요. API 연결 <b className="num">{impact.domain_tools}</b>개와 속성 종류도 사라져요.</li>}
+        </ul>
+      ) : <LoadingBlock rows={2} label="삭제할 내용을 확인하는 중" />}
+      <div className="mt-5">
+        <Field label={`확인을 위해 ${eul(name)} 그대로 입력해 주세요`} error={error || null}>
+          <Input data-autofocus value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
+        </Field>
+      </div>
+    </Dialog>
   );
 }
 
@@ -217,6 +261,7 @@ export default function Overview({ bot }: { bot: Bot }) {
   const { version } = useShell();
   const { data: detail, reload: reloadDetail } = useFetch<BotDetail>(`/bots/${bot.slug}`, [version]);
   const empty = detail ? detail.counts.faq === 0 && detail.counts.flows === 0 : false;
+  const [deleting, setDeleting] = useState(false);
   const { data: settings, error, loading, reload, setData } = useFetch<BotSettings>(`/bots/${bot.slug}/settings`);
   const counts = detail?.counts;
   // imported bots are titled "bank (ko)"; the form shows the readable name, so a first save stores it
@@ -246,6 +291,14 @@ export default function Overview({ bot }: { bot: Bot }) {
       {error && <ErrorState error={error} onRetry={reload} what="기본 설정" />}
       {loading && <LoadingBlock rows={6} label="기본 설정을 불러오는 중" />}
       {initial && <SettingsForm bot={bot} initial={initial} onSaved={(x) => setData(x)} />}
+      <section aria-labelledby="danger" className="mt-8 flex flex-wrap items-center gap-4 rounded-2xl border border-err-line bg-surface px-6 py-5">
+        <div className="min-w-0 flex-1">
+          <h2 id="danger" className="text-[15px] font-semibold text-ink">상담봇 삭제</h2>
+          <p className="mt-0.5 text-[13px] text-muted">이 상담봇의 질문, 시나리오, 게시 이력을 모두 지워요. 되돌릴 수 없어요.</p>
+        </div>
+        <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setDeleting(true)}>삭제</Button>
+      </section>
+      {deleting && <DeleteBot bot={bot} name={botName(bot)} onClose={() => setDeleting(false)} />}
     </main>
   );
 }

@@ -108,6 +108,14 @@ def end(sid: str) -> None:
         _drop(s)
 
 
+def end_bot(bot_slug: str) -> None:
+    """Every test conversation of a bot, when the bot is deleted."""
+    with _LOCK:
+        gone = [_SESSIONS.pop(k) for k, s in list(_SESSIONS.items()) if s.bot == bot_slug]
+    for s in gone:
+        _drop(s)
+
+
 def _plain(v):
     """JSON-safe copy of engine data (tuples, dates and dataclasses become lists and text)."""
     return json.loads(json.dumps(v, ensure_ascii=False, default=str))

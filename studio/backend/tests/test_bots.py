@@ -134,3 +134,38 @@ def test_copy_of_a_real_bot_validates_and_keeps_fixed_notices_to_translate(clien
     assert b["translate"]["notices"] == ["time_deposit_early_close"] and len(b["translate"]["flows"]) == 11
     rep = client.post(f"{A}/bots/bank-en/validate").json()
     assert rep["ok"], rep["items"]
+
+
+def test_delete_a_bot_and_the_domain_with_its_last_bot(client, tmp_path):
+    assert new_clinic(client).status_code == 201
+    assert new_clinic(client, "en", start="copy", copy_from="clinic-ko").status_code == 201
+    assert client.post(f"{A}/bots/clinic-ko/publications", json={"note": "v1"}).status_code == 201
+    assert (tmp_path / "exports" / "clinic-ko").is_dir()
+    chat = client.post(f"{A}/bots/clinic-ko/chat", json={}).json()["id"]
+    assert client.get(f"{A}/bots/clinic-ko/delete-impact").json() ==         {"faq": 0, "flows": 0, "publications": 1, "last_of_domain": False, "domain_tools": 0}
+
+    r = client.delete(f"{A}/bots/clinic-ko")
+    assert r.status_code == 200 and r.json() == {"deleted": "clinic-ko", "domain_deleted": None}
+    assert client.get(f"{A}/bots/clinic-ko").status_code == 404
+    assert not (tmp_path / "exports" / "clinic-ko").exists()
+    assert client.post(f"{A}/bots/clinic-ko/chat/{chat}/turns", json={"text": "hi"}).status_code == 404
+    # the copy keeps working; its source is gone
+    assert client.get(f"{A}/bots/clinic-en").json()["copied_from"] == "clinic-ko"
+    assert client.get(f"{A}/bots/clinic-en/delete-impact").json()["last_of_domain"] is True
+
+    r = client.delete(f"{A}/bots/clinic-en")
+    assert r.json() == {"deleted": "clinic-en", "domain_deleted": "clinic"}
+    assert client.get(f"{A}/domains/clinic").status_code == 404
+    assert new_clinic(client).status_code == 201          # the id is free again
+    assert client.delete(f"{A}/bots/nope").status_code == 404
+
+
+def test_deleting_an_imported_domain_lets_it_be_imported_again(client):
+    assert client.post(f"{A}/domains/import", json={"domain": "bank"}).status_code == 201
+    assert client.delete(f"{A}/bots/bank-en").status_code == 200
+    assert client.delete(f"{A}/bots/bank-ko").json()["domain_deleted"] == "bank"
+    from studio_backend.db import session_scope
+    from studio_backend.models import Tool
+    with session_scope() as s:
+        assert s.query(Tool).count() == 0
+    assert client.post(f"{A}/domains/import", json={"domain": "bank"}).status_code == 201

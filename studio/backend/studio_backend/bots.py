@@ -1,4 +1,4 @@
-"""New bots: empty (language starter only) or a copy of a sibling of the same domain in another language.
+"""New and deleted bots. New ones are empty (language starter only) or a copy of a sibling of the same domain in another language.
 
 Design: `studio/frontend/src/mock/DESIGN-NOTES.md`, "새 상담봇 만들기". Every new bot gets the language starter
 (`starters/<lang>/`: situation wording and the confirm, command, correction and confusion words), because the engine's
@@ -17,7 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import settings, yamlio
-from .models import Bot, Domain, DomainFile, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout
+from .models import (Bot, Domain, DomainFile, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
+                     Tool)
 from .portable import BOT_SETTINGS
 
 STARTERS = pathlib.Path(__file__).resolve().parent / "starters"
@@ -183,3 +184,30 @@ def set_to_translate(bot: Bot, left: dict) -> None:
 
 def repo_folders(root: str) -> list[str]:
     return sorted(d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d))) if os.path.isdir(root) else []
+
+
+# --- delete ---
+
+def delete_impact(session: Session, bot: Bot) -> dict:
+    """What a delete removes, for the confirm dialog: the bot's content and history, and the domain when it is the
+    domain's last bot (its API 연결 and 속성 종류 go with it)."""
+    dom = session.get(Domain, bot.domain_id)
+    last = len(dom.bots) == 1
+    count = lambda model, col, v: session.query(model).filter(col == v).count()
+    return {"faq": count(FaqEntry, FaqEntry.bot_id, bot.id), "flows": count(Flow, Flow.bot_id, bot.id),
+            "publications": count(Publication, Publication.bot_id, bot.id), "last_of_domain": last,
+            "domain_tools": count(Tool, Tool.domain_id, dom.id) if last else 0}
+
+
+def delete_bot(session: Session, bot: Bot) -> dict:
+    """Content, layout and publications go by the foreign keys' `on delete cascade`; the domain goes with its last bot."""
+    dom = session.get(Domain, bot.domain_id)
+    out = {"deleted": bot.slug, "domain_deleted": None}
+    session.delete(bot)
+    session.flush()
+    session.refresh(dom)
+    if not dom.bots:
+        out["domain_deleted"] = dom.slug
+        session.delete(dom)
+    session.flush()
+    return out
