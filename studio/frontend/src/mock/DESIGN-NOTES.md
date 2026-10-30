@@ -199,6 +199,36 @@ page instead (design-critique); the panel is a labelled `aside`, replies are ann
 the input keeps the focus after each turn (accessibility-review). Not done: a voice mode, a customer-data form in 시작 조건
 (only 기준 시각; 정책값 come from 개요), and showing the panel's current step on the canvas.
 
+## ST4 A2 (2026-10-30): typed API params, response items and the call check (ADR 0014 A2, engine R16b)
+
+Engine side, read only (`voxstage/tools.py`, `voxstage/rules/flows.py`, `docs/plan/specs/R16b-api-types-and-flow-check.md`):
+`params` is the old list of names or a map `name: {type, length, choices, required}` (a bare type name is allowed);
+`returns` maps a response item to its type (`boolean` allowed); a fake API rule's `when` and `return` may name only
+declared items, with values of the declared type; the flow check reports `{code, node, parameter, role, field, path}` for
+`unbound`, `type_mismatch` and `not_collected` (all problems of one flow at once). What the engine reads and what the
+studio keeps: nothing new in the database, the tool body is stored as the file has it.
+
+| Screen | What the user sees | Why this shape |
+|---|---|---|
+| API 연결, list | 받는 속성 with each one's type ("account_last4 (숫자 자리(키패드 포함) 4자리), note (말 그대로), 선택") and 응답 항목 | A typed tool used to open broken (the form read the map as a list, and a save wrote the list back, so the types were lost); that is fixed first |
+| API 연결, form | 받는 속성: one row per attribute with 이름, 형식 (the engine's field types), 자릿수 for digits, 보기 for choice, 꼭 필요해요. 응답 항목: 이름 and 형식 (also 예 또는 아니요) | The type list is the engine's (`PARAM_TYPES`); a row with no 형식 is the old untyped list, written back as the list. Types are all or nothing, because the engine reads the map form only; a 선택 속성 needs a 형식 |
+| 가짜 API 응답 규칙 | A condition's name is picked from the declared 받는 속성, a returned item from the declared 응답 항목; the value input follows the type (보기 select, 예/아니요, digits keep leading zeros as text, numbers are numbers) and says "4자리로 넣어 주세요" beside the row | P6: the fake API and the spec cannot drift. The same check runs in the backend on save (`422` with the engine's own sentence) |
+| 시나리오, API 호출 step | The 가져올 속성 list offers only attributes whose type fits the parameter by the engine's own rule (`number` takes digits, a boolean fits only text, a choice needs its words inside the parameter's). A response item of an earlier call shows its type and is disabled when it does not fit. A 선택 속성 is not counted as 연결 안 됨 | `fits()` is now a copy of `_fits_type`; only an offer filter, the engine decides at validation |
+| 검증 → 편집기 | Each engine item is drawn on its step (red ring and count, already there) and, in the binding form, under its parameter as a sentence: "account: 연결한 속성(acct)을 받지 않고 이 단계에 오는 길이 있어요", and for the path a row of buttons ("그 길: 조건으로 나누기 gate → API 호출 lookup") that select those steps. While the API step is selected the steps and exits of the path are drawn amber | The review memo (5. Publish-check errors on the graph); the check itself stays in the engine, the studio keeps no second copy |
+
+Backend: `validation.py` turns a `FlowCheckError` into one report item per problem (`code`, `node_id`, `parameter`, `role`,
+`field`, `path`; `message` is the engine's sentence); `POST/PUT /domains/<d>/tools` run `FakeApiExecutor({tools: {name: body}})`
+on the body (without `requires`/`verifies`, which the engine checks across the domain at validation) and answer `422` with
+the loader's message, so a tool the engine would refuse for every bot is never saved. Tests: `tests/test_apicheck.py`
+(save checks, `unbound`, `not_collected` with the witness path, `type_mismatch` for a constant), `src/lib/tools.test.ts`,
+`src/lib/flowcheck.test.ts`, `src/pages/Tools.test.tsx` (a typed tool opens as it is and a save keeps its types and writes
+"0042" as text), `src/pages/FlowData.test.tsx`.
+
+Terms (owner rule): 받는 속성 and 응답 항목 for what an API takes and returns; 값 only for what the user types as a
+constant (a rule's condition and response values). Not done: the editor does not run the data-flow check live (the engine
+does, at 검증하기); the DB's `bank` tools are still the old list form until the domain is imported again, so
+their forms show "형식 정하지 않음".
+
 ## Skills used
 
 Mockups: `claude-mem:design-is` (audit table above) and the `dataviz` rules for the home summary tiles.

@@ -11,7 +11,7 @@ import re
 import tempfile
 
 from voxstage.domain_pack import DomainPack
-from voxstage.rules.flows import load_flows
+from voxstage.rules.flows import FlowCheckError, load_flows
 from voxstage.rules.types import load_types
 from voxstage.tools import FakeApiExecutor
 
@@ -46,6 +46,22 @@ def _item(exc: Exception, root: str, domain: str, lang: str, default_file: str) 
             "flow_id": flow_id, "node_id": node_id, "field": None, "message": shown}
 
 
+def _check_items(exc: FlowCheckError, root: str, lang: str) -> list[dict]:
+    """One report item per problem of the engine's call check (R16b): the structured fields stay, so the editor can
+    point at the node and the parameter; `message` is the engine's own sentence for that problem."""
+    shown = str(exc.file).replace(root + os.sep, "").replace(root, "").replace("\\", "/")
+    fm = re.search(r"/flows/([\w\-]+)\.yaml", shown)
+    flow_id = fm.group(1) if fm else None
+    lines = [ln.strip()[2:] for ln in str(exc).splitlines()[1:] if ln.strip().startswith("- ")]
+    out = []
+    for i, it in enumerate(exc.items):
+        out.append({"severity": "error", "source": "engine", "code": it["code"], "file": shown, "lang": lang,
+                    "flow_id": flow_id, "node_id": it.get("node"), "field": it.get("field"),
+                    "parameter": it.get("parameter"), "role": it.get("role"), "path": it.get("path"),
+                    "message": lines[i] if i < len(lines) else it["code"]})
+    return out
+
+
 def validate_files(files: dict[str, str], domain: str, lang: str) -> list[dict]:
     """Report items for one bot's exported files; an empty list means the engine loads them."""
     items: list[dict] = []
@@ -75,6 +91,8 @@ def validate_files(files: dict[str, str], domain: str, lang: str) -> list[dict]:
         if os.path.isdir(flows_dir):
             try:
                 load_flows(flows_dir, pack.tools_path, pack.sensitive_slots, pack.notices, types)
+            except FlowCheckError as exc:
+                items.extend(_check_items(exc, root, lang))
             except Exception as exc:
                 items.append(_item(exc, root, domain, lang, f"{domain}/{lang}/flows"))
     return items

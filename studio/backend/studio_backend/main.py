@@ -455,6 +455,17 @@ def _tool(session: Session, dom: Domain, name: str) -> Tool:
     return t
 
 
+def check_tool_body(name: str, body: dict) -> None:
+    """Refuse what the engine's loader would refuse for this tool (types, `returns`, fake API rules against both:
+    R16b, P6). `requires` and `verifies` are checked across the whole domain at validation, so they are left out."""
+    from voxstage.tools import FakeApiExecutor   # read only
+    own = {k: v for k, v in body.items() if k not in ("requires", "verifies")}
+    try:
+        FakeApiExecutor({"tools": {name: own}})
+    except (ValueError, TypeError, KeyError) as exc:
+        raise HTTPException(422, str(exc))
+
+
 def affected_bots(dom: Domain) -> list[str]:
     return sorted(b.slug for b in dom.bots)
 
@@ -472,6 +483,7 @@ def create_tool(d: str, body: ToolIn, session: Session = Depends(get_session), u
         raise HTTPException(422, "name is required")
     if session.scalar(select(Tool).where(Tool.domain_id == dom.id, Tool.name == body.name)):
         raise HTTPException(409, f"tool {body.name} exists")
+    check_tool_body(body.name, body.body or {})
     pos = (session.scalar(select(func.max(Tool.position)).where(Tool.domain_id == dom.id)) or -1) + 1
     t = Tool(domain_id=dom.id, name=body.name, position=pos, body=body.body or {}, updated_by=user.id)
     session.add(t)
@@ -495,6 +507,7 @@ def update_tool(d: str, name: str, body: ToolIn, session: Session = Depends(get_
     dom = get_domain(session, d)
     t = _tool(session, dom, name)
     check_revision(t, body.revision, tool_out(t))
+    check_tool_body(name, body.body or {})
     t.body = body.body or {}
     t.revision += 1
     t.updated_by = user.id

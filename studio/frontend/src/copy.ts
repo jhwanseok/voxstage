@@ -30,6 +30,8 @@ export const EXTRACTORS: Record<string, string> = {
   text: "말 그대로", number: "숫자", digits: "숫자 자리(키패드 포함)", choice: "보기 중 하나", date: "날짜",
   month_start: "달의 첫날", day: "날짜의 일", time_window: "시간대(오전·오후·저녁)", duration: "기간",
 };
+/** `boolean` exists only in an API's response (a true or false answer), not as something a caller says. */
+export const RETURN_ONLY: Record<string, string> = { boolean: "예 또는 아니요" };
 
 export function when(iso: string): string {
   const d = new Date(iso);

@@ -38,6 +38,17 @@ describe("binding", () => {
     expect(fits({ type: "digits", length: 4 }, { type: "digits", length: 6 })).toBe(false);
     expect(fits({ type: "digits" }, { type: "text" })).toBe(false);
     expect(fits(null, { type: "text" })).toBe(true);   // untyped params (before A2) accept any field
+    // the engine's rule (`_fits_type`): number takes digits, a boolean fits only text, a choice needs its words inside
+    expect(fits({ type: "number" }, { type: "digits", length: 4 })).toBe(true);
+    expect(fits({ type: "digits" }, { type: "number" })).toBe(false);
+    expect(fits({ type: "text" }, { type: "boolean" })).toBe(true);
+    expect(fits({ type: "number" }, { type: "boolean" })).toBe(false);
+    expect(fits({ type: "digits", length: 4 }, { type: "digits" })).toBe(false);
+    expect(fits({ type: "choice", choices: ["a", "b"] }, { type: "choice", choices: { 하나: "a" } })).toBe(true);
+    expect(fits({ type: "choice", choices: ["a"] }, { type: "choice", choices: ["a", "b"] })).toBe(false);
+    expect(fits({ type: "date" }, { type: "date" })).toBe(true);
+    expect(fits({ type: "date" }, { type: "day" })).toBe(false);
+    expect(fits({ type: "number" }, null)).toBe(true);   // an API that declares no `returns` is not checked
   });
   it("reads old template arguments and replaces them by a binding", () => {
     const n = { type: "call", tool: "t", args: { order_id: "{order_id}", size: "{size | default('')}" } };

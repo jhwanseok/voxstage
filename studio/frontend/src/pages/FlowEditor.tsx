@@ -12,6 +12,7 @@ import { useBotActions } from "../actions";
 import { ApiError, api, type Bot, type FlowDetail, type Item, type Report, type Tool } from "../api";
 import { EXTRACTORS, ON_EXCEED } from "../copy";
 import { paramNames } from "../lib/datatypes";
+import { isCheck, pathMarks, type Names } from "../lib/flowcheck";
 import { useFetch, useShell, useUnsavedWarning } from "../hooks";
 import { autoLayout, START_ID } from "../lib/graph";
 import {
@@ -19,7 +20,7 @@ import {
 } from "../lib/flowEdit";
 import type { TypesDoc, TypesResponse } from "../lib/datatypes";
 import { paths } from "../paths";
-import { AskTarget, BindingForm, cardNote, RoleDefaultField, RolesSection } from "./FlowData";
+import { AskTarget, BindingForm, cardNote, fieldLabel, RoleDefaultField, RolesSection } from "./FlowData";
 import {
   Button, cn, Disclosure, ErrorState, Field, IconButton, Input, LoadingBlock, Notice, Select, StatusChip, Textarea, useToast,
   WordsInput,
@@ -69,7 +70,7 @@ function headline(b: Record<string, any>, tools: Map<string, Tool>): ReactNode {
   }
 }
 
-interface CardData extends Record<string, unknown> { nid: string; body: Record<string, any>; tools: Map<string, Tool>; engine: number; local: number; isStart: boolean; note: string | null }
+interface CardData extends Record<string, unknown> { nid: string; body: Record<string, any>; tools: Map<string, Tool>; engine: number; local: number; isStart: boolean; note: string | null; onPath: boolean }
 
 function StepCard({ data, selected }: NodeProps<Node<CardData>>) {
   if (!data.body) return null;
@@ -79,7 +80,7 @@ function StepCard({ data, selected }: NodeProps<Node<CardData>>) {
   const ex = exits(data.body);
   return (
     <div style={{ width: CARD_W }} className={cn("overflow-hidden rounded-xl bg-surface shadow-sm ring-1",
-      selected ? "ring-2 ring-brand-500" : data.engine ? "ring-err-fg" : "ring-line")}>
+      selected ? "ring-2 ring-brand-500" : data.engine ? "ring-err-fg" : data.onPath ? "ring-2 ring-warn-fg" : "ring-line")}>
       <Handle type="target" position={Position.Top} id="in" />
       <div className={cn("h-1.5", k.bar)} />
       <div className="px-4 pb-3 pt-2.5">
@@ -91,6 +92,7 @@ function StepCard({ data, selected }: NodeProps<Node<CardData>>) {
         </div>
         <div className="mt-2 line-clamp-3 text-[14px] font-semibold leading-snug text-ink">{headline(data.body, data.tools)}</div>
         {data.note && <div className={cn("mt-1 text-xs", data.note.startsWith("연결 안 된") ? "font-medium text-warn-fg" : "text-ink-2")}>{data.note}</div>}
+        {data.onPath && !selected && <div className="mt-1.5 text-xs font-medium text-warn-fg">속성을 받지 않고 지나갈 수 있는 길이에요</div>}
         {(data.engine > 0 || data.local > 0) && (
           <div className={cn("mt-1.5 text-xs font-medium", data.engine ? "text-err-fg" : "text-warn-fg")}>
             {data.engine ? `엔진 검사 문제 ${data.engine}개` : `확인할 곳 ${data.local}개`}
@@ -191,8 +193,9 @@ function PairsEditor({ rows, onChange, left, right }: { rows: [string, string][]
 
 const TEMPLATE_HINT = "중괄호로 감싼 이름(예: {amount})은 앞에서 받은 값으로 바뀌어요.";
 
-function NodeForm({ d, id, tools, doc, lang, problems, onPatch, onNode, onConnect, onRemove, onRename, onMakeStart }: {
+function NodeForm({ d, id, tools, doc, lang, problems, names, checks, onSelect, onPatch, onNode, onConnect, onRemove, onRename, onMakeStart }: {
   d: FlowDraft; id: string; tools: Tool[]; doc: TypesDoc | null; lang: string; problems: { text: string; engine: boolean }[];
+  names: Names; checks: Item[]; onSelect: (id: string) => void;
   onNode: (body: Record<string, any>) => void;
   onPatch: (patch: Record<string, any>, drop?: string[]) => void; onConnect: (handle: string, to: string | null) => void;
   onRemove: () => void; onRename: (to: string) => void; onMakeStart: () => void;
@@ -280,7 +283,7 @@ function NodeForm({ d, id, tools, doc, lang, problems, onPatch, onNode, onConnec
             </Select>
           </Field>
           {tool?.body.risky && <Notice tone="warn" title="되돌릴 수 없는 API예요">예/아니오 확인 단계의 "예"에서만 이어질 수 있어요. 엔진이 게시 전에 검사해요.</Notice>}
-          {tool && <BindingForm d={d} id={id} tool={tool} tools={tools} doc={doc} lang={lang} onNode={onNode} />}
+          {tool && <BindingForm d={d} id={id} tool={tool} tools={tools} doc={doc} lang={lang} onNode={onNode} checks={checks} names={names} onSelect={onSelect} />}
         </>
       )}
 
@@ -447,6 +450,12 @@ function Editor({ bot, detail, tools, doc }: { bot: Bot; detail: FlowDetail; too
   const engineItems: Item[] = bot.validated && !dirty ? (report?.items ?? []).filter((i) => i.flow_id === flowId) : [];
   const local = useMemo(() => localProblems(d), [d]);
   const toolMap = useMemo(() => new Map(tools.map((t) => [t.name, t])), [tools]);
+  // sentences for the engine's call check, and the steps and exits of the path the selected step is reached on
+  const names: Names = useMemo(() => ({
+    source: (role, field) => (role ? fieldLabel(d.header, doc, bot.lang, role, field ?? "") : String(field ?? "")),
+    step: (id) => `${(KIND[d.nodes[id]?.type as Kind] ?? KIND.goto).label} ${id}`,
+  }), [d, doc, bot.lang]);
+  const marks = useMemo(() => pathMarks(engineItems.filter((i) => i.node_id === sel), draftEdges(d)), [JSON.stringify(engineItems), sel, d]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // positions: the saved top-to-bottom layout when complete, otherwise an automatic one
   const initialPositions = useMemo(() => {
@@ -476,7 +485,7 @@ function Editor({ bot, detail, tools, doc }: { bot: Bot; detail: FlowDetail; too
         id, type: "step", position: old.get(id)?.position ?? placed.current[id] ?? initialPositions[id] ?? { x: 0, y: 0 },
         measured: old.get(id)?.measured,
         data: { nid: id, body: d.nodes[id], tools: toolMap, isStart: d.start === id, note: cardNote(d.nodes[id], d.header, doc, bot.lang, toolMap),
-                engine: engineItems.filter((i) => i.node_id === id).length, local: local.filter((p) => p.node === id).length },
+                engine: engineItems.filter((i) => i.node_id === id).length, local: local.filter((p) => p.node === id).length, onPath: marks.nodes.has(id) },
       });
       return [
         { id: START_ID, type: "trigger", position: old.get(START_ID)?.position ?? initialPositions[START_ID] ?? { x: 0, y: -190 },
@@ -484,7 +493,7 @@ function Editor({ bot, detail, tools, doc }: { bot: Bot; detail: FlowDetail; too
         ...d.order.filter((id) => d.nodes[id]).map(card),
       ];
     });
-  }, [d, initialPositions, toolMap, doc, JSON.stringify(engineItems), local]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [d, initialPositions, toolMap, doc, JSON.stringify(engineItems), local, sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (detail.layout.viewport && detail.layout.direction === "TB") rf.setViewport(detail.layout.viewport);
@@ -497,11 +506,11 @@ function Editor({ bot, detail, tools, doc }: { bot: Bot; detail: FlowDetail; too
     ...draftEdges(d).filter((e) => d.nodes[e.to]).map((e) => ({
       id: e.id, source: e.from, sourceHandle: e.handle, target: e.to, targetHandle: "in", type: "smoothstep",
       label: e.handle === "next" ? undefined : e.label, selected: selEdge === e.id, reconnectable: "target" as const,
-      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(e.handle) },
-      style: { stroke: edgeColor(e.handle), strokeWidth: 1.8 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: marks.edges.has(e.id) ? "var(--warn-fg)" : edgeColor(e.handle) },
+      style: marks.edges.has(e.id) ? { stroke: "var(--warn-fg)", strokeWidth: 3.2 } : { stroke: edgeColor(e.handle), strokeWidth: 1.8 },
       labelStyle: { fill: edgeColor(e.handle), fontWeight: 700 }, labelBgStyle: { fill: "var(--surface)" }, labelBgPadding: [6, 3] as [number, number],
     })),
-  ], [d, selEdge]);
+  ], [d, selEdge, marks]);
 
   const onNodesChange = (changes: NodeChange[]) => {
     setRfNodes((ns) => applyNodeChanges(changes.filter((c) => c.type !== "remove" && c.type !== "select"), ns));
@@ -574,7 +583,7 @@ function Editor({ bot, detail, tools, doc }: { bot: Bot; detail: FlowDetail; too
     : bot.valid && bot.has_unpublished_changes ? <Button variant="primary" size="sm" icon={<Rocket size={14} />} onClick={actions.openPublish}>게시하기</Button> : null;
 
   const panelProblems = sel ? [
-    ...engineItems.filter((i) => i.node_id === sel).map((i) => ({ text: i.message, engine: true })),
+    ...engineItems.filter((i) => i.node_id === sel && !isCheck(i)).map((i) => ({ text: i.message, engine: true })),
     ...local.filter((p) => p.node === sel).map((p) => ({ text: p.text, engine: false })),
   ] : [];
   const flowLevel = [...engineItems.filter((i) => !i.node_id).map((i) => i.message), ...local.filter((p) => !p.node).map((p) => p.text)];
@@ -637,6 +646,7 @@ function Editor({ bot, detail, tools, doc }: { bot: Bot; detail: FlowDetail; too
           {flowLevel.length > 0 && <div className="px-5 pt-5"><Notice tone="warn" title="시나리오 전체">{flowLevel.join(" ")}</Notice></div>}
           {tab === "node" && sel && d.nodes[sel] ? (
             <NodeForm d={d} id={sel} tools={tools} doc={doc} lang={bot.lang} problems={panelProblems}
+              names={names} checks={engineItems.filter((i) => i.node_id === sel && isCheck(i))} onSelect={select}
               onNode={(body) => setD((x) => ({ ...x, nodes: { ...x.nodes, [sel]: body } }))}
               onPatch={(patch, drop = []) => setD((x) => { const b = { ...x.nodes[sel], ...patch }; drop.forEach((k) => delete b[k]); return { ...x, nodes: { ...x.nodes, [sel]: b } }; })}
               onConnect={(h, to) => link(sel, h, to)} onRemove={() => remove(sel)} onMakeStart={() => setD((x) => ({ ...x, start: sel }))}

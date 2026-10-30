@@ -1,5 +1,6 @@
 /** Types, roles and call bindings (ADR 0014, engine R16a): reading and writing the file shapes, and what the editor may offer.
  *  The engine loader has the last word; nothing here is a second copy of its data-flow check. */
+import { EXTRACTORS } from "../copy";
 import { edges, type FlowDraft } from "./flowEdit";
 
 export type Labels = Record<string, string>;
@@ -73,13 +74,33 @@ export function paramSpec(tool: Record<string, any> | undefined, name: string): 
   return p && !Array.isArray(p) && typeof p === "object" && p[name] !== undefined ? fieldSpec(p[name]) : null;
 }
 export const returnNames = (tool: Record<string, any> | undefined): string[] => Object.keys(tool?.returns ?? {});
-
-/** A field fits a parameter when the parameter has no type yet, or the types (and lengths, when both say) agree. */
-export function fits(param: FieldSpec | null, field: FieldSpec | null): boolean {
-  if (!param?.type || !field?.type) return true;
-  if (param.type !== field.type) return false;
-  return param.length == null || field.length == null || param.length === field.length;
+/** The declared type of one response item (`returns`), or null when the API declares none. */
+export function returnSpec(tool: Record<string, any> | undefined, name: string): FieldSpec | null {
+  const r = tool?.returns;
+  return r && typeof r === "object" && !Array.isArray(r) && r[name] !== undefined ? fieldSpec(r[name]) : null;
 }
+
+/** The words a choice offers, whether `choices` is a list or a map of spoken word -> value. */
+export const choiceValues = (s: FieldSpec | null | undefined): string[] =>
+  (Array.isArray(s?.choices) ? (s!.choices as string[]) : Object.values(s?.choices ?? {})).map(String);
+
+/** Can a value of type `field` be passed to a parameter typed `param`? The engine's own rule (`_fits_type`,
+ *  voxstage/rules/flows.py), so the editor offers only what the loader will accept. A source without a type (an
+ *  API that declares no `returns`) and a parameter without one are not checked, as in the engine. */
+export function fits(param: FieldSpec | null, field: FieldSpec | null): boolean {
+  const want = param?.type;
+  if (!want || want === "text") return true;
+  const kind = field?.type;
+  if (!kind) return true;
+  if (kind === "boolean") return false;
+  if (want === "number") return kind === "number" || kind === "digits";
+  if (want === "digits") return kind === "digits" && (param!.length == null || field!.length === param!.length);
+  if (want === "choice") return kind === "choice" && choiceValues(field).every((v) => choiceValues(param).includes(v));
+  return kind === want;
+}
+
+/** "숫자 자리(키패드 포함) 4자리": the type's name with its length. */
+export const specText = (s: FieldSpec | null): string => (s?.type ? `${EXTRACTORS[s.type] ?? s.type}${s.length ? ` ${s.length}자리` : ""}` : "");
 
 export type Source = { role: string; field: string } | { call: string; field: string } | { const: string | number };
 export type Binding =

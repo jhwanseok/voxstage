@@ -2,19 +2,18 @@
  *  the call binding form. Shapes come from `lib/datatypes.ts`; the engine checks the data flow at validation. */
 import { Plus, Trash2, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { Bot, Tool } from "../api";
+import type { Bot, Item, Tool } from "../api";
 import { EXTRACTORS } from "../copy";
 import {
-  bindingOf, callsBefore, defaultSteps, fieldOptions, fits, labelOf, NAME, paramNames, paramSpec, renameRoleRefs, RESERVED,
-  returnNames, rolesOf, setBinding, withLabel, type FieldSpec, type RoleDef, type Source, type TypesDoc,
+  bindingOf, callsBefore, choiceValues, defaultSteps, fieldOptions, fits, labelOf, NAME, paramNames, paramSpec, renameRoleRefs, RESERVED,
+  returnNames, returnSpec, rolesOf, setBinding, specText, withLabel, type FieldSpec, type RoleDef, type Source, type TypesDoc,
 } from "../lib/datatypes";
+import { describeCheck, type Names } from "../lib/flowcheck";
 import type { FlowDraft } from "../lib/flowEdit";
 import { paths } from "../paths";
 import { Button, eul, Field, IconButton, Input, josa, Notice, Select, Tag } from "../ui";
 
 /** The values a choice stores: the words of a list, or the values of a word -> value map. */
-const choiceValues = (s: FieldSpec) => (Array.isArray(s.choices) ? s.choices : Object.values(s.choices ?? {})).map(String);
-const specText = (s: FieldSpec | null) => (s ? `${EXTRACTORS[s.type] ?? s.type}${s.length ? ` ${s.length}자리` : ""}` : "");
 
 /** "예약자의 이름" for a role path, the raw path when the role or field is gone. */
 export function fieldLabel(header: Record<string, any>, doc: TypesDoc | null, lang: string, role: string, field: string): string {
@@ -187,8 +186,10 @@ function choiceOf(binding: ReturnType<typeof bindingOf>): Choice {
   }
 }
 
-export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
+export function BindingForm({ d, id, tool, tools, doc, lang, onNode, checks = [], names, onSelect }: {
   d: FlowDraft; id: string; tool: Tool; tools: Tool[]; doc: TypesDoc | null; lang: string; onNode: (b: Record<string, any>) => void;
+  /** the engine's call check items of this step (`unbound`, `type_mismatch`, `not_collected`) */
+  checks?: Item[]; names?: Names; onSelect?: (id: string) => void;
 }) {
   const b = d.nodes[id];
   const params = paramNames(tool.body);
@@ -196,7 +197,8 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
   const before = callsBefore(d, id);
   const toolOf = (step: string) => tools.find((t) => t.name === d.nodes[step]?.tool);
   if (!params.length) return <p className="text-[13px] text-muted">이 API는 받는 속성이 없어요.</p>;
-  const unbound = params.filter((p) => bindingOf(b, p).kind === "none").length;
+  const optional = (p: string) => paramSpec(tool.body, p)?.required === false;
+  const unbound = params.filter((p) => bindingOf(b, p).kind === "none" && !optional(p)).length;
 
   return (
     <div className="space-y-3">
@@ -215,7 +217,13 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
           error = !o ? `${josa(`${cur.role}.${cur.field}`, "이", "가")} 지금은 없어요` : !fits(spec, o.spec) ? `형식이 맞지 않아요 (받는 쪽 ${specText(spec)}, 고른 속성 ${specText(o.spec)})` : null;
         } else if (cur.kind === "call") {
           error = d.nodes[cur.call]?.type !== "call" ? `${cur.call} API 호출 단계가 지금은 없어요`
-            : !before.always.includes(cur.call) ? (before.sometimes.includes(cur.call) ? "일부 경로에서만 이 결과가 있어요" : "이 단계보다 앞에서 부르지 않아요") : null;
+            : !before.always.includes(cur.call) ? (before.sometimes.includes(cur.call) ? "일부 경로에서만 이 결과가 있어요" : "이 단계보다 앞에서 부르지 않아요")
+            : (() => {
+              const body = toolOf(cur.call)?.body;
+              if (returnNames(body).length && !returnNames(body).includes(cur.field)) return `${cur.field || "이 항목"}은 응답 항목에 없어요`;
+              const rs = returnSpec(body, cur.field);
+              return rs && !fits(spec, rs) ? `형식이 맞지 않아요 (받는 쪽 ${specText(spec)}, 고른 항목 ${specText(rs)})` : null;
+            })();
         }
         const set = (src: Source | null) => onNode(setBinding(b, p, src));
         const onChoice = (c: string) => {
@@ -232,9 +240,21 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
               {spec && <span className="text-xs text-muted">{specText(spec)}</span>}
               {cur.kind === "legacy" && <Tag tone="idle">예전 방식</Tag>}
               {cur.kind === "template" && <Tag tone="idle">직접 쓴 식</Tag>}
-              {cur.kind === "none" && <Tag tone="warn">연결 안 됨</Tag>}
+              {cur.kind === "none" && (optional(p) ? <Tag tone="idle">선택, 연결 안 함</Tag> : <Tag tone="warn">연결 안 됨</Tag>)}
+              {optional(p) && cur.kind !== "none" && <span className="text-xs text-muted">선택</span>}
             </div>
             {cur.kind === "template" && <code className="block rounded bg-sunken px-2 py-1 text-xs text-ink-2">{cur.text}</code>}
+            {checks.filter((c) => c.parameter === p).map((c, i) => (
+              <div key={i} role="alert" className="rounded-md bg-err-bg px-2.5 py-1.5 text-xs font-medium text-err-fg">
+                {names ? describeCheck({ ...c, path: null }, names) : c.message}
+                {c.code === "not_collected" && c.path && onSelect && (
+                  <span className="mt-1.5 flex flex-wrap items-center gap-1 font-normal">
+                    <span className="text-err-fg">그 길:</span>
+                    {c.path.map((s, k) => <button key={`${s}-${k}`} type="button" onClick={() => onSelect(s)} className="rounded bg-surface px-1.5 py-0.5 text-ink-2 ring-1 ring-line hover:text-ink">{names?.step(s) ?? s}</button>)}
+                  </span>
+                )}
+              </div>
+            ))}
             <Field label="가져올 속성" error={error}>
               <Select value={cur.kind === "template" ? "__template" : choice} onChange={(e) => onChoice(e.target.value)}>
                 {cur.kind === "template" && <option value="__template">지금 식 그대로 두기</option>}
@@ -262,7 +282,7 @@ export function BindingForm({ d, id, tool, tools, doc, lang, onNode }: {
                 <Field label="결과 중 어떤 항목">
                   <Select value={cur.field} onChange={(e) => set({ call: cur.call, field: e.target.value })}>
                     {!rets.includes(cur.field) && <option value={cur.field}>{cur.field || "고르기"}</option>}
-                    {rets.map((r) => <option key={r} value={r}>{r}</option>)}
+                    {rets.map((r) => { const rs = returnSpec(toolOf(cur.call)?.body, r); const ok = fits(spec, rs); return <option key={r} value={r} disabled={!ok && r !== cur.field}>{r}{rs ? ` (${specText(rs)})` : ""}{ok ? "" : " 형식이 맞지 않아요"}</option>; })}
                   </Select>
                 </Field>
               ) : (
@@ -301,7 +321,8 @@ export function cardNote(body: Record<string, any>, header: Record<string, any>,
     return `${josa(labelOf(r, body.role_default, lang), "이", "가")} ${josa(labelOf(header.roles?.[from], from, lang), "과", "와")} 같은지 물어요`;
   }
   if (body.type === "call" && body.tool) {
-    const open = paramNames(tools.get(body.tool)?.body).filter((p) => bindingOf(body, p).kind === "none").length;
+    const tb = tools.get(body.tool)?.body;
+    const open = paramNames(tb).filter((p) => bindingOf(body, p).kind === "none" && paramSpec(tb, p)?.required !== false).length;
     return open ? `연결 안 된 속성 ${open}개` : null;
   }
   return null;

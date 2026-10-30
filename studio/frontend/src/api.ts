@@ -36,6 +36,9 @@ export interface Domain { slug: string; title: string; bots: Bot[] }
 export interface Item {
   severity: "error" | "warning"; source: string; code: string; file: string; lang: string | null;
   flow_id: string | null; node_id: string | null; field: string | null; message: string;
+  /** the engine's call check (`unbound`, `type_mismatch`, `not_collected`): which parameter, which source, and for
+   *  `not_collected` one path of steps on which the value is not collected before the call */
+  parameter?: string | null; role?: string | null; path?: string[] | null;
 }
 export interface Report { ok: boolean; draft_revision: number; shared_revision: number; items: Item[] }
 export interface Pattern { all_of?: any[]; any_of?: string[]; none_of?: string[]; priority?: number; regex?: string[]; note?: string }

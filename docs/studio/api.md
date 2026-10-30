@@ -53,7 +53,7 @@ be saved.
 |---|---|---|
 | `GET /domains/{d}/tools` | | tools in order |
 | `POST /domains/{d}/tools` | `{name, body}` | tool |
-| `PUT /domains/{d}/tools/{name}` | body (`params`, `rules`, `default`, `risky`, `requires`, `verifies`, `retry`) | tool |
+| `PUT /domains/{d}/tools/{name}` | body (`params` as a list of names or a typed map, `returns`, `rules`, `default`, `risky`, `requires`, `verifies`, `retry`) | tool; `422` with the loader's sentence when the engine would refuse the tool (types, `returns`, or a rule whose `when` or `return` does not follow them; ADR 0014 A2) |
 | `DELETE /domains/{d}/tools/{name}` | | `204`; `409` with the flows that call it unless `force=true` |
 
 Rename is delete plus create; the response of `PUT` for a tool that flows use warns with the flow ids.
@@ -91,7 +91,7 @@ authoritative and runs on validate.
 
 | Method and path | Request | Response |
 |---|---|---|
-| `POST /bots/{b}/validate` | `{}` | `ValidationReport` for the bot's current draft, including the domain's shared assets. Exports to a temp directory and runs the loader for this bot's language only. |
+| `POST /bots/{b}/validate` | `{}` | `ValidationReport` for the bot's current draft, including the domain's shared assets. Exports to a temp directory and runs the loader for this bot's language only. The engine's call check (R16b) gives one item per problem with `code` (`unbound`, `type_mismatch`, `not_collected`), `node_id`, `parameter`, `role`, `field` and, for `not_collected`, `path` (one witness path of step ids ending at the call). |
 | `POST /bots/{b}/publications` | `{note}` | `201` publication. Runs validation first; with errors: `422` and the report, nothing is written. Needs the `publisher` role (v1: always true). |
 | `GET /bots/{b}/publications` | | list newest first: number, note, kind, published_by, published_at, file count |
 | `GET /bots/{b}/publications/{n}` | | publication with its files (paths and sizes) |
