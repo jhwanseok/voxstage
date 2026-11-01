@@ -9,14 +9,14 @@ from contextlib import asynccontextmanager
 from io import BytesIO
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import bots, chat, datatypes, portable, service, settings, yamlio
+from . import bots, chat, datatypes, diffs, portable, service, settings, siblings, yamlio
 from .db import get_session, session_scope
 from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile, Role, Tool, User, UserRole)
@@ -47,21 +47,43 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="voxstage studio", version="0.0.1", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5710", "http://127.0.0.1:5710"],
-                   allow_methods=["*"], allow_headers=["*"])
+ROLE_RANK = {"editor": 1, "publisher": 2, "admin": 3}     # each role also may do what the lower ones may (ST2 D4)
+READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 API = "/api/v1"
 
 
-def current_user(session: Session = Depends(get_session)) -> User:
-    return session.scalar(select(User).where(User.email == LOCAL_USER_EMAIL))
+def current_user(session: Session = Depends(get_session), x_studio_user: str | None = Header(default=None)) -> User:
+    """The local user, or the user named by the `X-Studio-User` header (an email). There is no login: the header is a
+    guard against slips, not a security boundary (ST2 D4)."""
+    if x_studio_user is None:
+        return session.scalar(select(User).where(User.email == LOCAL_USER_EMAIL))
+    user = session.scalar(select(User).where(User.email == x_studio_user))
+    if user is None:
+        raise HTTPException(401, {"message": f"unknown user {x_studio_user}"})
+    if not user.is_active:
+        raise HTTPException(403, {"message": f"user {x_studio_user} is not active"})
+    return user
 
 
 def require_role(role: str):
-    """One place for role checks; v1 lets the local user do everything."""
     def dep(user: User = Depends(current_user), session: Session = Depends(get_session)) -> User:
+        have = max((ROLE_RANK.get(r, 0) for r in session.scalars(select(UserRole.role_name).where(UserRole.user_id == user.id))), default=0)
+        if have < ROLE_RANK[role]:
+            raise HTTPException(403, {"message": f"this needs the {role} role", "missing_role": role})
         return user
     return dep
+
+
+def write_guard(request: Request, user: User = Depends(current_user), session: Session = Depends(get_session)) -> None:
+    """Every change needs at least `editor`; the stronger roles are asked for by the endpoints themselves. Talking to
+    a bot in the test chat changes no content."""
+    if request.method not in READ_METHODS and "/chat" not in request.url.path:
+        require_role("editor")(user, session)
+
+
+app = FastAPI(title="voxstage studio", version="0.0.1", lifespan=lifespan, dependencies=[Depends(write_guard)])
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5710", "http://127.0.0.1:5710"],
+                   allow_methods=["*"], allow_headers=["*"])
 
 
 # --- helpers ---
@@ -148,7 +170,7 @@ class NewBotIn(BaseModel):
     settings: dict[str, Any] | None = None
 
 
-@app.post(f"{API}/bots", status_code=201)
+@app.post(f"{API}/bots", status_code=201, dependencies=[Depends(require_role("admin"))])
 def create_bot(body: NewBotIn, session: Session = Depends(get_session), user: User = Depends(current_user)):
     """An empty bot (language starter only) or a copy of a sibling; the 기본 설정 values are checked as on 개요."""
     present = set(session.scalars(select(Domain.slug)))
@@ -230,7 +252,7 @@ class ImportRequest(BaseModel):
     replace: bool = False
 
 
-@app.post(f"{API}/domains/import", status_code=201)
+@app.post(f"{API}/domains/import", status_code=201, dependencies=[Depends(require_role("admin"))])
 def import_domain(req: ImportRequest, session: Session = Depends(get_session), user: User = Depends(current_user)):
     if req.source != "repo_domains":
         raise HTTPException(400, "only source=repo_domains is supported in ST1")
@@ -826,6 +848,12 @@ def end_chat(b: str, sid: str, session: Session = Depends(get_session)):
 
 # --- validation, publication ---
 
+@app.get(API + "/bots/{b}/siblings/check")
+def siblings_check(b: str, session: Session = Depends(get_session)):
+    """Warnings, not errors: scenarios whose structure differs from the same-id ones of the other-language bots."""
+    return siblings.check(session, get_bot(session, b))
+
+
 @app.post(API + "/bots/{b}/validate")
 def validate(b: str, session: Session = Depends(get_session)):
     bot = get_bot(session, b)
@@ -844,8 +872,13 @@ class PublishIn(BaseModel):
     note: str = ""
 
 
-def pub_out(p: Publication, files: int | None = None) -> dict:
+def _names(session: Session) -> dict[str, str]:
+    return dict(session.execute(select(User.id, User.display_name)).all())
+
+
+def pub_out(p: Publication, files: int | None = None, names: dict[str, str] | None = None) -> dict:
     return {"number": p.number, "note": p.note, "kind": p.kind, "published_by": p.published_by,
+            "published_by_name": (names or {}).get(p.published_by),
             "published_at": p.published_at.isoformat(), "content_hash": p.content_hash,
             "shared_revision": p.shared_revision, "restored_from_number": p.restored_from_number,
             **({"file_count": files} if files is not None else {})}
@@ -863,7 +896,34 @@ def publish(b: str, body: PublishIn, session: Session = Depends(get_session),
     except service.NothingToPublish:
         session.rollback()
         raise HTTPException(409, "nothing to publish: the content equals the newest publication")
-    return pub_out(pub)
+    return pub_out(pub, names={user.id: user.display_name})
+
+
+class RollbackIn(BaseModel):
+    note: str = ""
+    discard_draft: bool = False
+
+
+@app.post(API + "/bots/{b}/publications/{n}/rollback", status_code=201)
+def rollback(b: str, n: int, body: RollbackIn, session: Session = Depends(get_session),
+             user: User = Depends(require_role("publisher"))):
+    """Publish the bot's own files of publication n again as a new publication and make the draft equal to it."""
+    bot = get_bot(session, b)
+    pub = _pub(session, bot, n)
+    try:
+        new = service.rollback_bot(session, bot, pub, body.note, body.discard_draft, user.id)
+    except service.DraftHasChanges:
+        session.rollback()
+        return JSONResponse(status_code=409, content={"code": "unpublished_changes", "message":
+                            "the draft has changes that are not published; rolling back replaces them"})
+    except service.ValidationFailed as exc:
+        session.rollback()
+        return JSONResponse(status_code=422, content={"message": "validation failed", "report": exc.report})
+    except service.NothingToPublish:
+        session.rollback()
+        return JSONResponse(status_code=409, content={"code": "same_as_newest", "message":
+                            "the newest publication already has this content"})
+    return pub_out(new, names={user.id: user.display_name})
 
 
 @app.get(API + "/bots/{b}/publications")
@@ -872,7 +932,8 @@ def list_publications(b: str, session: Session = Depends(get_session)):
     counts = dict(session.execute(select(PublicationFile.publication_id, func.count())
                                   .join(Publication, Publication.id == PublicationFile.publication_id)
                                   .where(Publication.bot_id == bot.id).group_by(PublicationFile.publication_id)).all())
-    return [pub_out(p, counts.get(p.id, 0)) for p in
+    names = _names(session)
+    return [pub_out(p, counts.get(p.id, 0), names) for p in
             session.scalars(select(Publication).where(Publication.bot_id == bot.id).order_by(Publication.number.desc()))]
 
 
@@ -889,7 +950,47 @@ def one_publication(b: str, n: int, session: Session = Depends(get_session)):
     p = _pub(session, bot, n)
     files = session.scalars(select(PublicationFile).where(PublicationFile.publication_id == p.id)
                             .order_by(PublicationFile.path)).all()
-    return {**pub_out(p), "files": [{"path": f.path, "size": len(f.content.encode("utf-8"))} for f in files]}
+    return {**pub_out(p, names=_names(session)), "files": [{"path": f.path, "size": len(f.content.encode("utf-8"))} for f in files]}
+
+
+def _pub_files(session: Session, p: Publication) -> dict[str, str]:
+    return {f.path: f.content for f in session.scalars(select(PublicationFile).where(PublicationFile.publication_id == p.id))}
+
+
+@app.get(API + "/bots/{b}/publications/{n}/diff")
+def publication_diff(b: str, n: int, against: str = "previous", session: Session = Depends(get_session)):
+    """What changes going from `against` to publication n: the one before it (default), another number, or `draft`.
+    With `draft` it is what a rollback to n would change in the draft."""
+    bot = get_bot(session, b)
+    target = _pub(session, bot, n)
+    domain = session.get(Domain, bot.domain_id)
+    if against == "draft":
+        base, base_ref = portable.export_bot(session, bot), {"kind": "draft", "number": None}
+    elif against == "previous":
+        prev = session.scalar(select(Publication).where(Publication.bot_id == bot.id, Publication.number < n)
+                              .order_by(Publication.number.desc()).limit(1))
+        base, base_ref = (_pub_files(session, prev), {"kind": "publication", "number": prev.number}) if prev else             ({}, {"kind": "none", "number": None})
+    else:
+        try:
+            m = int(against)
+        except ValueError:
+            raise HTTPException(422, "against is previous, draft or a publication number")
+        base, base_ref = _pub_files(session, _pub(session, bot, m)), {"kind": "publication", "number": m}
+    return {"base": base_ref, "target": {"kind": "publication", "number": n},
+            **diffs.compare(base, _pub_files(session, target), domain.slug, bot.lang)}
+
+
+@app.get(API + "/bots/{b}/changes")
+def draft_changes(b: str, session: Session = Depends(get_session)):
+    """What the draft changed since the newest publication (the publish dialog); everything is new before the first."""
+    bot = get_bot(session, b)
+    domain = session.get(Domain, bot.domain_id)
+    latest = session.scalar(select(Publication).where(Publication.bot_id == bot.id)
+                            .order_by(Publication.number.desc()).limit(1))
+    base = _pub_files(session, latest) if latest else {}
+    return {"base": {"kind": "publication", "number": latest.number} if latest else {"kind": "none", "number": None},
+            "target": {"kind": "draft", "number": None},
+            **diffs.compare(base, portable.export_bot(session, bot), domain.slug, bot.lang)}
 
 
 @app.get(API + "/bots/{b}/publications/{n}/files/{path:path}")

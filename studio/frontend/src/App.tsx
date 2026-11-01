@@ -4,15 +4,16 @@ import {
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BotActionsContext } from "./actions";
-import { ApiError, api, type Bot, type Publication, type Report } from "./api";
+import { api, type Bot, type Report } from "./api";
 import { botName, botStatus, langName } from "./copy";
 import { ShellContext, useFetch, useShell } from "./hooks";
 import { paths, type BotSection } from "./paths";
-import { Button, cn, Dialog, ErrorState, Field, Input, LoadingBlock, Notice, StatusChip, ToastProvider, useToast } from "./ui";
+import { Button, cn, ErrorState, LoadingBlock, Notice, StatusChip, ToastProvider, useToast } from "./ui";
 import FaqPage from "./pages/Faq";
 import FlowEditor from "./pages/FlowEditor";
 import Flows from "./pages/Flows";
 import History from "./pages/History";
+import PublishDialog from "./pages/PublishDialog";
 import Home from "./pages/Home";
 import Overview from "./pages/Overview";
 import DataPage from "./pages/Data";
@@ -35,45 +36,6 @@ const MENU: { section: BotSection; label: string; icon: typeof LayoutDashboard }
   { section: "validation", label: "검증", icon: ShieldCheck },
   { section: "history", label: "게시 이력", icon: HistoryIcon },
 ];
-
-function PublishDialog({ bot, onClose }: { bot: Bot; onClose: () => void }) {
-  const { refresh } = useShell();
-  const toast = useToast();
-  const nav = useNavigate();
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [report, setReport] = useState<Report | null>(null);
-  const [message, setMessage] = useState("");
-  const publish = async () => {
-    setBusy(true); setMessage(""); setReport(null);
-    try {
-      const p = await api.post<Publication>(`/bots/${bot.slug}/publications`, { note });
-      refresh(); onClose(); toast(`${p.number}번째로 게시했어요`);
-      nav(paths.bot(bot.slug, "history"));
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 422) { setReport(e.body.report); refresh(); setMessage("엔진이 이 초안을 받아들이지 않아 게시하지 않았어요. 아래를 고친 뒤 다시 게시해 보세요."); }
-      else if (e instanceof ApiError && e.status === 409) setMessage("마지막 게시와 내용이 같아서 게시할 것이 없어요.");
-      else setMessage((e as Error).message);
-    } finally { setBusy(false); }
-  };
-  return (
-    <Dialog open onClose={onClose} title={`${botName(bot)} 게시하기`}
-      footer={<><Button onClick={onClose}>취소</Button><Button variant="primary" loading={busy} icon={<Rocket size={15} />} onClick={publish}>게시하기</Button></>}>
-      <p className="mb-4 text-sm text-ink-2">엔진 검사를 한 번 더 거친 뒤 지금 초안을 {bot.last_published_number + 1}번째 버전으로 저장하고 엔진이 읽는 파일로 내보내요. 게시한 버전은 바뀌지 않아요.</p>
-      <Field label="무엇을 바꿨나요?" optional hint="게시 이력에 남아요.">
-        <Input data-autofocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="예: 재질문 횟수를 3번으로 늘림" />
-      </Field>
-      {message && <div className="mt-4"><Notice tone={report ? "err" : "warn"} title={message} /></div>}
-      {report && (
-        <ul className="mt-3 space-y-1.5 text-[13px]">
-          {report.items.filter((i) => i.severity === "error").map((i, k) => (
-            <li key={k} className="rounded-lg bg-sunken px-3 py-2"><span className="font-medium">{i.flow_id ? `시나리오 ${i.flow_id}` : i.file}</span><br /><span className="text-ink-2">{i.message}</span></li>
-          ))}
-        </ul>
-      )}
-    </Dialog>
-  );
-}
 
 function Sidebar({ bot }: { bot?: Bot }) {
   const { bots } = useShell();
