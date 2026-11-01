@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import bots, chat, datatypes, diffs, portable, service, settings, yamlio
+from . import bots, chat, datatypes, diffs, portable, service, settings, siblings, yamlio
 from .db import get_session, session_scope
 from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile, Role, Tool, User, UserRole)
@@ -825,6 +825,12 @@ def end_chat(b: str, sid: str, session: Session = Depends(get_session)):
 
 
 # --- validation, publication ---
+
+@app.get(API + "/bots/{b}/siblings/check")
+def siblings_check(b: str, session: Session = Depends(get_session)):
+    """Warnings, not errors: scenarios whose structure differs from the same-id ones of the other-language bots."""
+    return siblings.check(session, get_bot(session, b))
+
 
 @app.post(API + "/bots/{b}/validate")
 def validate(b: str, session: Session = Depends(get_session)):

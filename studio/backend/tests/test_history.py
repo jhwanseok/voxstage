@@ -218,3 +218,39 @@ def test_only_the_newest_five_publications_are_kept_and_numbers_never_repeat(cli
     assert [p["number"] for p in pubs] == [8, 7, 6, 5, 4] and pubs[0]["restored_from_number"] == 3
     # the oldest one kept has nothing before it to compare with
     assert client.get(f"{A}/bots/{BOT}/publications/4/diff").json()["base"]["kind"] == "none"
+
+
+# --- sibling check (D3) ---
+
+def test_the_imported_pair_has_no_structural_differences(client):
+    r = client.get(f"{A}/bots/{BOT}/siblings/check").json()
+    assert r["siblings"] == [{"bot": "bank-en", "lang": "en", "compared": r["siblings"][0]["compared"], "warnings": []}]
+    assert r["siblings"][0]["compared"] >= 5 and r["warning_count"] == 0
+
+
+def test_sibling_check_names_the_first_difference_and_ignores_wording(client):
+    # wording and constants differ by language: not a warning
+    edit_flow(client, lambda n: n["say_fail"].update(text="완전히 다른 문장입니다."))
+    assert client.get(f"{A}/bots/{BOT}/siblings/check").json()["warning_count"] == 0
+    # a new step and a rewired step are
+    def change(nodes):
+        nodes["say_sorry"] = {"type": "say", "text": "죄송합니다.", "next": "done"}
+        nodes["say_fail"] = {**nodes["say_fail"], "next": "say_sorry"}
+    edit_flow(client, change)
+    w = client.get(f"{A}/bots/{BOT}/siblings/check").json()["siblings"][0]["warnings"]
+    assert w == [{"flow": "transfer", "kind": "structure_differs",
+                  "difference": {"kind": "exit", "step": "say_fail", "exit": "next", "here": "say_sorry", "there": "done"}}]
+    # the other side: from the English bot the new step is the one it does not have
+    en = client.get(f"{A}/bots/bank-en/siblings/check").json()["siblings"][0]["warnings"]
+    assert en[0]["difference"] == {"kind": "exit", "step": "say_fail", "exit": "next", "here": "done", "there": "say_sorry"}
+
+
+def test_sibling_check_lists_scenarios_that_exist_in_one_language_only(client):
+    assert client.post(f"{A}/bots/{BOT}/flows", json={"id": "only_korean"}).status_code == 201
+    assert client.delete(f"{A}/bots/bank-en/flows/transfer").status_code == 204
+    w = {x["flow"]: x["kind"] for x in client.get(f"{A}/bots/{BOT}/siblings/check").json()["siblings"][0]["warnings"]}
+    assert w == {"only_korean": "only_here", "transfer": "only_here"}
+    w = {x["flow"]: x["kind"] for x in client.get(f"{A}/bots/bank-en/siblings/check").json()["siblings"][0]["warnings"]}
+    assert w == {"only_korean": "only_there", "transfer": "only_there"}
+    # a warning never blocks a publication
+    assert client.post(f"{A}/bots/{BOT}/publications", json={}).status_code in (201, 422)
