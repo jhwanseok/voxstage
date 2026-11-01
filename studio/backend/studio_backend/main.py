@@ -866,6 +866,33 @@ def publish(b: str, body: PublishIn, session: Session = Depends(get_session),
     return pub_out(pub)
 
 
+class RollbackIn(BaseModel):
+    note: str = ""
+    discard_draft: bool = False
+
+
+@app.post(API + "/bots/{b}/publications/{n}/rollback", status_code=201)
+def rollback(b: str, n: int, body: RollbackIn, session: Session = Depends(get_session),
+             user: User = Depends(require_role("publisher"))):
+    """Publish the bot's own files of publication n again as a new publication and make the draft equal to it."""
+    bot = get_bot(session, b)
+    pub = _pub(session, bot, n)
+    try:
+        new = service.rollback_bot(session, bot, pub, body.note, body.discard_draft, user.id)
+    except service.DraftHasChanges:
+        session.rollback()
+        return JSONResponse(status_code=409, content={"code": "unpublished_changes", "message":
+                            "the draft has changes that are not published; rolling back replaces them"})
+    except service.ValidationFailed as exc:
+        session.rollback()
+        return JSONResponse(status_code=422, content={"message": "validation failed", "report": exc.report})
+    except service.NothingToPublish:
+        session.rollback()
+        return JSONResponse(status_code=409, content={"code": "same_as_newest", "message":
+                            "the newest publication already has this content"})
+    return pub_out(new)
+
+
 @app.get(API + "/bots/{b}/publications")
 def list_publications(b: str, session: Session = Depends(get_session)):
     bot = get_bot(session, b)

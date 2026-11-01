@@ -114,13 +114,24 @@ def import_domain(session: Session, domains_root: str, slug: str, replace: bool 
 
 
 def _import_bot(session: Session, bot: Bot, lang_dir: str, user_id: str | None) -> dict:
+    files: dict[str, str] = {}
+    for rel in _walk(lang_dir):
+        try:
+            files[rel] = _read(os.path.join(lang_dir, rel))
+        except UnicodeDecodeError:
+            continue
+    return load_bot_files(session, bot, files, user_id)
+
+
+def load_bot_files(session: Session, bot: Bot, files: dict[str, str], user_id: str | None) -> dict:
+    """Add a bot's draft rows from its language directory as {path inside the language directory: text}. The caller
+    has emptied the bot's rows; a rollback reads a publication this way, an import reads a directory."""
     modelled: list[str] = []
-    faq = yamlio.load(_read(os.path.join(lang_dir, "faq.yaml"))) or {}
+    faq = yamlio.load(files["faq.yaml"]) or {}
     patterns: dict = {}
     pat_order: dict = {}
-    pat_path = os.path.join(lang_dir, "rules", "faq_patterns.yaml")
-    if os.path.exists(pat_path):
-        for i, e in enumerate((yamlio.load(_read(pat_path)) or {}).get("entries") or []):
+    if "rules/faq_patterns.yaml" in files:
+        for i, e in enumerate((yamlio.load(files["rules/faq_patterns.yaml"]) or {}).get("entries") or []):
             e = dict(e)
             eid = e.pop("id")
             patterns[eid] = e
@@ -132,32 +143,24 @@ def _import_bot(session: Session, bot: Bot, lang_dir: str, user_id: str | None) 
                              pattern=patterns.get(e["id"]), pattern_position=pat_order.get(e["id"]),
                              updated_by=user_id))
     modelled.append("faq.yaml")
-    flows_dir = os.path.join(lang_dir, "flows")
-    if os.path.isdir(flows_dir):
-        for name in sorted(os.listdir(flows_dir)):
-            if not name.endswith(".yaml"):
-                continue
-            raw = yamlio.load(_read(os.path.join(flows_dir, name))) or {}
-            fid = name[:-5]
-            nodes = raw.get("nodes") or {}
-            header = {k: v for k, v in raw.items() if k not in ("id", "start", "nodes")}
-            session.add(Flow(bot_id=bot.id, flow_id=fid, header=header, start=raw.get("start"), nodes=nodes,
-                             node_order=list(nodes), updated_by=user_id))
-            modelled.append(f"flows/{name}")
+    for rel in sorted(files):
+        if not (rel.startswith("flows/") and rel.endswith(".yaml") and "/" not in rel[len("flows/"):]):
+            continue
+        raw = yamlio.load(files[rel]) or {}
+        nodes = raw.get("nodes") or {}
+        header = {k: v for k, v in raw.items() if k not in ("id", "start", "nodes")}
+        session.add(Flow(bot_id=bot.id, flow_id=rel[len("flows/"):-5], header=header, start=raw.get("start"),
+                         nodes=nodes, node_order=list(nodes), updated_by=user_id))
+        modelled.append(rel)
     for kind, rel in BOT_SETTINGS.items():
-        p = os.path.join(lang_dir, rel)
-        if os.path.exists(p):
-            session.add(DomainSetting(bot_id=bot.id, kind=kind, body=yamlio.load(_read(p)), updated_by=user_id))
+        if rel in files:
+            session.add(DomainSetting(bot_id=bot.id, kind=kind, body=yamlio.load(files[rel]), updated_by=user_id))
             modelled.append(rel)
     raw_files: list[str] = []
-    for rel in _walk(lang_dir):
+    for rel in sorted(files):
         if rel in modelled:
             continue
-        try:
-            text = _read(os.path.join(lang_dir, rel))
-        except UnicodeDecodeError:
-            continue
-        session.add(DomainFile(bot_id=bot.id, path=rel, content=text, updated_by=user_id))
+        session.add(DomainFile(bot_id=bot.id, path=rel, content=files[rel], updated_by=user_id))
         raw_files.append(rel)
     return {"modelled": modelled, "raw": raw_files}
 

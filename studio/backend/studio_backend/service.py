@@ -7,12 +7,13 @@ import os
 import pathlib
 import shutil
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from . import bots, validation
-from .models import Bot, Domain, Publication, PublicationFile
-from .portable import export_bot
+from .models import (Bot, Domain, DomainFile, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
+                     PublicationFile)
+from .portable import export_bot, load_bot_files, prune_layout
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 
@@ -97,9 +98,82 @@ def publish_bot(session: Session, bot: Bot, note: str, user_id: str | None) -> P
     bot.last_published_number = number
     bot.published_draft_revision = bot.draft_revision
     bot.published_shared_revision = domain.shared_revision
+    prune_publications(session, bot)
     session.commit()
     write_export_dir(bot.slug, files)
     return pub
+
+
+KEEP_PUBLICATIONS = 5       # ST2 D5: the newest five of a bot; numbers keep counting up and are never reused
+
+
+def prune_publications(session: Session, bot: Bot) -> int:
+    """Delete all but the newest `KEEP_PUBLICATIONS` publications of the bot (their files go with them)."""
+    old = session.scalars(select(Publication.id).where(Publication.bot_id == bot.id)
+                          .order_by(Publication.number.desc()).offset(KEEP_PUBLICATIONS)).all()
+    if old:
+        session.execute(delete(Publication).where(Publication.id.in_(old)))
+    return len(old)
+
+
+class DraftHasChanges(Exception):
+    pass
+
+
+def rollback_bot(session: Session, bot: Bot, pub: Publication, note: str, discard_draft: bool,
+                 user_id: str | None) -> Publication:
+    """A new publication (kind `rollback`) with the bot's own files of `pub`, and a draft equal to it (ST2 D1: the
+    domain's shared files stay as they are now). Nothing changes unless the result passes the engine's loader."""
+    domain = session.get(Domain, bot.domain_id)
+    if bot.published_draft_revision != bot.draft_revision and not discard_draft:
+        raise DraftHasChanges()
+    prefix = f"{domain.slug}/{bot.lang}/"
+    now = export_bot(session, bot)
+    old = {f.path: f.content for f in session.scalars(select(PublicationFile).where(PublicationFile.publication_id == pub.id))}
+    files = {p: t for p, t in now.items() if not p.startswith(prefix)}
+    files.update({p: t for p, t in old.items() if p.startswith(prefix)})
+    items = validation.validate_files(files, domain.slug, bot.lang)
+    rep = validation.report(items, bot.draft_revision, domain.shared_revision)
+    if not rep["ok"]:
+        raise ValidationFailed(rep)
+    latest = session.scalar(select(Publication).where(Publication.bot_id == bot.id)
+                            .order_by(Publication.number.desc()).limit(1))
+    if latest is not None and latest.content_hash == content_hash(files):
+        raise NothingToPublish()
+    flows_before = set(session.scalars(select(Flow.flow_id).where(Flow.bot_id == bot.id)))
+    for model in (FaqEntry, Flow, DomainSetting, DomainFile):
+        session.execute(delete(model).where(model.bot_id == bot.id))
+    session.flush()
+    load_bot_files(session, bot, {p[len(prefix):]: t for p, t in files.items() if p.startswith(prefix)}, user_id)
+    session.flush()
+    # layout is not versioned (ADR 0013): positions of steps that still exist stay, the others are dropped
+    kept = {f.flow_id: set(f.nodes) for f in session.scalars(select(Flow).where(Flow.bot_id == bot.id))}
+    for fid in flows_before - set(kept):
+        session.execute(delete(FlowNodeLayout).where(FlowNodeLayout.bot_id == bot.id, FlowNodeLayout.flow_id == fid))
+        lay = session.get(FlowLayout, (bot.id, fid))
+        if lay is not None:
+            session.delete(lay)
+    for fid, nodes in kept.items():
+        prune_layout(session, bot, fid, nodes)
+    bot.draft_revision += 1
+    saved = export_bot(session, bot)        # what the draft now is; it is what gets stored
+    rep = validate_bot(session, bot)
+    number = (session.scalar(select(func.max(Publication.number)).where(Publication.bot_id == bot.id)) or 0) + 1
+    new = Publication(bot_id=bot.id, number=number, shared_revision=domain.shared_revision, note=note, kind="rollback",
+                      restored_from_number=pub.number, content_hash=content_hash(saved),
+                      validation={"warnings": [i for i in rep["items"] if i["severity"] != "error"]},
+                      published_by=user_id)
+    session.add(new)
+    session.flush()
+    for path, text in saved.items():
+        session.add(PublicationFile(publication_id=new.id, path=path, content=text))
+    bot.last_published_number = number
+    bot.published_draft_revision = bot.draft_revision
+    bot.published_shared_revision = domain.shared_revision
+    prune_publications(session, bot)
+    session.commit()
+    write_export_dir(bot.slug, saved)
+    return new
 
 
 def write_export_dir(bot_slug: str, files: dict[str, str]) -> str:

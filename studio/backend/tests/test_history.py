@@ -124,3 +124,97 @@ def test_summary_names_added_and_removed_faq_entries_and_tools(client):
     assert [x["id"] for x in s["faq"]["added"]] == ["brand_new"]
     assert [x["id"] for x in s["faq"]["removed"]] == [e["id"]]
     assert s["tools"]["changed"] == [{"name": tool["name"], "fields": ["retry"]}]
+
+
+# --- rollback and retention (D1, D5) ---
+
+def export_dir(tmp_path):
+    root = tmp_path / "exports" / BOT
+    return {str(p.relative_to(root)).replace(chr(92), "/"): p.read_bytes().decode("utf-8").replace(chr(13) + chr(10), chr(10))
+            for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+def pub_files(c, n):
+    out = {}
+    for f in c.get(f"{A}/bots/{BOT}/publications/{n}").json()["files"]:
+        out[f["path"]] = c.get(f"{A}/bots/{BOT}/publications/{n}/files/{f['path']}").text
+    return out
+
+
+def test_rollback_makes_a_new_publication_and_a_draft_equal_to_the_old_one(client, tmp_path):
+    two_versions(client)
+    first = pub_files(client, 1)
+    r = client.post(f"{A}/bots/{BOT}/publications/1/rollback", json={"note": "undo"})
+    assert r.status_code == 201, r.text
+    out = r.json()
+    assert out["number"] == 3 and out["kind"] == "rollback" and out["restored_from_number"] == 1 and out["note"] == "undo"
+    assert pub_files(client, 3) == first                     # same files as publication 1 (shared files unchanged since)
+    assert export_dir(tmp_path) == {k: v.replace(chr(13) + chr(10), chr(10)) for k, v in first.items()}
+    b = client.get(f"{A}/bots/{BOT}").json()
+    assert b["last_published_number"] == 3 and not b["has_unpublished_changes"] and b["valid"]
+    assert client.get(f"{A}/bots/{BOT}/changes").json()["summary"]["empty"]
+    flow = client.get(f"{A}/bots/{BOT}/flows/transfer").json()["flow"]
+    assert "say_sorry" not in flow["nodes"]
+    assert [p["number"] for p in client.get(f"{A}/bots/{BOT}/publications").json()] == [3, 2, 1]
+    # rolling back to what is already the newest content is refused
+    assert client.post(f"{A}/bots/{BOT}/publications/3/rollback", json={}).status_code == 409
+
+
+def test_rollback_needs_the_owner_to_say_what_happens_to_unpublished_changes(client):
+    two_versions(client)
+    edit_faq(client, answer="초안에만 있는 문장")
+    r = client.post(f"{A}/bots/{BOT}/publications/1/rollback", json={})
+    assert r.status_code == 409 and r.json()["code"] == "unpublished_changes"
+    assert "초안에만 있는 문장" in client.get(f"{A}/bots/{BOT}/faq").json()[0]["answer"]      # nothing changed
+    ok = client.post(f"{A}/bots/{BOT}/publications/1/rollback", json={"discard_draft": True})
+    assert ok.status_code == 201
+    assert "초안에만 있는 문장" not in client.get(f"{A}/bots/{BOT}/faq").json()[0]["answer"]
+
+
+def test_rollback_leaves_shared_files_and_other_languages_alone(client):
+    publish(client)
+    other_before = client.get(f"{A}/bots/bank-en/faq").json()
+    tool = client.get(f"{A}/domains/bank/tools").json()[0]
+    assert client.put(f"{A}/domains/bank/tools/{tool['name']}",
+                      json={"body": {**tool["body"], "retry": 0}, "revision": tool["revision"]}).status_code == 200
+    edit_faq(client, answer="두 번째")
+    publish(client)
+    r = client.post(f"{A}/bots/{BOT}/publications/1/rollback", json={})
+    assert r.status_code == 201, r.text
+    assert next(t for t in client.get(f"{A}/domains/bank/tools").json() if t["name"] == tool["name"])["body"]["retry"] == 0
+    assert "retry: 0" in client.get(f"{A}/bots/{BOT}/publications/3/files/bank/tools.yaml").text    # D1: shared as of now
+    assert "retry: 1" in client.get(f"{A}/bots/{BOT}/publications/1/files/bank/tools.yaml").text
+    assert client.get(f"{A}/bots/bank-en/faq").json() == other_before
+
+
+def test_rollback_that_no_longer_validates_changes_nothing(client, tmp_path):
+    publish(client)
+    # the shared types lose a type that publication 1's flows rely on: the old files no longer load
+    d = client.get(f"{A}/bots/{BOT}/flows/transfer").json()["flow"]
+    nodes = {k: dict(v) for k, v in d["nodes"].items()}
+    nodes["say_x"] = {"type": "say", "text": "x", "next": "done"}
+    nodes["say_fail"] = {**nodes["say_fail"], "next": "say_x"}
+    client.put(f"{A}/bots/{BOT}/flows/transfer", json={"start": d["start"], "nodes": nodes, "revision": d["revision"]})
+    publish(client)
+    tool = next(t for t in client.get(f"{A}/domains/bank/tools").json() if t["name"] == "get_transfer_fee")
+    assert client.delete(f"{A}/domains/bank/tools/{tool['name']}?force=true").status_code == 204
+    before = (pub_files(client, 2), client.get(f"{A}/bots/{BOT}").json()["draft_revision"])
+    r = client.post(f"{A}/bots/{BOT}/publications/1/rollback", json={"discard_draft": True})
+    assert r.status_code == 422 and r.json()["report"]["ok"] is False
+    assert (pub_files(client, 2), client.get(f"{A}/bots/{BOT}").json()["draft_revision"]) == before
+    assert [p["number"] for p in client.get(f"{A}/bots/{BOT}/publications").json()] == [2, 1]
+
+
+def test_only_the_newest_five_publications_are_kept_and_numbers_never_repeat(client):
+    for i in range(7):
+        edit_faq(client, answer=f"답변 {i}")
+        assert publish(client) == i + 1
+    nums = [p["number"] for p in client.get(f"{A}/bots/{BOT}/publications").json()]
+    assert nums == [7, 6, 5, 4, 3]
+    assert client.get(f"{A}/bots/{BOT}/publications/2").status_code == 404
+    # a rollback also counts, and it may point at a publication that is gone afterwards
+    assert client.post(f"{A}/bots/{BOT}/publications/3/rollback", json={}).status_code == 201
+    pubs = client.get(f"{A}/bots/{BOT}/publications").json()
+    assert [p["number"] for p in pubs] == [8, 7, 6, 5, 4] and pubs[0]["restored_from_number"] == 3
+    # the oldest one kept has nothing before it to compare with
+    assert client.get(f"{A}/bots/{BOT}/publications/4/diff").json()["base"]["kind"] == "none"
