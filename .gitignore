@@ -228,3 +228,8 @@ studio/**/node_modules/
 studio/**/.venv/
 studio/**/__pycache__/
 studio/**/dist/
+
+# studio end-to-end test output
+studio/e2e/.out/
+studio/frontend/test-results/
+studio/frontend/playwright-report/

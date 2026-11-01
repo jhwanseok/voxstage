@@ -130,14 +130,16 @@ when anything changes.
 
 ## 8. Publish, history, diff, rollback
 
-- **Publish** (top bar): enabled when the last validation is for the current revision and has no errors. The dialog
-  shows what changed since the last publication (file list and counts), asks for a note, and publishes. On `422` it
-  shows the report.
+- **Publish** (top bar): the dialog shows what changed since the last publication (summary by meaning, the text under
+  "자세히"), the sibling check warnings (never blocking), asks for a note, and publishes. With nothing changed it says so
+  before a note is typed and the button is off. On `422` it shows the report.
 - **History**: publications newest first with number, note, kind (publish / rollback), author, time. Selecting one
-  shows its files and a diff against the previous publication, against another publication or against the draft
-  (file by file, unified text diff of the exported YAML; the flow diff also lists added, removed and rewired nodes).
-- **Rollback** on a publication: explains that this creates a new publication and replaces the draft; blocked with
-  a prompt when the draft has unpublished changes (discard or cancel). Download as zip.
+  shows its comparison (previous version by default, another version or the current draft: a summary by meaning with
+  the unified text diff under "자세히") and its files. Only the newest 5 versions are kept (ST2 D5). A version made by a
+  rollback says which one it restored; the author's name is shown.
+- **Rollback** on a publication ("이 버전으로 되돌리기", not on the newest): explains that this creates a new version and
+  replaces the draft, that the domain's shared files (API connections, types, lists) are not rolled back (ST2 D1), shows
+  what changes in the draft, and asks to discard unpublished changes when there are any. Download as zip.
 
 ## 9. Notices and wording (ST3)
 

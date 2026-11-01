@@ -103,8 +103,11 @@ checks apply unchanged. The flow id is the file name; the `id` key inside the fi
 - The export directory `studio/exports/<bot slug>/` always equals the newest publication of that bot. It is itself an
   engine `domains_dir`: it holds `<domain>/tools.yaml`, the slot lists and `<domain>/<lang>/...` for this bot's language
   only. It is written to a temporary directory next to it and renamed, so the engine never reads half a pack.
-- Rollback to number N: copy N's files into a new publication (kind `rollback`), then load them into the draft with the
-  importer (replacing meaning rows, keeping layout of surviving nodes). Draft edits made after N are replaced; the
+- Retention (ST2 D5): after every publish or rollback only the newest 5 publications of the bot are kept; `number`
+  keeps counting up and is never reused, `restored_from_number` may name a publication that is gone.
+- Rollback to number N (ST2 D1): the new publication holds N's own files (`<domain>/<lang>/...`) plus the domain's
+  current shared files, must load in the engine, and is then loaded into the draft with the importer
+  (`portable.load_bot_files`; replacing meaning rows, keeping layout of surviving nodes). Draft edits made after N are replaced; the
   endpoint refuses when the draft has unpublished changes unless `discard_draft: true` is sent.
 
 ### Validation results

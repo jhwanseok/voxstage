@@ -12,8 +12,10 @@ with the current row. Every response row contains `revision`.
 
 | Method and path | Purpose |
 |---|---|
-| `GET /me` | The current user and roles. v1: the seeded local user, all roles. |
-| `GET /roles` | The role names. Present so the UI can show role chips; there is no user management in v1. |
+| `GET /me` | The current user and roles. Without a header: the seeded local user, who has every role. With `X-Studio-User: <email>` that user (`401` unknown, `403` inactive). There is no login: the header guards against slips, it is not a security boundary (ST2 D4). |
+| `GET /roles` | The role names. There is no user management in v1. |
+
+Roles (ST2 D4), each also allowed what the lower ones are: `editor` (every change to content; reading and the test chat need no role), `publisher` (publish, rollback), `admin` (import a domain, create and delete a bot). A missing role answers `403 {detail: {message, missing_role}}`.
 
 ## Domains, bots and import
 
@@ -92,12 +94,14 @@ authoritative and runs on validate.
 | Method and path | Request | Response |
 |---|---|---|
 | `POST /bots/{b}/validate` | `{}` | `ValidationReport` for the bot's current draft, including the domain's shared assets. Exports to a temp directory and runs the loader for this bot's language only. The engine's call check (R16b) gives one item per problem with `code` (`unbound`, `type_mismatch`, `not_collected`), `node_id`, `parameter`, `role`, `field` and, for `not_collected`, `path` (one witness path of step ids ending at the call). |
-| `POST /bots/{b}/publications` | `{note}` | `201` publication. Runs validation first; with errors: `422` and the report, nothing is written. Needs the `publisher` role (v1: always true). |
-| `GET /bots/{b}/publications` | | list newest first: number, note, kind, published_by, published_at, file count |
+| `POST /bots/{b}/publications` | `{note}` | `201` publication. Runs validation first; with errors: `422` and the report, nothing is written. Needs `publisher`. Afterwards only the newest 5 publications of the bot are kept (ST2 D5); numbers are never reused. |
+| `GET /bots/{b}/publications` | | list newest first: number, note, kind, restored_from_number, published_by, published_by_name, published_at, file count |
 | `GET /bots/{b}/publications/{n}` | | publication with its files (paths and sizes) |
 | `GET /bots/{b}/publications/{n}/files/{path}` | | file content |
-| `GET /bots/{b}/publications/{n}/diff?against={m \| "draft"}` | | per-file status (added, removed, changed) and unified diffs of the exported text |
-| `POST /bots/{b}/publications/{n}/rollback` | `{note, discard_draft: false}` | `201` new publication of kind `rollback`; the draft is reset to it. `409` when the draft has unpublished changes and `discard_draft` is false |
+| `GET /bots/{b}/publications/{n}/diff?against={previous (default) \| m \| draft}` | | what changes going from `against` to n: `{base, target, files: [{path, status, unified}], summary}`; `summary` is by meaning (`faq`, `flows` with steps added, removed, changed and rewired, `tools`, `settings`, `other`, `empty`). With `draft` it is what a rollback to n would change. Before the oldest kept publication `base.kind` is `none` |
+| `GET /bots/{b}/changes` | | the same shape: what the draft changed since the newest publication (the publish dialog) |
+| `GET /bots/{b}/siblings/check` | | `{siblings: [{bot, lang, compared, warnings: [{flow, kind: only_here \| only_there \| structure_differs, difference}]}], warning_count}`. Structure only (step ids and kinds, exits, API, attribute bindings), never wording. Warnings, never errors (ST2 D3) |
+| `POST /bots/{b}/publications/{n}/rollback` | `{note, discard_draft: false}` | `201` new publication of kind `rollback` with `restored_from_number`: the bot's own files of n plus the domain's current shared files (ST2 D1); the draft is reset to it. `409 {code: unpublished_changes}` when the draft has unpublished changes and `discard_draft` is false, `409 {code: same_as_newest}`, `422` with the report when the result does not load (nothing changed). Needs `publisher` |
 | `GET /bots/{b}/publications/{n}/export.zip` | | the files as a zip |
 
 Flow of a publish: validate (engine loader on a temp export of this bot; the optional sibling check is a warning and never blocks) then, only if no errors,

@@ -1,6 +1,6 @@
 # Spec ST2: publication history, diff, rollback, sibling check, roles
 
-Status: **approved, D1 to D5 decided** (owner: ST2 before ST3, decisions 2026-11-01).
+Status: **built** on `wip/studio-st2` (decisions D1 to D5 of 2026-11-01). Roles: `editor` content, `publisher` also publish and rollback, `admin` also import, create and delete bots. End-to-end test: `cd studio/frontend && npm run e2e` (own database `studio_e2e`, ports 8712/5712, installed Chrome).
 Read first: this file, [docs/studio/README.md](../../studio/README.md) (decisions 1 to 6 of 2026-10-27, esp. 3 and 4),
 [api.md](../../studio/api.md) "Validation, publication, history", [data-model.md](../../studio/data-model.md)
 "Publications", [screens.md](../../studio/screens.md) section 8, ADR 0012 and 0013. Do not edit `voxstage/`. Work on
