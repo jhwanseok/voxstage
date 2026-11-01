@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import bots, chat, datatypes, portable, service, settings, yamlio
+from . import bots, chat, datatypes, diffs, portable, service, settings, yamlio
 from .db import get_session, session_scope
 from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile, Role, Tool, User, UserRole)
@@ -890,6 +890,46 @@ def one_publication(b: str, n: int, session: Session = Depends(get_session)):
     files = session.scalars(select(PublicationFile).where(PublicationFile.publication_id == p.id)
                             .order_by(PublicationFile.path)).all()
     return {**pub_out(p), "files": [{"path": f.path, "size": len(f.content.encode("utf-8"))} for f in files]}
+
+
+def _pub_files(session: Session, p: Publication) -> dict[str, str]:
+    return {f.path: f.content for f in session.scalars(select(PublicationFile).where(PublicationFile.publication_id == p.id))}
+
+
+@app.get(API + "/bots/{b}/publications/{n}/diff")
+def publication_diff(b: str, n: int, against: str = "previous", session: Session = Depends(get_session)):
+    """What changes going from `against` to publication n: the one before it (default), another number, or `draft`.
+    With `draft` it is what a rollback to n would change in the draft."""
+    bot = get_bot(session, b)
+    target = _pub(session, bot, n)
+    domain = session.get(Domain, bot.domain_id)
+    if against == "draft":
+        base, base_ref = portable.export_bot(session, bot), {"kind": "draft", "number": None}
+    elif against == "previous":
+        prev = session.scalar(select(Publication).where(Publication.bot_id == bot.id, Publication.number < n)
+                              .order_by(Publication.number.desc()).limit(1))
+        base, base_ref = (_pub_files(session, prev), {"kind": "publication", "number": prev.number}) if prev else             ({}, {"kind": "none", "number": None})
+    else:
+        try:
+            m = int(against)
+        except ValueError:
+            raise HTTPException(422, "against is previous, draft or a publication number")
+        base, base_ref = _pub_files(session, _pub(session, bot, m)), {"kind": "publication", "number": m}
+    return {"base": base_ref, "target": {"kind": "publication", "number": n},
+            **diffs.compare(base, _pub_files(session, target), domain.slug, bot.lang)}
+
+
+@app.get(API + "/bots/{b}/changes")
+def draft_changes(b: str, session: Session = Depends(get_session)):
+    """What the draft changed since the newest publication (the publish dialog); everything is new before the first."""
+    bot = get_bot(session, b)
+    domain = session.get(Domain, bot.domain_id)
+    latest = session.scalar(select(Publication).where(Publication.bot_id == bot.id)
+                            .order_by(Publication.number.desc()).limit(1))
+    base = _pub_files(session, latest) if latest else {}
+    return {"base": {"kind": "publication", "number": latest.number} if latest else {"kind": "none", "number": None},
+            "target": {"kind": "draft", "number": None},
+            **diffs.compare(base, portable.export_bot(session, bot), domain.slug, bot.lang)}
 
 
 @app.get(API + "/bots/{b}/publications/{n}/files/{path:path}")
