@@ -1,6 +1,6 @@
 # Spec ST2: publication history, diff, rollback, sibling check, roles
 
-Status: **draft, details open** (owner: ST2 before ST3, 2026-10-31). Nothing here is built until the spec is approved.
+Status: **approved, D1 to D5 decided** (owner: ST2 before ST3, decisions 2026-11-01).
 Read first: this file, [docs/studio/README.md](../../studio/README.md) (decisions 1 to 6 of 2026-10-27, esp. 3 and 4),
 [api.md](../../studio/api.md) "Validation, publication, history", [data-model.md](../../studio/data-model.md)
 "Publications", [screens.md](../../studio/screens.md) section 8, ADR 0012 and 0013. Do not edit `voxstage/`. Work on
@@ -27,15 +27,15 @@ and `updated_by` and `published_by` columns that are already filled with the loc
 
 ## Decisions to settle before approval
 
-Asked one at a time, recommendation first. A row is edited to DECIDED when the owner answers.
+All five answered by the owner on 2026-11-01. D1 to D4 follow the recommendation; D5 differs (keep the newest 5, not forever).
 
 | # | Question | Recommendation and why | Status |
 |---|---|---|---|
-| D1 | A bot's publication also holds the **domain's shared files** (`tools.yaml`, `types.yaml`, slot lists, raw domain files). Does a rollback restore them too? | **No: restore only the bot's own files.** The shared files belong to every language of the domain; rolling back `bank-en` must not silently change `bank-ko`'s API connections or types. The new publication is N's own files plus the domain's current shared files, and it must pass the engine's validation or nothing changes (`422` with the report). A later option "also restore the shared files" can be added with the list of affected bots, if wanted | OPEN, asked first |
-| D2 | **Diff unit**: raw text only, or a summary by meaning? | **Both, summary first.** A summary by what an operator edits (questions added, changed, removed; scenarios with steps added, removed, rewired, text changed; API connections; each settings file) with the unified text diff of the exported YAML under "자세히". Text alone says "line 212 changed", which no operator can use; the summary alone hides what exactly changed | OPEN |
-| D3 | **Sibling check**: when does it run, what does it compare, does it ever block? | **On demand and in the publish dialog, as warnings, never blocking.** Compare only structure of same-id scenarios (step ids, kinds, links, API and its 속성 connections); never texts, which differ by language. Say which scenarios exist in one language only. The engine's twin test stays on `domains/`; a studio bot may differ on purpose (README: "optional report, not a rule") | OPEN |
-| D4 | **Roles**: enforce them, and how is the user chosen without a login? | **Enforce in the API, choose the user with a header, no screen.** `editor` edits content, `publisher` also publishes and rolls back, `admin` also imports and deletes bots; the user is the `X-Studio-User` email, defaulting to the local user (who has all roles), so the app behaves as today and tests can act as an editor. The history shows the author's display name. A login screen and a user admin screen stay out (api.md "Not in v1") | OPEN |
-| D5 | **Retention**: keep every publication? | **Yes, forever.** They are small text and the history is the audit trail; nothing deletes a publication, and deleting a bot deletes its history (as it does today) | proposed, no question needed unless the owner objects |
+| D1 | A bot's publication also holds the **domain's shared files** (`tools.yaml`, `types.yaml`, slot lists, raw domain files). Does a rollback restore them too? | **No: restore only the bot's own files.** The shared files belong to every language of the domain; rolling back `bank-en` must not silently change `bank-ko`'s API connections or types. The new publication is N's own files plus the domain's current shared files, and it must pass the engine's validation or nothing changes (`422` with the report). A later option "also restore the shared files" can be added with the list of affected bots, if wanted | **DECIDED A** (2026-11-01) |
+| D2 | **Diff unit**: raw text only, or a summary by meaning? | **Both, summary first.** A summary by what an operator edits (questions added, changed, removed; scenarios with steps added, removed, rewired, text changed; API connections; each settings file) with the unified text diff of the exported YAML under "자세히". Text alone says "line 212 changed", which no operator can use; the summary alone hides what exactly changed | **DECIDED, both** (2026-11-01) |
+| D3 | **Sibling check**: when does it run, what does it compare, does it ever block? | **On demand and in the publish dialog, as warnings, never blocking.** Compare only structure of same-id scenarios (step ids, kinds, links, API and its 속성 connections); never texts, which differ by language. Say which scenarios exist in one language only. The engine's twin test stays on `domains/`; a studio bot may differ on purpose (README: "optional report, not a rule") | **DECIDED, structure only** (2026-11-01). Owner: real bots will differ in content too, so structure is enough |
+| D4 | **Roles**: enforce them, and how is the user chosen without a login? | **Enforce in the API, choose the user with a header, no screen.** `editor` edits content, `publisher` also publishes and rolls back, `admin` also imports and deletes bots; the user is the `X-Studio-User` email, defaulting to the local user (who has all roles), so the app behaves as today and tests can act as an editor. The history shows the author's display name. A login screen and a user admin screen stay out (api.md "Not in v1") | **DECIDED as recommended** (2026-11-01) |
+| D5 | **Retention**: how many publications are kept? | **Decided by the owner: the newest 5 per bot.** After every publish or rollback the older ones are deleted with their files. The publication number keeps counting up and is never reused, so "3rd version" stays unambiguous; a rollback that points at a deleted number keeps the number as text. Only the newest 5 can be compared or rolled back to, and the screen says so. The export directory is the current state, not history | **DECIDED** (2026-11-01), differs from the proposal "forever" |
 
 ## Build order
 
@@ -44,7 +44,7 @@ Asked one at a time, recommendation first. A row is edited to DECIDED when the o
    from the parsed YAML (D2): FAQ entries by id (and their pattern), scenarios by id with steps added, removed, changed,
    rewired, API connections by name, settings files by kind. `GET /bots/{b}/publications/{n}/diff?against={m | draft}`
    returns `{files: [{path, status, unified}], summary: {...}}`. The default `against` is the publication before `n`.
-2. **Rollback (backend).** `POST /bots/{b}/publications/{n}/rollback` `{note, discard_draft}` per D1: refuse (`409`) when the
+2. **Rollback (backend).** (After the new publication is stored, prune per D5: keep the newest 5.) `POST /bots/{b}/publications/{n}/rollback` `{note, discard_draft}` per D1: refuse (`409`) when the
    draft has unpublished changes and `discard_draft` is false (decision 3); build the new files from N's own files plus the
    current shared files; validate them with the engine loader (`422` with the report, nothing changed, when they fail); in one
    transaction store a publication of kind `rollback` with `restored_from_number`, replace the bot's draft meaning rows from the
@@ -74,7 +74,7 @@ apply (author, no co-author trailer, no secrets).
 
 - Backend (real Postgres): diff of two publications, of a publication against the draft, and `against` defaults; the summary
   names the changed FAQ entry, a scenario with an added and a rewired step, a changed API connection, a changed settings
-  file; rollback creates publication `n+1` with kind `rollback`, the draft's export equals N's own files, other bots of the
+  file; a publish or rollback beyond 5 prunes the oldest and numbers never repeat (D5); rollback creates publication `n+1` with kind `rollback`, the draft's export equals N's own files, other bots of the
   domain and the shared files are unchanged (D1), `409` with an unpublished draft and `discard_draft: false`, `422` leaves
   everything as it was when N no longer validates against the shared files; layout rules of decision 4; sibling check for
   identical, one-sided and rewired scenarios; role checks (editor refused on publish and rollback, publisher refused on delete).
@@ -85,7 +85,7 @@ apply (author, no co-author trailer, no secrets).
 ## Done when
 
 - A publication can be compared with the previous one, another one and the draft, with a summary by meaning and the text diff.
-- A rollback gives a new publication of kind `rollback`, a draft equal to it, history intact, and no change to other languages'
+- A rollback gives a new publication of kind `rollback`, a draft equal to it, the newest 5 kept (D5), and no change to other languages'
   bots or the domain's shared files (D1).
 - The sibling check lists differences between `bank-en` and `bank-ko` (none for the imported pair) and a deliberately broken
   copy shows them; publishing is never blocked by it.
@@ -96,4 +96,4 @@ apply (author, no co-author trailer, no secrets).
 
 Notices and wording forms, settings forms, 정책값 in the engine's format (ST3); a chat window (built as 대화로 테스트); restoring
 single files or single entries from a version; a login screen, user management, comments, locking (api.md "Not in v1");
-publishing several bots at once; deleting or pruning publications.
+publishing several bots at once; a manual delete of a publication (the automatic keep-5 pruning of D5 is in).
