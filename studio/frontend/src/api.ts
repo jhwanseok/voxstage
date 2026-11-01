@@ -84,4 +84,6 @@ export interface BotSettings {
 export interface Publication {
   number: number; note: string; kind: string; published_by: string | null; published_at: string;
   content_hash: string; file_count?: number;
+  /** for kind "rollback": the number it restored (that version may have been removed since) */
+  restored_from_number?: number | null;
 }
