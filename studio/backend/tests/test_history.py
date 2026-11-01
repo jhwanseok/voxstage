@@ -254,3 +254,69 @@ def test_sibling_check_lists_scenarios_that_exist_in_one_language_only(client):
     assert w == {"only_korean": "only_there", "transfer": "only_there"}
     # a warning never blocks a publication
     assert client.post(f"{A}/bots/{BOT}/publications", json={}).status_code in (201, 422)
+
+
+# --- roles (D4) ---
+
+def make_user(session, email, *roles, active=True):
+    from studio_backend.models import User, UserRole
+    u = User(email=email, display_name=email.split("@")[0], is_active=active)
+    session.add(u)
+    session.flush()
+    for r in roles:
+        session.add(UserRole(user_id=u.id, role_name=r))
+    session.commit()
+    return u
+
+
+def as_user(email):
+    return {"X-Studio-User": email}
+
+
+def test_the_local_user_does_everything_and_the_history_names_the_author(client):
+    me = client.get(f"{A}/me").json()
+    assert me["roles"] == ["admin", "editor", "publisher"]
+    publish(client)
+    assert client.get(f"{A}/bots/{BOT}/publications").json()[0]["published_by_name"] == "Local user"
+    assert client.get(f"{A}/bots/{BOT}/publications/1").json()["published_by_name"] == "Local user"
+
+
+def test_an_editor_edits_but_cannot_publish_roll_back_or_delete(client, session):
+    make_user(session, "ed@x", "editor")
+    h = as_user("ed@x")
+    publish(client)
+    e = client.get(f"{A}/bots/{BOT}/faq").json()[0]
+    ok = client.put(f"{A}/bots/{BOT}/faq/{e['id']}", json={**e, "revision": None, "answer": "편집자가 고침"}, headers=h)
+    assert ok.status_code == 200
+    r = client.post(f"{A}/bots/{BOT}/publications", json={}, headers=h)
+    assert r.status_code == 403 and r.json()["detail"]["missing_role"] == "publisher"
+    assert client.post(f"{A}/bots/{BOT}/publications/1/rollback", json={"discard_draft": True}, headers=h).status_code == 403
+    assert client.delete(f"{A}/bots/{BOT}", headers=h).status_code == 403
+    assert client.post(f"{A}/domains/import", json={"domain": "shop"}, headers=h).status_code == 403
+    assert client.get(f"{A}/bots/{BOT}/publications", headers=h).status_code == 200       # reading needs no role
+    assert client.get(f"{A}/bots/{BOT}/faq").json()[0]["answer"] == "편집자가 고침"        # and the draft did change
+
+
+def test_a_publisher_publishes_and_rolls_back_but_cannot_delete(client, session):
+    make_user(session, "pub@x", "publisher")
+    h = as_user("pub@x")
+    publish(client)
+    edit_faq(client, answer="두 번째")
+    r = client.post(f"{A}/bots/{BOT}/publications", json={"note": "by publisher"}, headers=h)
+    assert r.status_code == 201 and r.json()["published_by_name"] == "pub"
+    back = client.post(f"{A}/bots/{BOT}/publications/1/rollback", json={}, headers=h)
+    assert back.status_code == 201
+    assert client.delete(f"{A}/bots/{BOT}", headers=h).status_code == 403
+    assert client.get(f"{A}/bots/{BOT}/publications").json()[0]["published_by_name"] == "pub"
+
+
+def test_a_user_without_roles_cannot_change_anything_and_unknown_users_are_refused(client, session):
+    make_user(session, "reader@x")
+    make_user(session, "gone@x", "admin", active=False)
+    e = client.get(f"{A}/bots/{BOT}/faq").json()[0]
+    assert client.put(f"{A}/bots/{BOT}/faq/{e['id']}", json={**e, "revision": None}, headers=as_user("reader@x")).status_code == 403
+    assert client.get(f"{A}/bots/{BOT}/faq", headers=as_user("reader@x")).status_code == 200
+    assert client.get(f"{A}/me", headers=as_user("nobody@x")).status_code == 401
+    assert client.get(f"{A}/me", headers=as_user("gone@x")).status_code == 403
+    # the test chat changes no content, so it needs no role
+    assert client.post(f"{A}/bots/{BOT}/chat", json={}, headers=as_user("reader@x")).status_code != 403

@@ -127,6 +127,7 @@ export default function History({ bot }: { bot: Bot }) {
                     <span className="text-xs text-muted">{when(p.published_at)}</span>
                   </div>
                   {p.kind === "rollback" && <div className="mt-0.5 text-xs font-medium text-brand-700">{p.restored_from_number}번째 버전으로 되돌림</div>}
+                  {p.published_by_name && <div className="mt-0.5 text-xs text-muted">{p.published_by_name}</div>}
                   <div className="mt-0.5 truncate text-[13px] text-ink-2">{p.note || <span className="text-muted">메모 없음</span>}</div>
                 </button>
               </li>

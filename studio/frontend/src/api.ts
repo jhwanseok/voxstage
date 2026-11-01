@@ -1,6 +1,10 @@
+const ROLE_WORD: Record<string, string> = { editor: "편집", publisher: "게시", admin: "관리" };
+
 export class ApiError extends Error {
   constructor(public status: number, public body: any) {
-    super(typeof body === "string" ? body : body?.detail?.message ?? body?.detail ?? body?.message ?? `HTTP ${status}`);
+    super(status === 403 && body?.detail?.missing_role
+      ? `이 작업은 ${ROLE_WORD[body.detail.missing_role] ?? body.detail.missing_role} 권한이 필요해요`
+      : typeof body === "string" ? body : body?.detail?.message ?? body?.detail ?? body?.message ?? `HTTP ${status}`);
   }
 }
 
@@ -86,4 +90,5 @@ export interface Publication {
   content_hash: string; file_count?: number;
   /** for kind "rollback": the number it restored (that version may have been removed since) */
   restored_from_number?: number | null;
+  published_by_name?: string | null;
 }
