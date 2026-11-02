@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import bots, chat, datatypes, diffs, portable, service, settings, siblings, yamlio
+from . import bots, chat, datatypes, diffs, portable, service, settings, siblings, slotlists, wording, yamlio
 from .db import get_session, session_scope
 from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile, Role, Tool, User, UserRole)
@@ -613,6 +613,237 @@ def put_types(d: str, body: TypesIn, session: Session = Depends(get_session), us
     return types_out(session, dom)
 
 
+# --- 안내 문구 and 응답 규칙 (ST3) ---
+
+def _bot_setting(session: Session, bot: Bot, kind: str) -> DomainSetting | None:
+    return session.scalar(select(DomainSetting).where(DomainSetting.bot_id == bot.id, DomainSetting.kind == kind))
+
+
+def _bot_flows(session: Session, bot: Bot) -> list[Flow]:
+    return list(session.scalars(select(Flow).where(Flow.bot_id == bot.id).order_by(Flow.flow_id)))
+
+
+def _attribute_names(session: Session, bot: Bot) -> list[str]:
+    dom = session.get(Domain, bot.domain_id)
+    types = _types_row(session, dom)
+    return wording.attribute_names(_bot_flows(session, bot), ((types.body if types else None) or {}).get("session_roles"))
+
+
+def _starter_body(lang: str, rel: str):
+    try:
+        return bots._starter(lang, rel)
+    except bots.BotError:
+        return None
+
+
+def notices_out(session: Session, bot: Bot) -> dict:
+    row = _bot_setting(session, bot, "notices")
+    starter = _starter_body(bot.lang, "notices.yaml") or {}
+    form = wording.stored_to_form(row.body if row else starter)
+    flows = _bot_flows(session, bot)
+    used = {n["id"]: sorted(f.flow_id for f in flows
+                            if any(isinstance(x, dict) and x.get("type") == "notices"
+                                   and (x.get("ids") is None or n["id"] in x["ids"]) for x in (f.nodes or {}).values()))
+            for n in form["notices"]}
+    return {"slug": bot.slug, "lang": bot.lang, "exists": row is not None, "revision": row.revision if row else 0,
+            **form, "starter_wording": wording.stored_to_form(starter)["wording"],
+            "meaning": wording.WORDING_MEANING, "placeholder_keys": list(wording.PLACEHOLDER_KEYS),
+            "attributes": _attribute_names(session, bot), "reserved": wording.RESERVED,
+            "to_translate": bots.to_translate(bot)["notices"], "used_by": used}
+
+
+class NoticeIn(BaseModel):
+    id: str
+    text: str
+    applies_when: str | None = None
+
+
+class NoticesIn(BaseModel):
+    notices: list[NoticeIn]
+    wording: dict[str, str]
+    revision: int | None = None
+
+
+class ExpressionIn(BaseModel):
+    text: str
+
+
+@app.get(API + "/bots/{b}/notices")
+def get_notices(b: str, session: Session = Depends(get_session)):
+    return notices_out(session, get_bot(session, b))
+
+
+@app.put(API + "/bots/{b}/notices")
+def put_notices(b: str, body: NoticesIn, session: Session = Depends(get_session), user: User = Depends(current_user)):
+    bot = get_bot(session, b)
+    row = _bot_setting(session, bot, "notices")
+    if row is not None:
+        check_revision(row, body.revision, notices_out(session, bot))
+    try:
+        stored = wording.check_notices(body.model_dump(exclude={"revision"}), _attribute_names(session, bot))
+    except wording.WordingError as exc:
+        raise HTTPException(422, {"message": "invalid notices", "problems": exc.problems})
+    before = wording.stored_to_form(row.body if row else None)["notices"]
+    if row is None:
+        session.add(DomainSetting(bot_id=bot.id, kind="notices", body=stored, updated_by=user.id))
+        touch_bot(bot)
+    elif stored != row.body:
+        row.body, row.updated_by = stored, user.id
+        row.revision += 1
+        touch_bot(bot)
+    # ST3 D6, per item: a fixed notice that was changed or removed is no longer the sibling's text
+    old = {n["id"]: n for n in before}
+    for n in body.notices:
+        if old.get(n.id, {}).get("text") != n.text:
+            bots.mark_translated(bot, "notices", n.id)
+    for nid in set(old) - {n.id for n in body.notices}:
+        bots.mark_translated(bot, "notices", nid)
+    session.commit()
+    return notices_out(session, bot)
+
+
+@app.post(API + "/bots/{b}/notices/check-expression")
+def check_expression(b: str, body: ExpressionIn, session: Session = Depends(get_session)):
+    bot = get_bot(session, b)
+    return wording.check_expression(body.text, _attribute_names(session, bot))
+
+
+def rules_out(session: Session, bot: Bot) -> dict:
+    out: dict[str, Any] = {"slug": bot.slug, "lang": bot.lang, "kinds": {}}
+    for kind in wording.RULE_KINDS:
+        row = _bot_setting(session, bot, kind)
+        starter = _starter_body(bot.lang, portable.BOT_SETTINGS[kind])
+        out["kinds"][kind] = {"exists": row is not None, "revision": row.revision if row else 0,
+                              "body": row.body if row else starter, "starter": starter}
+    return out
+
+
+class RuleIn(BaseModel):
+    body: dict[str, Any]
+    revision: int | None = None
+
+
+class RuleTestIn(BaseModel):
+    text: str = Field(max_length=500)
+    bodies: dict[str, dict[str, Any]] | None = None
+
+
+@app.get(API + "/bots/{b}/rules")
+def get_rules(b: str, session: Session = Depends(get_session)):
+    return rules_out(session, get_bot(session, b))
+
+
+@app.put(API + "/bots/{b}/rules/{kind}")
+def put_rule(b: str, kind: str, body: RuleIn, session: Session = Depends(get_session),
+             user: User = Depends(current_user)):
+    if kind not in wording.RULE_KINDS:
+        raise HTTPException(404, f"no rule file {kind}")
+    bot = get_bot(session, b)
+    row = _bot_setting(session, bot, kind)
+    if row is not None:
+        check_revision(row, body.revision, rules_out(session, bot))
+    try:
+        wording.check_rule(kind, body.body)
+    except wording.WordingError as exc:
+        raise HTTPException(422, {"message": f"invalid {kind}", "problems": exc.problems})
+    if row is None:
+        session.add(DomainSetting(bot_id=bot.id, kind=kind, body=body.body, updated_by=user.id))
+        touch_bot(bot)
+    elif body.body != row.body:
+        row.body, row.updated_by = body.body, user.id
+        row.revision += 1
+        touch_bot(bot)
+    session.commit()
+    return rules_out(session, bot)
+
+
+@app.post(API + "/bots/{b}/rules/test")
+def test_rules(b: str, body: RuleTestIn, session: Session = Depends(get_session)):
+    """The engine's matchers on a typed sentence, with the saved rule words or the ones the form holds."""
+    bot = get_bot(session, b)
+    current = rules_out(session, bot)["kinds"]
+    bodies = {k: (body.bodies or {}).get(k, current[k]["body"]) for k in wording.RULE_KINDS}
+    try:
+        return wording.test_sentence(bot.lang, body.text, bodies)
+    except wording.WordingError as exc:
+        raise HTTPException(422, {"message": "invalid rule words", "problems": exc.problems})
+
+
+# --- slot lists of a domain (sensitive_slots.yaml, readback_slots.yaml; ST3) ---
+
+def _list_row(session: Session, dom: Domain, kind: str) -> DomainSetting | None:
+    return session.scalar(select(DomainSetting).where(DomainSetting.domain_id == dom.id, DomainSetting.kind == kind))
+
+
+def _asked(session: Session, dom: Domain) -> dict[str, dict]:
+    types = _types_row(session, dom)
+    return slotlists.asked_attributes(domain_flows(session, dom), types.body if types else None)
+
+
+def slot_lists_out(session: Session, dom: Domain) -> dict:
+    sens, back = _list_row(session, dom, "sensitive_slots"), _list_row(session, dom, "readback_slots")
+    asked = _asked(session, dom)
+    sens_names = list((sens.body or {}).get("sensitive_slots") or []) if sens else []
+    back_map = dict((back.body or {}).get("readback_slots") or {}) if back else {}
+    return {"domain": dom.slug, "sensitive": {"revision": sens.revision if sens else 0, "slots": sens_names},
+            "readback": {"revision": back.revision if back else 0,
+                         "slots": [{"slot": k, "format": v} for k, v in back_map.items()]},
+            "candidates": slotlists.candidates(asked), "formats": slotlists.formats(),
+            "asked_in": {a: sorted({f"{bot}/{fid}" for bot, fid in e["flows"]}) for a, e in asked.items()},
+            "affects_bots": affected_bots(dom)}
+
+
+class SlotListsIn(BaseModel):
+    sensitive: list[str]
+    readback: list[dict[str, str]]
+    sensitive_revision: int | None = None
+    readback_revision: int | None = None
+
+
+@app.get(API + "/domains/{d}/slot-lists")
+def get_slot_lists(d: str, session: Session = Depends(get_session)):
+    return slot_lists_out(session, get_domain(session, d))
+
+
+@app.put(API + "/domains/{d}/slot-lists")
+def put_slot_lists(d: str, body: SlotListsIn, session: Session = Depends(get_session),
+                   user: User = Depends(current_user)):
+    dom = get_domain(session, d)
+    sens, back = _list_row(session, dom, "sensitive_slots"), _list_row(session, dom, "readback_slots")
+    current = slot_lists_out(session, dom)
+    if sens is not None:
+        check_revision(sens, body.sensitive_revision, current)
+    if back is not None:
+        check_revision(back, body.readback_revision, current)
+    now_back = {r["slot"]: r["format"] for r in current["readback"]["slots"]}
+    try:
+        clean = slotlists.check_lists(body.sensitive, body.readback,
+                                      {"sensitive": current["sensitive"]["slots"], "readback": now_back},
+                                      _asked(session, dom))
+    except wording.WordingError as exc:
+        raise HTTPException(422, {"message": "invalid slot lists", "problems": exc.problems})
+    changed = False
+    for kind, row, doc, same in (
+            ("sensitive_slots", sens, {"sensitive_slots": clean["sensitive"]} if clean["sensitive"] else None,
+             clean["sensitive"] == current["sensitive"]["slots"]),
+            ("readback_slots", back, {"readback_slots": clean["readback"]} if clean["readback"] else None,
+             clean["readback"] == now_back)):
+        if same:
+            continue
+        changed = True
+        if doc is None:
+            session.delete(row)
+        elif row is None:
+            session.add(DomainSetting(domain_id=dom.id, kind=kind, body=doc, updated_by=user.id))
+        else:
+            row.body, row.updated_by = doc, user.id
+            row.revision += 1
+    if changed:
+        touch_domain(session, dom)
+    session.commit()
+    return slot_lists_out(session, dom)
+
+
 # --- flows (viewer in ST1) ---
 
 def layout_out(session: Session, bot: Bot, flow_id: str) -> dict:
@@ -865,7 +1096,7 @@ def validate(b: str, session: Session = Depends(get_session)):
 @app.get(API + "/bots/{b}/validation")
 def last_validation(b: str, session: Session = Depends(get_session)):
     bot = get_bot(session, b)
-    return service.cached_report(bot)
+    return service.refresh_policy_items(session, bot, service.cached_report(bot))
 
 
 class PublishIn(BaseModel):

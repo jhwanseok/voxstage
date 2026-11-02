@@ -10,7 +10,7 @@ import shutil
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from . import bots, validation
+from . import bots, settings, validation
 from .models import (Bot, Domain, DomainFile, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      PublicationFile)
 from .portable import export_bot, load_bot_files, prune_layout
@@ -51,13 +51,34 @@ def bot_status(bot: Bot, domain: Domain) -> dict:
 def validate_bot(session: Session, bot: Bot) -> dict:
     domain = session.get(Domain, bot.domain_id)
     files = export_bot(session, bot)
-    items = validation.validate_files(files, domain.slug, bot.lang)
+    items = validation.validate_files(files, domain.slug, bot.lang) + policy_items(session, bot)
     rep = validation.report(items, bot.draft_revision, domain.shared_revision)
     bot.last_validated_revision = bot.draft_revision
     bot.last_validated_shared_revision = domain.shared_revision
     bot.last_validation_ok = rep["ok"]
     _REPORTS[bot.id] = rep
     return rep
+
+
+def policy_items(session: Session, bot: Bot) -> list[dict]:
+    """ST3 D5: a flow says `{policy.<key>}` and the bot has no value for it. The engine takes the value from the
+    request's `setup.policy`, so this only warns; the values are the studio's own and are never exported."""
+    have = (bot.studio_settings or {}).get("policy") or {}
+    flows = session.scalars(select(Flow).where(Flow.bot_id == bot.id)).all()
+    domain = session.get(Domain, bot.domain_id)
+    return [{"severity": "warning", "source": "studio", "code": "policy_value_missing",
+             "file": f"{domain.slug}/{bot.lang}/flows/{fid}.yaml", "lang": bot.lang, "flow_id": fid, "node_id": None,
+             "field": None, "parameter": None, "role": None, "path": None, "policy_key": ref["key"],
+             "message": f"정책 값 `{ref['key']}`에 값이 없습니다. 개요의 기본 설정에서 값을 입력하세요."}
+            for ref in settings.policy_refs(flows) if ref["key"] not in have for fid in ref["flows"]]
+
+
+def refresh_policy_items(session: Session, bot: Bot, rep: dict | None) -> dict | None:
+    """The policy values change without a new draft revision, so the cached report gets its warnings recomputed."""
+    if rep is None:
+        return None
+    items = [i for i in rep["items"] if i.get("code") != "policy_value_missing"] + policy_items(session, bot)
+    return {**rep, "items": items}
 
 
 def content_hash(files: dict[str, str]) -> str:

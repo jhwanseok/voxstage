@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import settings, yamlio
-from .models import (Bot, Domain, DomainFile, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
+from .models import (Bot, Domain, DomainSetting, FaqEntry, Flow, FlowLayout, FlowNodeLayout, Publication,
                      Tool)
 from .portable import BOT_SETTINGS
 
@@ -112,8 +112,8 @@ def create_bot(session: Session, *, domain: str, lang: str, domain_title: str | 
                                   updated_by=user_id))
     starter = _starter(lang, "notices.yaml")
     notices = _fixed_notices(session, src) if src else {}
-    session.add(DomainFile(bot_id=bot.id, path="notices.yaml", updated_by=user_id,
-                           content=yamlio.dump({"notices": notices, "wording": starter["wording"]})))
+    session.add(DomainSetting(bot_id=bot.id, kind="notices", updated_by=user_id,
+                              body={"notices": notices, "wording": starter["wording"]}))
     if src:
         bot.origin = {"copied_from": src.slug, "to_translate": _copy_content(session, src, bot, user_id)}
         bot.origin["to_translate"]["notices"] = list(notices)
@@ -126,8 +126,8 @@ def _setting(session: Session, bot: Bot, kind: str) -> DomainSetting | None:
 
 
 def _fixed_notices(session: Session, src: Bot) -> dict:
-    row = session.scalar(select(DomainFile).where(DomainFile.bot_id == src.id, DomainFile.path == "notices.yaml"))
-    doc = yamlio.load(row.content) if row else None
+    row = _setting(session, src, "notices")
+    doc = row.body if row else None
     return dict(doc.get("notices") or {}) if isinstance(doc, dict) else {}
 
 
