@@ -1,6 +1,6 @@
 # Spec ST3: notices, wording, rule words, slot lists, policy values
 
-Status: **draft, details open** (written 2026-11-01). Nothing here is built until the owner approves it.
+Status: **decided, in build** (written 2026-11-01; the owner answered D1 to D6 on 2026-11-01, every one as recommended).
 Read first: this file, [docs/studio/README.md](../../studio/README.md), [screens.md](../../studio/screens.md) sections 9 and 10,
 [data-model.md](../../studio/data-model.md), [R5](R5-notices-registry.md) (registry decisions R5-1, R5-2), R7b, R8, R9, R14.
 Do not edit `voxstage/`. Work on branch `wip/studio-st3`, finish on `dev`.
@@ -27,16 +27,16 @@ Do not edit `voxstage/`. Work on branch `wip/studio-st3`, finish on `dev`.
 
 ## Decisions to settle before approval
 
-Asked one at a time, recommendation first. A row is edited to DECIDED when the owner answers.
+The owner answered all six on 2026-11-01 (hub Q72), each as recommended.
 
 | # | Question | Recommendation and why | Status |
 |---|---|---|---|
-| D1 | **Where do these forms live?** | **Two new menu pages.** "안내 문구" (fixed notices and the 17 wordings, one language) and "응답 규칙" (yes and no words, commands, corrections, confusions). The slot lists go on the existing 데이터 page, because they belong to the domain and are shared by every language. Wording and rule words are per bot, the slot lists are per domain, so mixing them on one page would hide that a slot-list change reaches the other language | OPEN, asked first |
-| D2 | **How much of the wording can be edited?** | **Text only.** The 17 keys are the engine's fixed set and all are required, so the form shows each key with when it is said (plain Korean), its text, a check that `{value}` is present where the engine needs it (`readback`, `correction.offer`) and absent where it does not, and a "기본 문구로 되돌리기" that copies the language starter. No adding or removing keys | OPEN |
-| D3 | **How is `applies_when` of a fixed notice entered?** | **A text box with a live check, plus a list of the attributes to click in.** The expression language is the engine's; the studio compiles the text with the engine and shows the error under the box, so it can never save something the engine will refuse. A point-and-click builder is a later step | OPEN |
-| D4 | **Can an operator try the rule words?** | **Yes, a small test box on 응답 규칙.** Type a sentence and see which command, yes or no, or correction it triggers, computed by the engine's matcher. Without it, editing `any_of` lists is guesswork. The 대화로 테스트 stays for whole conversations | OPEN |
-| D5 | **Policy values: stay studio-only?** | **Yes.** The engine reads `{policy.<key>}` from the request's `setup.policy` (R14), not from a file, so a published pack has no value in it. Keep the values in `studio_settings`, never export them, and add a validation warning when a flow uses a key with no value | OPEN |
-| D6 | **Translation tracking for wording and notices** | **Per item.** Saving a wording key or a fixed notice of a copied bot marks that item translated; the overview counter goes down as the list is done. Same rule as FAQ entries and flows | proposed, no question needed unless the owner objects |
+| D1 | **Where do these forms live?** | **Two new menu pages.** "안내 문구" (fixed notices and the 17 wordings, one language) and "응답 규칙" (yes and no words, commands, corrections, confusions). The slot lists go on the existing 데이터 page, because they belong to the domain and are shared by every language. Wording and rule words are per bot, the slot lists are per domain, so mixing them on one page would hide that a slot-list change reaches the other language | **DECIDED** |
+| D2 | **How much of the wording can be edited?** | **Text only.** The 17 keys are the engine's fixed set and all are required, so the form shows each key with when it is said (plain Korean), its text, a check that `{value}` is present where the engine needs it (`readback`, `correction.offer`) and absent where it does not, and a "기본 문구로 되돌리기" that copies the language starter. No adding or removing keys | **DECIDED** |
+| D3 | **How is `applies_when` of a fixed notice entered?** | **A text box with a live check, plus a list of the attributes to click in.** The expression language is the engine's; the studio compiles the text with the engine and shows the error under the box, so it can never save something the engine will refuse. A point-and-click builder is a later step | **DECIDED** |
+| D4 | **Can an operator try the rule words?** | **Yes, a small test box on 응답 규칙.** Type a sentence and see which command, yes or no, or correction it triggers, computed by the engine's matcher. Without it, editing `any_of` lists is guesswork. The 대화로 테스트 stays for whole conversations | **DECIDED** |
+| D5 | **Policy values: stay studio-only?** | **Yes.** The engine reads `{policy.<key>}` from the request's `setup.policy` (R14), not from a file, so a published pack has no value in it. Keep the values in `studio_settings`, never export them, and add a validation warning when a flow uses a key with no value | **DECIDED** |
+| D6 | **Translation tracking for wording and notices** | **Per item.** Saving a wording key or a fixed notice of a copied bot marks that item translated; the overview counter goes down as the list is done. Same rule as FAQ entries and flows | **DECIDED** |
 
 ## Build order
 

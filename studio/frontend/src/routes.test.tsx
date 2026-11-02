@@ -42,6 +42,8 @@ beforeEach(() => {
       : url.endsWith("/settings") ? settings
       : url.endsWith("/validation") ? null
       : url.endsWith("/types") ? { domain: "bank", exists: false, revision: 0, body: { types: {}, session_roles: {} }, usage: {}, field_types: ["text"], affects_bots: ["bank-ko"] }
+      : url.endsWith("/slot-lists") ? { domain: "bank", sensitive: { revision: 0, slots: [] }, readback: { revision: 0, slots: [] },
+        candidates: { sensitive: [], readback: [] }, formats: [], asked_in: {}, affects_bots: ["bank-ko"] }
       : [];
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   }));

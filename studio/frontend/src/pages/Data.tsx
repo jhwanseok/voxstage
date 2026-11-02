@@ -11,6 +11,7 @@ import {
   Button, Disclosure, EmptyState, ErrorState, Field, IconButton, Input, LoadingBlock, Notice, PageHeader, Segmented, Select,
   Sheet, StatusChip, eul, useToast, WordsInput,
 } from "../ui";
+import SlotLists from "./SlotLists";
 
 const typeName = (t: string) => EXTRACTORS[t] ?? t;
 
@@ -308,6 +309,12 @@ export default function DataPage({ bot }: { bot: Bot }) {
                 <Button size="sm" icon={<Plus size={14} />} disabled={!types.length} onClick={() => setOpen({ kind: "caller", id: null })}>발신자 정하기</Button>
               </div>
             )}
+          </section>
+
+          <section aria-labelledby="slots-h">
+            <h2 id="slots-h" className="text-[15px] font-semibold text-ink">속성 목록</h2>
+            <p className="mb-3 mt-0.5 text-xs text-muted">언어와 상관없이 {domainName(bot.domain, bot.domain_title)}의 모든 상담봇에 똑같이 적용돼요.</p>
+            <SlotLists bot={bot} />
           </section>
         </div>
       )}

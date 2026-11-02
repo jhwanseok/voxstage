@@ -80,14 +80,29 @@ is no per-node endpoint.
 lists, required keys), edges point to existing nodes, one outgoing edge per handle, unreachable nodes. The loader is
 authoritative and runs on validate.
 
-## Notices and wording, settings (ST3)
+## Notices, wording, rule words, slot lists (ST3, built)
+
+Every check here is the engine's own: the body is written to a temporary file and read by the engine's loader
+(`load_registry`, `load_confirm_words`, `load_commands`, `load_correction`, `load_confusions`, `load_sensitive_slots`,
+`load_readback_slots`), after field checks that name the key. A refusal is `422 {detail: {message, problems: [{field, message}]}}`
+(`field` is `wording.<key>`, `notices.<id>.text`, `notices.<id>.applies_when`, `sensitive.<attribute>`, ...). A stale `revision` is `409`.
+Saving changes the bot's draft (or the domain's shared revision for slot lists); validate and publish as usual.
 
 | Method and path | Purpose |
 |---|---|
-| `GET/POST/PUT/DELETE /bots/{b}/notices[/{id}]` | Fixed notices: text, unique integer priority, optional `applies_when` |
-| `GET/PUT /bots/{b}/wording` | The fixed set of situation keys; `PUT` takes all keys |
-| `GET/PUT /bots/{b}/settings/{kind}` (bot) and `/domains/{d}/settings/{kind}` (shared: `sensitive_slots`, `readback_slots`) | `config`, `confirm`, `commands`, `corrections`, `confusions`, `sensitive_slots`, `readback_slots` |
-| `GET/PUT /bots/{b}/files/{path}` and `/domains/{d}/files/{path}` | Raw files (also the policy files until the format is modelled) |
+| `GET /bots/{b}/notices` | `{notices: [{id, text, applies_when}] in speaking order, wording: {key: text} (17 keys), starter_wording, meaning, placeholder_keys, attributes, reserved, to_translate, used_by, revision}` |
+| `PUT /bots/{b}/notices` | `{notices, wording, revision}`. All 17 keys are required and fixed; `{value}` is required in `readback` and `correction.offer` and refused elsewhere; a fixed notice has a unique name, text without `{}`, and an `applies_when` that the engine compiles. Priorities are written as 10, 20, 30 in list order. Changed or removed fixed notices of a copied bot come off `to_translate.notices` |
+| `POST /bots/{b}/notices/check-expression` | `{text}` gives `{ok, error, names}`: the engine compiles the text over the bot's attributes and the reserved names (`slots`, `customer`, `policy`, `result`) and says which attributes it reads |
+| `GET /bots/{b}/rules` | `{kinds: {confirm, commands, corrections, confusions: {exists, revision, body, starter}}}`; a missing file shows the language starter |
+| `PUT /bots/{b}/rules/{confirm\|commands\|corrections\|confusions}` | `{body, revision}` in the engine file's shape (`yes_words`/`no_words`; `cancel`/`back`/`agent` patterns; `correction` pattern; `pairs`) |
+| `POST /bots/{b}/rules/test` | `{text, bodies?}` runs the engine's tokenizer and `Matcher`: `{tokens, command: {matched, ties}, confirm: {answer, yes_words, no_words}, correction: {matched}, confusions: [{value, partner}]}`. `bodies` are rule files as the form holds them (saved or not) |
+| `GET /domains/{d}/slot-lists` | `{sensitive: {slots, revision}, readback: {slots: [{slot, format}], revision}, candidates, formats, asked_in, affects_bots}`. Sensitive candidates are attributes every scenario asks as `digits`; formats are the engine's `count`, `date`, `money('KRW')`, `money('USD')` |
+| `PUT /domains/{d}/slot-lists` | `{sensitive: [names], readback: [{slot, format}], sensitive_revision, readback_revision}`. A sensitive attribute that a scenario asks in another format is refused; an empty list removes the file; a change raises the domain's `shared_revision` |
+| `GET/PUT /bots/{b}/settings` | Unchanged (ST1 and later): `config` numbers, hand-off number, policy values (studio only) |
+
+Validation reports a warning `policy_value_missing` (one item per scenario and key, with `policy_key`) when a scenario says
+`{policy.<key>}` and the bot has no value for it (decision D5). The values stay in `bot.studio_settings` and are never exported.
+`GET /bots/{b}/validation` recomputes these warnings, because policy values change without a new draft revision.
 
 ## Validation, publication, history
 

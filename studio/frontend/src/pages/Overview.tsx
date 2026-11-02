@@ -51,11 +51,11 @@ function Translate({ bot, left, onDone }: { bot: Bot; left: ToTranslate; onDone:
   return (
     <Notice tone="warn" title={<span className="inline-flex items-center gap-1.5"><Languages size={15} aria-hidden />번역할 곳이 {total}개 남았어요</span>}
       action={<Button size="sm" loading={busy} onClick={done}>모두 번역했어요</Button>}>
-      {langName(from)} 상담봇에서 복사한 문구예요. 질문이나 시나리오를 고쳐 저장하면 번역한 것으로 보고 목록에서 빠져요.
+      {langName(from)} 상담봇에서 복사한 문구예요. 질문, 시나리오, 고정 안내를 고쳐 저장하면 번역한 것으로 보고 목록에서 빠져요.
       <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
         {left.faq.length > 0 && <li><Link className={linkCls} to={`${paths.bot(bot.slug, "faq")}?filter=translate`}>질문 {left.faq.length}개</Link></li>}
         {left.flows.length > 0 && <li><Link className={linkCls} to={paths.bot(bot.slug, "flows")}>시나리오 {left.flows.length}개</Link></li>}
-        {left.notices.length > 0 && <li className="text-ink-2">고정 안내 {left.notices.length}개: 아직 스튜디오에서 고칠 수 없어요</li>}
+        {left.notices.length > 0 && <li><Link className={linkCls} to={paths.bot(bot.slug, "notices")}>고정 안내 {left.notices.length}개</Link></li>}
       </ul>
     </Notice>
   );

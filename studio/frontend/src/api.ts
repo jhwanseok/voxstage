@@ -92,3 +92,5 @@ export interface Publication {
   restored_from_number?: number | null;
   published_by_name?: string | null;
 }
+
+export type { NoticesResponse, RulesResponse, SlotListsResponse } from "./lib/wording";

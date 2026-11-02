@@ -16,8 +16,8 @@ React, TypeScript, Vite; flow editor on React Flow (`@xyflow/react`). Server sta
 | 6 | Flow editor (same screen, editing on) | ST2 |
 | 7 | Validation panel | ST2 (a plain list in ST1) |
 | 8 | Publish dialog, history, diff, rollback | ST2 |
-| 9 | Notices and wording | ST3 |
-| 10 | Settings (policy, config, confirm words, commands, corrections) | ST3 |
+| 9 | 안내 문구 (fixed notices, 17 situation wordings) | ST3 |
+| 10 | 응답 규칙 (yes and no words, commands, corrections, confusions) and 속성 목록 on 데이터 | ST3 |
 | 11 | Preview chat | ST3 |
 
 ## 1. Domains and import
@@ -141,18 +141,30 @@ when anything changes.
   replaces the draft, that the domain's shared files (API connections, types, lists) are not rolled back (ST2 D1), shows
   what changes in the draft, and asks to discard unpublished changes when there are any. Download as zip.
 
-## 9. Notices and wording (ST3)
+## 9. 안내 문구 (ST3, built)
 
-Notices: ordered by priority, drag to reorder (priorities renumbered but unique), text (literal, no `{}`), `applies_when`
-expression over the flow's slots. Wording: the fixed set of situation keys, all required, with the key's meaning
-and, for the keys that need `{value}`, a check for it.
+Menu page of a bot, one language. Two tabs and one save bar (dirty state, 되돌리기, 저장, the same 409 and 422 handling as the other forms).
 
-## 10. Settings (ST3)
+- **고정 안내**: the fixed notices in speaking order. Each has a name (locked while a scenario uses it), the text (read as written, no
+  `{}`), and the optional `말하는 조건` (`applies_when`). The condition has a live check by the engine under the box and a row of
+  attributes to click in (the reserved names and the attributes the bot's scenarios collect). Reorder with the up and down buttons;
+  saving renumbers the priorities 10, 20, 30. A notice of a copied bot that still holds the sibling's language shows `번역할 곳`
+  until its text is saved. Which scenarios use a notice is shown on its row.
+- **상황별 문구**: the 17 situations the engine speaks, each with when it is said in plain Korean, its text, and a `{value}` check
+  (required for `readback` and `correction.offer`, refused elsewhere). `기본 문구로 되돌리기` per key and `모두 기본 문구로` copy the language starter.
+  Keys cannot be added or removed.
 
-Forms for `config` (fallback misses and action, ask re-prompts, max parked, correction limits, verification
-attempts, tool timeout and failures), `confirm` yes/no words, `commands` patterns, `corrections` and `confusions`,
-sensitive slots and read-back slots. Policy values follow the format the engine track merges in R14 and appear here only
-after that; until then they are raw files.
+## 10. 응답 규칙 and 속성 목록 (ST3, built)
+
+- **응답 규칙** (menu page, per bot because the words belong to a language): 예/아니요 words (a word in both lists is refused), the
+  three commands (취소, 이전으로, 상담사 연결) and the correction words as word-group patterns (the same inputs as a scenario's
+  start words), and the confusable number pairs. Below the form, **말 넣어 보기** sends a sentence to the engine's tokenizer and matchers
+  and shows the tokens, the command, the confirm answer, whether it counts as a correction and the confusable numbers. It uses the words on screen, saved or not.
+- **속성 목록** (section on 데이터, per domain because the lists are shared by every language): attributes that only the keypad may fill
+  (offered only if scenarios ask them as digits) and attributes read back after filling, each with how it is read (숫자, 날짜, 금액 원/달러).
+  The save bar says how many bots the change reaches.
+- Policy values stay on 개요 (`기본 설정`, studio only). A scenario that uses a value that is empty gets the warning `policy_value_missing` on 검증, linked to 개요.
+- The config numbers (fallback, ask, switch, correction, verification, tools) are on 개요 `기본 설정` (done earlier).
 
 ## 11. Preview (ST3)
 

@@ -15,7 +15,7 @@ from .portable import BOT_SETTINGS, SHARED_SETTINGS
 # keys of a step that say where it goes next; a change there is "rewired", not an edit of the step's content
 EXIT_KEYS = {"next", "on_yes", "on_no", "on_ok", "on_error", "else"}
 SETTING_LABELS = {"sensitive_slots": "민감 속성 목록", "readback_slots": "다시 읽어 줄 속성 목록", "types": "속성 형식",
-                  "config": "봇 설정", "confirm": "확인 규칙", "commands": "명령어 규칙", "corrections": "정정 규칙",
+                  "notices": "안내 문구", "config": "봇 설정", "confirm": "확인 규칙", "commands": "명령어 규칙", "corrections": "정정 규칙",
                   "confusions": "헷갈리는 말 규칙"}
 
 
