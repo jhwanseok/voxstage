@@ -1,0 +1,23 @@
+# Calibration set for the embedding FAQ retrieval (S2-1, decision S2-6). Written once from the canonical questions
+# only, before the first C00 run; the only data a threshold or margin may be chosen on. Frozen: do not edit.
+status: frozen
+lang: ko
+
+in_scope:
+  - {id: shop.faq.shipping_time, text: "택배는 언제쯤 도착하나요"}
+  - {id: shop.faq.return_how, text: "산 물건을 돌려보내고 싶은데 절차가 어떻게 되죠"}
+  - {id: shop.faq.track_order, text: "제 소포가 지금 어디쯤 왔어요"}
+  - {id: shop.faq.change_address, text: "배송 주소를 잘못 적었는데 고칠 수 있나요"}
+  - {id: shop.faq.payment_methods, text: "신용카드나 계좌이체로 결제할 수 있나요"}
+  - {id: shop.faq.gift_wrap, text: "구매한 상품을 선물용으로 포장해 줄 수 있어요"}
+  - {id: shop.faq.cancel_order, text: "마음이 바뀌어서 주문한 걸 취소하고 싶어요"}
+  - {id: shop.faq.use_coupon, text: "할인 코드는 어디에 입력해요"}
+out_of_scope:
+  - "서울에도 매장이 있나요"
+  - "이번 주말 날씨가 어때요"
+  - "괜찮은 노트북 하나 추천해 주세요"
+  - "여기서 판매자가 되려면 어떻게 하나요"
+  - "프랑스 대통령이 누구예요"
+  - "재미있는 이야기 하나 해 주세요"
+  - "렌터카도 예약할 수 있어요"
+  - "축구 경기는 몇 시에 시작해요"

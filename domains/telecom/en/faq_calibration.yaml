@@ -1,0 +1,23 @@
+# Calibration set for the embedding FAQ retrieval (S2-1, decision S2-6). Written once from the canonical questions
+# only, before the first C00 run; the only data a threshold or margin may be chosen on. Frozen: do not edit.
+status: frozen
+lang: en
+
+in_scope:
+  - {id: telecom.faq.check_usage, text: "How much mobile data have I used so far"}
+  - {id: telecom.faq.change_plan, text: "I would like to switch to a different price plan"}
+  - {id: telecom.faq.bill_due, text: "What is the deadline for paying this month's bill"}
+  - {id: telecom.faq.report_outage, text: "I have no signal and cannot make calls"}
+  - {id: telecom.faq.roaming, text: "Can I use my phone when I travel overseas"}
+  - {id: telecom.faq.replace_sim, text: "My SIM card is broken, how do I get a new one"}
+  - {id: telecom.faq.keep_number, text: "I want to move my phone number over from another carrier"}
+  - {id: telecom.faq.pay_bill, text: "What are the ways to settle my invoice"}
+out_of_scope:
+  - "Where is your nearest store"
+  - "Which phone should I buy"
+  - "Can I get a free television"
+  - "What is the stock price of your company"
+  - "How tall is Mount Everest"
+  - "Sing me a song"
+  - "Do you offer home internet in Busan"
+  - "Can you book me a taxi"

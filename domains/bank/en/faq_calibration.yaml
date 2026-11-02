@@ -1,0 +1,23 @@
+# Calibration set for the embedding FAQ retrieval (S2-1, decision S2-6). Written once from the canonical questions
+# only, before the first C00 run; the only data a threshold or margin may be chosen on. Frozen: do not edit.
+status: frozen
+lang: en
+
+in_scope:
+  - {id: bank.faq.hours, text: "Until what time are the branches open"}
+  - {id: bank.faq.card_loss, text: "My debit card was stolen, how do I stop it"}
+  - {id: bank.faq.transfer_limit, text: "What is the maximum amount I can transfer in a day"}
+  - {id: bank.faq.password_locked, text: "I keep getting locked out after typing my password wrong"}
+  - {id: bank.faq.statement_copy, text: "Where do I download my account statement"}
+  - {id: bank.faq.recurring_payment, text: "I want to stop an automatic monthly payment"}
+  - {id: bank.faq.international_transfer, text: "Is it possible to wire money to another country"}
+  - {id: bank.faq.loan_payoff, text: "Is there a penalty for repaying my loan ahead of schedule"}
+out_of_scope:
+  - "Where is the nearest ATM"
+  - "What is the exchange rate for euros today"
+  - "Can I get a mortgage for a house"
+  - "How do I become a bank employee"
+  - "What is the capital of Australia"
+  - "Can you tell me a joke"
+  - "Do you sell travel insurance"
+  - "My phone screen is cracked, what should I do"

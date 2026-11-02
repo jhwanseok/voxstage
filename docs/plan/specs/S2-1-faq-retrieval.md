@@ -1,7 +1,6 @@
 # Spec S2-1: FAQ retrieval with embeddings (C00), compared with S1
 
-Status: draft, **needs decisions** S2-4 to S2-7 (decision sheet, "S2 decisions"). Nothing is built before they are
-recorded. Read first: [decision-sheet.md](../decision-sheet.md) rows S2-1 and S2-3, [R1](R1-faq-rule-manager.md)
+Status: ready. S2-4 to S2-7 were decided as recommended on 2026-11-02 (decision sheet, "S2 decisions"). Read first: [decision-sheet.md](../decision-sheet.md) rows S2-1 and S2-3, [R1](R1-faq-rule-manager.md)
 (held-out rule), [stage-comparison.md](../../stage-comparison.md), `voxstage/rules/faq.py`, `voxstage/evaluate.py`.
 
 ## Goal
@@ -52,7 +51,7 @@ the reply.
   lazily; the model is not in the repository. Tests that need the model use `unittest.skipUnless` and the report says
   "skipped, model missing", never a silent pass.
 
-## Open questions (asked one at a time; each has a recommendation in the sheet)
+## Decisions S2-4 to S2-7 (all as recommended, 2026-11-02)
 
 | ID | Question | Recommendation |
 |---|---|---|

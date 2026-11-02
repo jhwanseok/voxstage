@@ -1,0 +1,23 @@
+# Calibration set for the embedding FAQ retrieval (S2-1, decision S2-6). Written once from the canonical questions
+# only, before the first C00 run; the only data a threshold or margin may be chosen on. Frozen: do not edit.
+status: frozen
+lang: en
+
+in_scope:
+  - {id: shop.faq.shipping_time, text: "When will my package arrive"}
+  - {id: shop.faq.return_how, text: "I want to send an item back, what is the process"}
+  - {id: shop.faq.track_order, text: "Where is my parcel right now"}
+  - {id: shop.faq.change_address, text: "I typed the wrong shipping address, can it be fixed"}
+  - {id: shop.faq.payment_methods, text: "Can I pay with a credit card or by bank transfer"}
+  - {id: shop.faq.gift_wrap, text: "Is it possible to have my purchase wrapped as a present"}
+  - {id: shop.faq.cancel_order, text: "I changed my mind and want to cancel what I ordered"}
+  - {id: shop.faq.use_coupon, text: "Where do I enter my discount code"}
+out_of_scope:
+  - "Do you have a store in Seoul"
+  - "What is the weather like this weekend"
+  - "Can you recommend a good laptop"
+  - "How do I become a seller on your site"
+  - "Who is the president of France"
+  - "Tell me a fun fact"
+  - "Can I rent a car through you"
+  - "What time does the football match start"

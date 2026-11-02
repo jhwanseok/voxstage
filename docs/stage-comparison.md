@@ -11,7 +11,7 @@ S1 was declared finished on 2026-10-28 (decision R15-2): no more rules are added
 
 | Capability | en clean | en noisy | ko clean | ko noisy | S2 | S3 |
 |---|---|---|---|---|---|---|
-| C00 FAQ answer | 89 / 144 | 89 / 144 | 86 / 149 | 86 / 149 | | |
+| C00 FAQ answer | 89 / 144 | 89 / 144 | 86 / 149 | 86 / 149 | rules first, then embedding: 120 / 144 · 107 / 149 (en · ko, clean = noisy); embedding only: 108 · 88 | |
 | C01 Scenario switch | 10 / 12 | 10 / 12 | 7 / 12 | 7 / 12 | | |
 | C02 Return after a side question | 5 / 6 | 5 / 6 | 4 / 6 | 4 / 6 | | |
 | C03 Cancel, back, hand off | 18 / 18 | 18 / 18 | 14 / 18 | 14 / 18 | | |
@@ -25,10 +25,18 @@ S1 was declared finished on 2026-10-28 (decision R15-2): no more rules are added
 | C11 Identity gate | 6 / 6 | 6 / 6 | 6 / 6 | 6 / 6 | | |
 | C12 Policy change | 6 / 6 | 6 / 6 | 6 / 6 | 6 / 6 | | |
 | C13 Interactions of two features | 4 / 8 | 6 / 8 | 4 / 8 | 6 / 8 | | |
-| **Overall** | **163 / 242** | **176 / 242** | **153 / 248** | **161 / 248** | | |
+| **Overall** | **163 / 242** | **176 / 242** | **153 / 248** | **161 / 248** | S2-1 rules first: en 199 / 247 clean, 212 noisy; ko 179 / 253 clean, 187 noisy (S1 at the same counts: 168 · 181 · 158 · 166) | |
 
 NullDM scores 0 percent and OracleDM 100 percent in both languages. C05 in clean mode is 0 by construction: clean mode
 feeds the true text, so there is no recognition error to correct; the noisy column is the one that measures it.
+
+## S2 row: FAQ retrieval (S2-1, multilingual-e5-small)
+
+Only C00 changes (Korean C02 drops from 4/6 to 2/6 with embeddings alone). The full table, the threshold sweep, the false
+accepts on the unanswerable draft list and the cost are in [ledger/s2-1-faq-retrieval.md](ledger/s2-1-faq-retrieval.md).
+Headline: embeddings answer ASR-damaged questions far better than the rules (en 39/48 against 20/48), rules first loses
+nothing the rules had, and the price is false accepts on near-domain questions (3/15 en, 1/15 ko against 0/15) and a
+model: 493 MB, p50 31 ms, about 1.2 GB resident. bge-m3 not run.
 
 ## S1 row: cost
 

@@ -1,0 +1,23 @@
+# Calibration set for the embedding FAQ retrieval (S2-1, decision S2-6). Written once from the canonical questions
+# only, before the first C00 run; the only data a threshold or margin may be chosen on. Frozen: do not edit.
+status: frozen
+lang: ko
+
+in_scope:
+  - {id: telecom.faq.check_usage, text: "지금까지 쓴 휴대폰 데이터가 얼마나 되는지 알고 싶어요"}
+  - {id: telecom.faq.change_plan, text: "다른 요금 상품으로 바꾸고 싶어요"}
+  - {id: telecom.faq.bill_due, text: "이번 달 청구 요금은 언제까지 내야 해요"}
+  - {id: telecom.faq.report_outage, text: "신호가 안 잡혀서 전화를 못 걸어요"}
+  - {id: telecom.faq.roaming, text: "외국에 나가서도 제 폰을 쓸 수 있나요"}
+  - {id: telecom.faq.replace_sim, text: "유심이 고장 났는데 새로 받으려면 어떻게 해요"}
+  - {id: telecom.faq.keep_number, text: "다른 통신사에서 쓰던 번호를 그대로 가져오고 싶어요"}
+  - {id: telecom.faq.pay_bill, text: "청구서는 어떤 방법으로 결제할 수 있어요"}
+out_of_scope:
+  - "가장 가까운 매장은 어디예요"
+  - "어떤 휴대폰을 사는 게 좋을까요"
+  - "공짜 텔레비전도 받을 수 있나요"
+  - "이 회사 주가가 얼마예요"
+  - "에베레스트 산 높이가 얼마예요"
+  - "노래 한 곡 불러 주세요"
+  - "부산에서도 집 인터넷을 설치해 주나요"
+  - "택시 좀 불러 주실 수 있어요"
