@@ -13,14 +13,14 @@ The engine reads, per domain `D` and language `L` (`voxstage/domain_pack.py`, `v
 | Engine file | Scope | Studio entity | Modelled in |
 |---|---|---|---|
 | `D/tools.yaml` | domain | `tool` | ST1 (form) |
-| `D/sensitive_slots.yaml`, `D/readback_slots.yaml` | domain | `domain_setting` (kind) | ST1 raw, ST3 form |
+| `D/sensitive_slots.yaml`, `D/readback_slots.yaml` | domain | `domain_setting` (kind) | ST3 (form on 데이터) |
 | `D/L/faq.yaml` | language | `faq_entry` | ST1 (form) |
 | `D/L/rules/faq_patterns.yaml` | language | `faq_entry.pattern` (same row as the FAQ entry) | ST1 (form) |
 | `D/L/flows/<id>.yaml` | language | `flow` | ST1 view, ST2 edit |
-| `D/L/notices.yaml` (`notices`, `wording`) | language | `notice`, `wording` | ST3 (form) |
-| `D/L/rules/config.yaml`, `confirm.yaml`, `commands.yaml`, `corrections.yaml`, `confusions.yaml` | language | `domain_setting` (kind) | ST1 raw, ST3 form |
+| `D/L/notices.yaml` (`notices`, `wording`) | language | `domain_setting` (kind `notices`; body is the file's parsed form) | ST3 (form; migration 0005 moves the raw row) |
+| `D/L/rules/config.yaml`, `confirm.yaml`, `commands.yaml`, `corrections.yaml`, `confusions.yaml` | language | `domain_setting` (kind) | config: 개요 form; the four rule files: ST3 form |
 | `D/L/faq_unanswerable.yaml`, `D/L/scenarios/*.yaml` | language | `domain_file` (raw) | raw until a later step |
-| policy values (R14) | to be decided by the engine track | `domain_file` (raw) | ST3 after R14 is merged |
+| policy values (R14) | not a file: the engine reads `{policy.<key>}` from the request's `setup.policy` | `bot.studio_settings.policy`, never exported | ST3 D5: studio only, warning `policy_value_missing` |
 
 A FAQ entry holds its patterns in the same row because the loader refuses a pack in which a FAQ entry has no pattern
 (`load_patterns`: "no pattern for FAQ entries"). A form that edited only `faq.yaml` could never produce a valid pack.
@@ -69,9 +69,8 @@ Shared rows reference `domain_id`; language-scoped rows reference `bot_id`.
 | `faq_entry` | (bot_id, entry_id) | position (int), question, answer, paraphrases (jsonb list), asr_variants (jsonb list), pattern (jsonb: `all_of`, `any_of`, `none_of`, `priority`, `regex`, `note`, as in `parse_pattern`) |
 | `tool` | (domain_id, name) | position, body (jsonb: `params`, `rules`, `default`, `risky`, `requires`, `verifies`, `retry`, as `tools._validate_spec`) |
 | `flow` | (bot_id, flow_id) | header (jsonb: `triggers`, `buttons`, `captures`, `interrupts`, `carry`, `prefill`, `role`, `verification`), start (text), nodes (jsonb map node_id to node body), node_order (jsonb list of node ids) |
-| `notice` | (bot_id, notice_id) | priority, text, applies_when (nullable). `fixed` is always true |
-| `wording` | (bot_id, key) | text. Keys are the fixed set in `domain_pack.WORDING_KEYS` |
-| `domain_setting` | (domain_id, kind) for the shared kinds `sensitive_slots`, `readback_slots`; (bot_id, kind) for the others | body (jsonb). Kinds: shared `sensitive_slots`, `readback_slots`; per bot `config`, `confirm`, `commands`, `corrections`, `confusions` |
+| `notices` setting | (bot_id, kind `notices`) | body: `{notices: {id: {text, priority, fixed: true, applies_when?}}, wording: {key: text}}`. No separate `notice` or `wording` tables: the file is one document, its 17 wording keys are the fixed set `domain_pack.WORDING_KEYS`, and the form writes priorities 10, 20, 30 in list order |
+| `domain_setting` | (domain_id, kind) for the shared kinds `sensitive_slots`, `readback_slots`; (bot_id, kind) for the others | body (jsonb). Kinds: shared `sensitive_slots`, `readback_slots`; per bot `notices`, `config`, `confirm`, `commands`, `corrections`, `confusions` |
 | `domain_file` | (domain_id or bot_id, path) | content (text), content_type. Path relative to the domain directory |
 
 `flow.nodes` keeps each node exactly as the YAML mapping (`{type: ask, slot: ..., next: ...}`), so the loader's key
