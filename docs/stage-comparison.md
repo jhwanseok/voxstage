@@ -34,7 +34,7 @@ feeds the true text, so there is no recognition error to correct; the noisy colu
 
 Only C00 changes (Korean C02 drops from 4/6 to 2/6 with embeddings alone). The full table, the threshold sweep, the false
 accepts on the unanswerable draft list and the cost are in [ledger/s2-1-faq-retrieval.md](ledger/s2-1-faq-retrieval.md).
-Headline: embeddings answer ASR-damaged questions far better than the rules (en 39/48 against 20/48), rules first loses
+Verdict by the S2-7 criterion (an improvement only if false accepts are not worse than S1): **not judged an improvement**, because false accepts rose from 0 to 3/15 (en) and 1/15 (ko), although the C00 pass rate rose. Headline: embeddings answer ASR-damaged questions far better than the rules (en 39/48 against 20/48), rules first loses
 nothing the rules had, and the price is false accepts on near-domain questions (3/15 en, 1/15 ko against 0/15) and a
 model: 493 MB, p50 31 ms, about 1.2 GB resident. bge-m3 not run.
 

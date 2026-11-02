@@ -234,7 +234,7 @@ def calibration_hash(domains_dir: str, lang: str) -> str:
     h = hashlib.sha256()
     for d in dataset.DOMAINS:
         with open(os.path.join(domains_dir, d, lang, "faq_calibration.yaml"), "rb") as f:
-            h.update(f.read())
+            h.update(f.read().replace(b"\r\n", b"\n"))   # the same hash with LF or CRLF line ends
     return h.hexdigest()[:16]
 
 

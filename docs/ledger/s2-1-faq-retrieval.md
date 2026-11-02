@@ -37,6 +37,14 @@ The FAQ part alone (`FaqRuleManager` vs `FaqEmbeddingManager`, no flows around i
 99/149 (ko); embedding only 117/144 and 94/149; rules first 133/144 and 121/149. The difference to the table above is the
 flow manager: a flow trigger takes some FAQ-shaped utterances before the FAQ is asked, in S1 and in S2 alike.
 
+## Verdict by the S2-7 criterion
+
+Decision S2-7: a result counts as an improvement over S1 only if it is not worse on false accepts. False accepts on the
+unanswerable draft list rose from 0 (S1) to 3/15 (en) and 1/15 (ko), for both S2 configurations. **So S2-1 is not judged
+an improvement over S1, although the pass rate on C00 rose** (en 89 to 120 and ko 86 to 107 with rules first). Both
+numbers stand side by side; there is no single score. The list is a five-question-per-pack draft, so the false-accept
+counts are a signal, not a rate.
+
 ## Threshold sweep (FAQ part alone, margin as chosen; the headline threshold was fixed before the run)
 
 Counts of right answers (question / paraphrase / ASR variant, of 24 / 72 / 48 en, 24 / 72 / 53 ko) and false accepts
@@ -67,8 +75,9 @@ p50 31 ms, p95 46 ms per query; cold model load 21 s; index build for all six pa
   because the rules need the exact words. Paraphrases are equal in English and worse in Korean when embeddings are used
   alone (25/72 against 36/72); in the FAQ part alone, 12 (en) and 19 (ko) cases the rules answered are lost, and 31 and
   21 cases are gained.
-- Rules first loses nothing the rules had (0 cases) and adds the embedding gains: it is the better configuration on pass
-  rate in both languages.
+- Rules first loses nothing the rules had (0 cases) and adds the embedding gains: it has the higher pass rate of the two
+  S2 configurations in both languages. It is not judged an improvement over S1 (see the verdict above), because it has
+  false accepts where S1 has none.
 - False accepts are near-domain questions: the loan interest rate question is answered with a nearby bank entry (en bank and
   ko bank), and one question each in shop and telecom (en) likewise. The rules had no false accept on this list. The list
   is five questions per pack and a draft, so these are counts to read as a signal, not as a rate.
