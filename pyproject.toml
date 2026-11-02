@@ -11,6 +11,7 @@ whisper = ["faster-whisper"]
 gemini = ["google-genai"]
 audio = ["scipy"]
 ko = ["kiwipiepy"]
+retrieval = ["sentence-transformers", "psutil"]
 
 [build-system]
 requires = ["setuptools>=68"]

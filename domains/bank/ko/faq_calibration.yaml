@@ -1,0 +1,23 @@
+# Calibration set for the embedding FAQ retrieval (S2-1, decision S2-6). Written once from the canonical questions
+# only, before the first C00 run; the only data a threshold or margin may be chosen on. Frozen: do not edit.
+status: frozen
+lang: ko
+
+in_scope:
+  - {id: bank.faq.hours, text: "지점은 몇 시까지 열려 있어요"}
+  - {id: bank.faq.card_loss, text: "체크카드를 도난당했는데 정지시키려면 어떻게 하죠"}
+  - {id: bank.faq.transfer_limit, text: "하루에 최대 얼마까지 보낼 수 있어요"}
+  - {id: bank.faq.password_locked, text: "비밀번호를 잘못 입력해서 계정이 막혔어요"}
+  - {id: bank.faq.statement_copy, text: "계좌 거래 명세는 어디서 내려받아요"}
+  - {id: bank.faq.recurring_payment, text: "매달 나가는 자동 결제를 멈추고 싶어요"}
+  - {id: bank.faq.international_transfer, text: "다른 나라로 돈을 부칠 수 있는지 궁금해요"}
+  - {id: bank.faq.loan_payoff, text: "대출금을 만기 전에 상환해도 되나요"}
+out_of_scope:
+  - "가장 가까운 현금인출기는 어디에 있어요"
+  - "오늘 유로 환율이 얼마예요"
+  - "주택 담보 대출을 받을 수 있을까요"
+  - "은행 직원이 되려면 어떻게 해야 하나요"
+  - "호주의 수도가 어디예요"
+  - "농담 하나 해 주세요"
+  - "여행자 보험도 파시나요"
+  - "휴대폰 화면이 깨졌는데 어떻게 하죠"
