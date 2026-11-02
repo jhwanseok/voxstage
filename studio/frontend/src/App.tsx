@@ -1,5 +1,5 @@
 import {
-  AudioLines, BookOpenText, Database, GitBranch, MessageSquare, History as HistoryIcon, LayoutDashboard, PlugZap, Rocket, ShieldCheck,
+  AudioLines, BookOpenText, Database, GitBranch, MessageSquare, History as HistoryIcon, LayoutDashboard, Megaphone, PlugZap, Rocket, ShieldCheck, SlidersHorizontal,
 } from "lucide-react";
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -15,7 +15,9 @@ import Flows from "./pages/Flows";
 import History from "./pages/History";
 import PublishDialog from "./pages/PublishDialog";
 import Home from "./pages/Home";
+import Notices from "./pages/Notices";
 import Overview from "./pages/Overview";
+import Rules from "./pages/Rules";
 import DataPage from "./pages/Data";
 import Tools from "./pages/Tools";
 import Validation from "./pages/Validation";
@@ -31,6 +33,8 @@ const MENU: { section: BotSection; label: string; icon: typeof LayoutDashboard }
   { section: "overview", label: "개요", icon: LayoutDashboard },
   { section: "faq", label: "자주 묻는 질문", icon: BookOpenText },
   { section: "flows", label: "시나리오", icon: GitBranch },
+  { section: "notices", label: "안내 문구", icon: Megaphone },
+  { section: "rules", label: "응답 규칙", icon: SlidersHorizontal },
   { section: "data", label: "데이터", icon: Database },
   { section: "tools", label: "API 연결", icon: PlugZap },
   { section: "validation", label: "검증", icon: ShieldCheck },
@@ -149,6 +153,8 @@ function BotShell() {
         <Route path="faq" element={<FaqPage bot={bot} />} />
         <Route path="flows" element={<Flows bot={bot} />} />
         <Route path="flows/:flowId" element={<FlowEditor bot={bot} />} />
+        <Route path="notices" element={<Notices bot={bot} />} />
+        <Route path="rules" element={<Rules bot={bot} />} />
         <Route path="data" element={<DataPage bot={bot} />} />
         <Route path="tools" element={<Tools bot={bot} />} />
         <Route path="validation" element={<Validation bot={bot} />} />

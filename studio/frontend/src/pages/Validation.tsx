@@ -7,11 +7,15 @@ import { paths } from "../paths";
 import { Button, EmptyState, ErrorState, LoadingBlock, Notice, PageHeader, StatusChip } from "../ui";
 
 /** Where a problem lives, as a link to the screen that fixes it. */
-function Where({ bot, file, flow, node }: { bot: Bot; file: string; flow: string | null; node: string | null }) {
+function Where({ bot, file, flow, node, code }: { bot: Bot; file: string; flow: string | null; node: string | null; code?: string }) {
   const cls = "font-medium text-brand-700 hover:underline";
+  if (code === "policy_value_missing") return <Link className={cls} to={paths.bot(bot.slug)}>기본 설정의 정책값</Link>;
   if (flow) return <Link className={cls} to={paths.flow(bot.slug, flow)}>시나리오 {flow}{node ? `, 단계 ${node}` : ""}</Link>;
   if (/faq/.test(file)) return <Link className={cls} to={paths.bot(bot.slug, "faq")}>자주 묻는 질문</Link>;
   if (/tools/.test(file)) return <Link className={cls} to={paths.bot(bot.slug, "tools")}>API 연결</Link>;
+  if (/notices\.yaml/.test(file)) return <Link className={cls} to={paths.bot(bot.slug, "notices")}>안내 문구</Link>;
+  if (/rules\/(confirm|commands|corrections|confusions)\.yaml/.test(file)) return <Link className={cls} to={paths.bot(bot.slug, "rules")}>응답 규칙</Link>;
+  if (/(sensitive|readback)_slots\.yaml/.test(file)) return <Link className={cls} to={paths.bot(bot.slug, "data")}>데이터</Link>;
   if (/config/.test(file)) return <Link className={cls} to={paths.bot(bot.slug)}>기본 설정</Link>;
   return <span className="font-mono text-xs text-ink-2">{file}</span>;
 }
@@ -57,7 +61,7 @@ export default function Validation({ bot }: { bot: Bot }) {
                   {report.items.map((i, k) => (
                     <tr key={k} className="align-top">
                       <td className="px-4 py-3">{i.severity === "error" ? <StatusChip tone="err">문제</StatusChip> : <StatusChip tone="warn">참고</StatusChip>}</td>
-                      <td className="px-4 py-3"><Where bot={bot} file={i.file} flow={i.flow_id} node={i.node_id} /></td>
+                      <td className="px-4 py-3"><Where bot={bot} file={i.file} flow={i.flow_id} node={i.node_id} code={i.code} /></td>
                       <td className="px-4 py-3 text-ink-2"><span className="break-words">{i.message}</span></td>
                     </tr>
                   ))}
