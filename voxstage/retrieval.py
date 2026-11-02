@@ -11,7 +11,8 @@ similarity passes a threshold (and leads the runner-up by a margin). Otherwise i
     python -m voxstage.retrieval bench e5-small         # latency and memory
 
 Evaluate it like any manager: `python -m voxstage.evaluate run voxstage.retrieval:embed_e5 --lang en`
-(`embed_*`: embeddings only; `hybrid_*`: the keyword rules first, embeddings when no rule matches).
+(`embed_*`: embeddings only; `hybrid_*`: the keyword rules first, embeddings when no rule matches). `flow_embed_*` and
+`flow_hybrid_*` are the same with the whole S1 flow manager around them, for the stage table.
 
 Held-out: only `dataset.authoring_view` (id, question, answer) is read for indexing. The held-out fields of the FAQ file
 are not read here (a test checks this); threshold and margin come only from `faq_calibration.yaml`.
@@ -198,10 +199,26 @@ def _factory(model_key: str, mode: str):
     return factory
 
 
+def _flow_factory(model_key: str, mode: str):
+    """The whole S1 flow manager (flows, side questions, gate) with the FAQ part replaced: the S2 row of the stage table."""
+    def factory(ctx):
+        from .evaluate import DEFAULT_DOMAINS_DIR
+        from .rules.interpreter import build_manager as flow_manager
+        manager = flow_manager(DEFAULT_DOMAINS_DIR, ctx.domain, ctx.lang, ctx.tools)
+        manager.faq = build_manager(DEFAULT_DOMAINS_DIR, ctx.domain, ctx.lang, model_key, mode)
+        return manager
+    factory.__name__ = f"flow_{mode}_{model_key.replace('-', '_')}"
+    return factory
+
+
 embed_e5 = _factory("e5-small", "embed")
 hybrid_e5 = _factory("e5-small", "hybrid")
 embed_bge = _factory("bge-m3", "embed")
 hybrid_bge = _factory("bge-m3", "hybrid")
+flow_embed_e5 = _flow_factory("e5-small", "embed")
+flow_hybrid_e5 = _flow_factory("e5-small", "hybrid")
+flow_embed_bge = _flow_factory("bge-m3", "embed")
+flow_hybrid_bge = _flow_factory("bge-m3", "hybrid")
 
 
 # --- calibration (S2-6): the only place a threshold or margin is chosen -----------------------------------
