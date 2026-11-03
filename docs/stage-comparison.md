@@ -36,7 +36,21 @@ Only C00 changes (Korean C02 drops from 4/6 to 2/6 with embeddings alone). The f
 accepts on the unanswerable draft list and the cost are in [ledger/s2-1-faq-retrieval.md](ledger/s2-1-faq-retrieval.md).
 Verdict by the S2-7 criterion (an improvement only if false accepts are not worse than S1): **not judged an improvement**, because false accepts rose from 0 to 3/15 (en) and 1/15 (ko), although the C00 pass rate rose. Headline: embeddings answer ASR-damaged questions far better than the rules (en 39/48 against 20/48), rules first loses
 nothing the rules had, and the price is false accepts on near-domain questions (3/15 en, 1/15 ko against 0/15) and a
-model: 493 MB, p50 31 ms, about 1.2 GB resident. bge-m3 not run.
+model: 493 MB, p50 31 ms, about 1.2 GB resident.
+
+### S2 row: bge-m3 (separate comparison row of S2-1)
+
+| | en | ko |
+|---|---|---|
+| C00, rules first, then bge-m3 | 126 / 144 | 113 / 149 |
+| C00, bge-m3 only | 123 / 144 | 109 / 149 |
+| Paraphrases answered, bge-m3 only | 57 / 72 | 46 / 72 |
+| False accepts on the draft list (S1: 0 / 15) | 2 / 15 | 1 / 15 |
+| Overall, rules first, clean · noisy (S1: 168 · 181 / 158 · 166) | 205 · 218 / 247 | 185 · 193 / 253 |
+
+Verdict by the S2-7 criterion: **not judged an improvement** (false accepts 2 and 1 against 0). Against e5-small: Korean
+paraphrases 25 to 46 of 72 with embeddings only, the C02 loss with embeddings only shrinks (ko 2/6 to 3/6) but does not
+vanish. Cost: 2293 MB model, p50 273 ms, about 2.0 GB resident. Details in the report above.
 
 ## S1 row: cost
 

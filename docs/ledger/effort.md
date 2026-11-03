@@ -124,3 +124,9 @@ One row per domain and language each time a step is measured. Every rule counts 
 | S2-1 | 5ebb5b3 | shop | ko | 151 | 63 | 8 | 0 | 1640 | 308 | 46 | 487 |
 | S2-1 | 5ebb5b3 | telecom | en | 123 | 57 | 8 | 0 | 1640 | 308 | 51 | 487 |
 | S2-1 | 5ebb5b3 | telecom | ko | 123 | 57 | 8 | 0 | 1640 | 308 | 50 | 487 |
+| S2-1-bge | 7c754ab | bank | en | 123 | 52 | 8 | 0 | 1640 | 308 | 45 | 487 |
+| S2-1-bge | 7c754ab | bank | ko | 123 | 52 | 8 | 0 | 1640 | 308 | 44 | 487 |
+| S2-1-bge | 7c754ab | shop | en | 151 | 63 | 8 | 0 | 1640 | 308 | 47 | 487 |
+| S2-1-bge | 7c754ab | shop | ko | 151 | 63 | 8 | 0 | 1640 | 308 | 46 | 487 |
+| S2-1-bge | 7c754ab | telecom | en | 123 | 57 | 8 | 0 | 1640 | 308 | 51 | 487 |
+| S2-1-bge | 7c754ab | telecom | ko | 123 | 57 | 8 | 0 | 1640 | 308 | 50 | 487 |
