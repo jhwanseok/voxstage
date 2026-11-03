@@ -1,5 +1,22 @@
 # Threshold and margin per model and language, chosen on faq_calibration.yaml only (S2-6).
 models:
+  bge-m3:
+    en:
+      calibration_hash: df30f826260b495b
+      correct: 24
+      false_accepts: 0
+      in_scope: 24
+      margin: 0.0
+      out_of_scope: 24
+      threshold: 0.675
+    ko:
+      calibration_hash: d1f8791e025a5224
+      correct: 23
+      false_accepts: 0
+      in_scope: 24
+      margin: 0.0
+      out_of_scope: 24
+      threshold: 0.69
   e5-small:
     en:
       calibration_hash: df30f826260b495b

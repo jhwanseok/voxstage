@@ -1,0 +1,56 @@
+== embed en
+{"threshold": 0.7, "asr_variant": "44/48", "paraphrase": "61/72", "question": "24/24", "unanswerable_draft": "2/15"}
+{"threshold": 0.75, "asr_variant": "35/48", "paraphrase": "47/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.78, "asr_variant": "28/48", "paraphrase": "38/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.8, "asr_variant": "21/48", "paraphrase": "32/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.82, "asr_variant": "17/48", "paraphrase": "24/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.84, "asr_variant": "12/48", "paraphrase": "18/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.86, "asr_variant": "8/48", "paraphrase": "12/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.88, "asr_variant": "6/48", "paraphrase": "9/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.9, "asr_variant": "5/48", "paraphrase": "6/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.92, "asr_variant": "4/48", "paraphrase": "2/72", "question": "24/24", "unanswerable_draft": "0/15"}
+== hybrid en
+{"threshold": 0.7, "asr_variant": "45/48", "paraphrase": "69/72", "question": "24/24", "unanswerable_draft": "2/15"}
+{"threshold": 0.75, "asr_variant": "41/48", "paraphrase": "65/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.78, "asr_variant": "36/48", "paraphrase": "62/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.8, "asr_variant": "32/48", "paraphrase": "59/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.82, "asr_variant": "29/48", "paraphrase": "55/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.84, "asr_variant": "28/48", "paraphrase": "55/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.86, "asr_variant": "24/48", "paraphrase": "55/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.88, "asr_variant": "23/48", "paraphrase": "55/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.9, "asr_variant": "22/48", "paraphrase": "55/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.92, "asr_variant": "22/48", "paraphrase": "54/72", "question": "24/24", "unanswerable_draft": "0/15"}
+== embed ko
+{"threshold": 0.7, "asr_variant": "42/53", "paraphrase": "59/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.75, "asr_variant": "38/53", "paraphrase": "45/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.78, "asr_variant": "35/53", "paraphrase": "35/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.8, "asr_variant": "32/53", "paraphrase": "31/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.82, "asr_variant": "31/53", "paraphrase": "22/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.84, "asr_variant": "30/53", "paraphrase": "19/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.86, "asr_variant": "26/53", "paraphrase": "13/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.88, "asr_variant": "24/53", "paraphrase": "9/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.9, "asr_variant": "20/53", "paraphrase": "5/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.92, "asr_variant": "18/53", "paraphrase": "4/72", "question": "24/24", "unanswerable_draft": "0/15"}
+== hybrid ko
+{"threshold": 0.7, "asr_variant": "45/53", "paraphrase": "62/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.75, "asr_variant": "42/53", "paraphrase": "54/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.78, "asr_variant": "39/53", "paraphrase": "51/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.8, "asr_variant": "38/53", "paraphrase": "51/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.82, "asr_variant": "37/53", "paraphrase": "49/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.84, "asr_variant": "36/53", "paraphrase": "48/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.86, "asr_variant": "34/53", "paraphrase": "47/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.88, "asr_variant": "34/53", "paraphrase": "46/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.9, "asr_variant": "32/53", "paraphrase": "45/72", "question": "24/24", "unanswerable_draft": "0/15"}
+{"threshold": 0.92, "asr_variant": "31/53", "paraphrase": "45/72", "question": "24/24", "unanswerable_draft": "0/15"}
+== embed en (lower thresholds)
+{'threshold': 0.6, 'asr_variant': '46/48', 'paraphrase': '68/72', 'question': '24/24', 'unanswerable_draft': '3/15'}
+{'threshold': 0.65, 'asr_variant': '45/48', 'paraphrase': '67/72', 'question': '24/24', 'unanswerable_draft': '3/15'}
+{'threshold': 0.675, 'asr_variant': '45/48', 'paraphrase': '65/72', 'question': '24/24', 'unanswerable_draft': '2/15'}
+{'threshold': 0.69, 'asr_variant': '44/48', 'paraphrase': '64/72', 'question': '24/24', 'unanswerable_draft': '2/15'}
+{'threshold': 0.7, 'asr_variant': '44/48', 'paraphrase': '61/72', 'question': '24/24', 'unanswerable_draft': '2/15'}
+== embed ko (lower thresholds)
+{'threshold': 0.6, 'asr_variant': '51/53', 'paraphrase': '67/72', 'question': '24/24', 'unanswerable_draft': '4/15'}
+{'threshold': 0.65, 'asr_variant': '47/53', 'paraphrase': '62/72', 'question': '24/24', 'unanswerable_draft': '2/15'}
+{'threshold': 0.675, 'asr_variant': '46/53', 'paraphrase': '60/72', 'question': '24/24', 'unanswerable_draft': '1/15'}
+{'threshold': 0.69, 'asr_variant': '44/53', 'paraphrase': '59/72', 'question': '24/24', 'unanswerable_draft': '1/15'}
+{'threshold': 0.7, 'asr_variant': '42/53', 'paraphrase': '59/72', 'question': '24/24', 'unanswerable_draft': '0/15'}
