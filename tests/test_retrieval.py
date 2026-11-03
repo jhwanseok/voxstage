@@ -142,6 +142,23 @@ class SelectionTest(unittest.TestCase):
         self.assertEqual((chosen["threshold"], chosen["margin"], chosen["correct"]), (0.9, 0.0, 1))
 
 
+class SafetyFloorTest(unittest.TestCase):
+    OUTSIDE = [("a", 0.60, 0.5), ("a", 0.62, 0.5), ("b", 0.70, 0.5)]
+
+    def test_the_floor_is_the_top_score_plus_the_tail_above_the_median(self):
+        self.assertAlmostEqual(retrieval.safety_floor(self.OUTSIDE), 0.70 + (0.70 - 0.62))
+
+    def test_safe_selection_stays_above_the_floor_where_plain_selection_hugs_the_top_score(self):
+        inside = [("a", 0.71, 0.5, "a"), ("a", 0.75, 0.5, "a"), ("b", 0.90, 0.5, "b")]
+        plain = retrieval.choose(inside, self.OUTSIDE)
+        safe = retrieval.choose(inside, self.OUTSIDE, safe=True)
+        self.assertEqual(plain["correct"], 3)
+        self.assertLess(plain["threshold"], retrieval.safety_floor(self.OUTSIDE))
+        self.assertGreaterEqual(safe["threshold"], retrieval.safety_floor(self.OUTSIDE))
+        self.assertEqual(safe["false_accepts"], 0)
+        self.assertEqual(safe["correct"], 1)    # only the 0.90 one clears the floor of 0.78
+
+
 class HeldOutTest(unittest.TestCase):
     def test_the_module_never_names_a_held_out_field(self):
         with open(retrieval.__file__, encoding="utf-8") as f:
@@ -164,10 +181,18 @@ class HeldOutTest(unittest.TestCase):
                 self.assertFalse({t.lower() for t in outside} & {t.lower() for t in un}, "calibration is not the test list")
 
     def test_the_config_matches_the_calibration_files(self):
-        config = retrieval.load_config()["models"]["e5-small"]
-        for lang in dataset.LANGS:
-            self.assertEqual(config[lang]["calibration_hash"], retrieval.calibration_hash(DEFAULT_DOMAINS_DIR, lang),
-                             "the calibration files changed after the threshold was chosen")
+        for section in ("models", "safe_models"):
+            for model, config in retrieval.load_config()[section].items():
+                for lang in dataset.LANGS:
+                    self.assertEqual(config[lang]["calibration_hash"], retrieval.calibration_hash(DEFAULT_DOMAINS_DIR, lang),
+                                     f"the calibration files changed after the threshold was chosen ({section}, {model})")
+
+    def test_the_safe_thresholds_are_not_below_the_plain_ones(self):
+        config = retrieval.load_config()
+        for model in config["safe_models"]:
+            for lang in dataset.LANGS:
+                self.assertGreaterEqual(config["safe_models"][model][lang]["threshold"],
+                                        config["models"][model][lang]["threshold"], (model, lang))
 
 
 @unittest.skipUnless(retrieval.available("e5-small"), "skipped, multilingual-e5-small is not in the local cache")

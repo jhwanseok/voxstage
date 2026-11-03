@@ -12,7 +12,8 @@ similarity passes a threshold (and leads the runner-up by a margin). Otherwise i
 
 Evaluate it like any manager: `python -m voxstage.evaluate run voxstage.retrieval:embed_e5 --lang en`
 (`embed_*`: embeddings only; `hybrid_*`: the keyword rules first, embeddings when no rule matches). `flow_embed_*` and
-`flow_hybrid_*` are the same with the whole S1 flow manager around them, for the stage table.
+`flow_hybrid_*` are the same with the whole S1 flow manager around them, for the stage table. The `*_safe` variants
+(S2-1c) use the thresholds chosen with a safety floor (`calibrate <model> --safe`, section `safe_models`).
 
 Held-out: only `dataset.authoring_view` (id, question, answer) is read for indexing. The held-out fields of the FAQ file
 are not read here (a test checks this); threshold and margin come only from `faq_calibration.yaml`.
@@ -168,9 +169,10 @@ def embedder(model_key: str) -> SentenceEmbedder:
 
 
 def embedding_matcher(domains_dir: str, domain: str, lang: str, model_key: str,
-                      threshold: Optional[float] = None, margin: Optional[float] = None) -> EmbeddingMatcher:
+                      threshold: Optional[float] = None, margin: Optional[float] = None,
+                      profile: str = "plain") -> EmbeddingMatcher:
     if threshold is None or margin is None:
-        chosen = load_config()["models"][model_key][lang]
+        chosen = load_config()["safe_models" if profile == "safe" else "models"][model_key][lang]
         threshold = chosen["threshold"] if threshold is None else threshold
         margin = chosen["margin"] if margin is None else margin
     key = (domains_dir, domain, lang, model_key, threshold, margin)
@@ -181,33 +183,34 @@ def embedding_matcher(domains_dir: str, domain: str, lang: str, model_key: str,
 
 
 def build_manager(domains_dir: str, domain: str, lang: str, model_key: str, mode: str,
-                  threshold: Optional[float] = None, margin: Optional[float] = None) -> FaqEmbeddingManager:
-    """mode: `embed` (embeddings only) or `hybrid` (rules first)."""
+                  threshold: Optional[float] = None, margin: Optional[float] = None,
+                  profile: str = "plain") -> FaqEmbeddingManager:
+    """mode: `embed` (embeddings only) or `hybrid` (rules first). profile: `plain` (S2-1) or `safe` (S2-1c)."""
     pack = _pack(domains_dir, domain, lang)
-    emb = embedding_matcher(domains_dir, domain, lang, model_key, threshold, margin)
-    manager = FaqEmbeddingManager(pack, emb, f"faq_{mode}_{model_key}")
+    emb = embedding_matcher(domains_dir, domain, lang, model_key, threshold, margin, profile)
+    manager = FaqEmbeddingManager(pack, emb, f"faq_{mode}_{model_key}" + ("_safe" if profile == "safe" else ""))
     if mode == "hybrid":
         manager.matcher = HybridMatcher(manager.rule_matcher, emb)
     return manager
 
 
-def _factory(model_key: str, mode: str):
+def _factory(model_key: str, mode: str, profile: str = "plain"):
     def factory(ctx):
         from .evaluate import DEFAULT_DOMAINS_DIR
-        return build_manager(DEFAULT_DOMAINS_DIR, ctx.domain, ctx.lang, model_key, mode)
-    factory.__name__ = f"{mode}_{model_key.replace('-', '_')}"
+        return build_manager(DEFAULT_DOMAINS_DIR, ctx.domain, ctx.lang, model_key, mode, profile=profile)
+    factory.__name__ = f"{mode}_{model_key.replace('-', '_')}" + ("_safe" if profile == "safe" else "")
     return factory
 
 
-def _flow_factory(model_key: str, mode: str):
+def _flow_factory(model_key: str, mode: str, profile: str = "plain"):
     """The whole S1 flow manager (flows, side questions, gate) with the FAQ part replaced: the S2 row of the stage table."""
     def factory(ctx):
         from .evaluate import DEFAULT_DOMAINS_DIR
         from .rules.interpreter import build_manager as flow_manager
         manager = flow_manager(DEFAULT_DOMAINS_DIR, ctx.domain, ctx.lang, ctx.tools)
-        manager.faq = build_manager(DEFAULT_DOMAINS_DIR, ctx.domain, ctx.lang, model_key, mode)
+        manager.faq = build_manager(DEFAULT_DOMAINS_DIR, ctx.domain, ctx.lang, model_key, mode, profile=profile)
         return manager
-    factory.__name__ = f"flow_{mode}_{model_key.replace('-', '_')}"
+    factory.__name__ = f"flow_{mode}_{model_key.replace('-', '_')}" + ("_safe" if profile == "safe" else "")
     return factory
 
 
@@ -219,6 +222,14 @@ flow_embed_e5 = _flow_factory("e5-small", "embed")
 flow_hybrid_e5 = _flow_factory("e5-small", "hybrid")
 flow_embed_bge = _flow_factory("bge-m3", "embed")
 flow_hybrid_bge = _flow_factory("bge-m3", "hybrid")
+embed_e5_safe = _factory("e5-small", "embed", "safe")
+hybrid_e5_safe = _factory("e5-small", "hybrid", "safe")
+embed_bge_safe = _factory("bge-m3", "embed", "safe")
+hybrid_bge_safe = _factory("bge-m3", "hybrid", "safe")
+flow_embed_e5_safe = _flow_factory("e5-small", "embed", "safe")
+flow_hybrid_e5_safe = _flow_factory("e5-small", "hybrid", "safe")
+flow_embed_bge_safe = _flow_factory("bge-m3", "embed", "safe")
+flow_hybrid_bge_safe = _flow_factory("bge-m3", "hybrid", "safe")
 
 
 # --- calibration (S2-6): the only place a threshold or margin is chosen -----------------------------------
@@ -242,11 +253,23 @@ THRESHOLDS = [round(0.50 + 0.005 * i, 3) for i in range(100)]   # 0.50 .. 0.995
 MARGINS = [0.0, 0.01, 0.02, 0.03, 0.05]
 
 
-def choose(scored_in: list, scored_out: list) -> dict:
+def safety_floor(scored_out: list) -> float:
+    """S2-1c: the threshold may not sit on the highest out-of-scope score. It must clear it by the distance the tail of
+    the out-of-scope scores reaches above their median: floor = max + (max - median), from calibration scores only."""
+    scores = sorted(s[1] for s in scored_out)
+    top, median = scores[-1], scores[len(scores) // 2] if len(scores) % 2 else (scores[len(scores) // 2 - 1] + scores[len(scores) // 2]) / 2
+    return top + (top - median)
+
+
+def choose(scored_in: list, scored_out: list, safe: bool = False) -> dict:
     """scored_*: lists of (best id, s1, s2[, expected id]). Zero false accepts first, then most correct answers;
-    ties go to the larger threshold, then the smaller margin."""
+    ties go to the larger threshold, then the smaller margin. `safe` (S2-1c) also keeps the threshold at or above
+    `safety_floor`, so that zero false accepts on the calibration set is not reached by hugging its highest score."""
     best = None
+    floor = safety_floor(scored_out) if safe and scored_out else 0.0
     for t in THRESHOLDS:
+        if t < floor:
+            continue
         for m in MARGINS:
             def ok(s):
                 return s[1] >= t and s[1] - s[2] >= m
@@ -256,10 +279,12 @@ def choose(scored_in: list, scored_out: list) -> dict:
             if best is None or key > best[0]:
                 best = (key, {"threshold": t, "margin": m, "false_accepts": fa, "out_of_scope": len(scored_out),
                               "correct": correct, "in_scope": len(scored_in)})
+    if safe:
+        best[1]["floor"] = round(floor, 4)
     return best[1]
 
 
-def calibrate(model_key: str, domains_dir: str = DOMAINS_DIR) -> dict:
+def calibrate(model_key: str, domains_dir: str = DOMAINS_DIR, safe: bool = False) -> dict:
     out = {}
     for lang in dataset.LANGS:
         scored_in, scored_out = [], []
@@ -268,7 +293,7 @@ def calibrate(model_key: str, domains_dir: str = DOMAINS_DIR) -> dict:
             ins, outs = load_calibration(os.path.join(domains_dir, d, lang, "faq_calibration.yaml"))
             scored_in += [(*matcher.scores(t), i) for i, t in ins]
             scored_out += [matcher.scores(t) for t in outs]
-        out[lang] = {**choose(scored_in, scored_out), "calibration_hash": calibration_hash(domains_dir, lang)}
+        out[lang] = {**choose(scored_in, scored_out, safe), "calibration_hash": calibration_hash(domains_dir, lang)}
     return out
 
 
@@ -360,6 +385,7 @@ def main(argv: Optional[list] = None) -> int:
         p.add_argument("model", choices=sorted(MODELS))
         if name == "calibrate":
             p.add_argument("--write", action="store_true", help="write the chosen values to domains/retrieval.yaml")
+            p.add_argument("--safe", action="store_true", help="S2-1c: keep the threshold above the safety floor")
     s = sub.add_parser("sweep")
     s.add_argument("model", choices=sorted(MODELS))
     s.add_argument("lang", choices=dataset.LANGS)
@@ -368,11 +394,11 @@ def main(argv: Optional[list] = None) -> int:
     if args.cmd == "download":
         print(json.dumps(download(args.model), indent=1))
     elif args.cmd == "calibrate":
-        chosen = calibrate(args.model)
+        chosen = calibrate(args.model, safe=args.safe)
         print(json.dumps(chosen, indent=1))
         if args.write:
             config = load_config() if os.path.exists(CONFIG_PATH) else {}
-            config.setdefault("models", {})[args.model] = chosen
+            config.setdefault("safe_models" if args.safe else "models", {})[args.model] = chosen
             with open(CONFIG_PATH, "w", encoding="utf-8", newline="\n") as f:
                 f.write("# Threshold and margin per model and language, chosen on faq_calibration.yaml only (S2-6).\n")
                 yaml.safe_dump(config, f, sort_keys=True, allow_unicode=True)

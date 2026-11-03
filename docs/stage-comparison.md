@@ -52,6 +52,23 @@ Verdict by the S2-7 criterion: **not judged an improvement** (false accepts 2 an
 paraphrases 25 to 46 of 72 with embeddings only, the C02 loss with embeddings only shrinks (ko 2/6 to 3/6) but does not
 vanish. Cost: 2293 MB model, p50 273 ms, about 2.0 GB resident. Details in the report above.
 
+### S2 row: conservative thresholds (S2-1c, safe profile)
+
+| | en | ko |
+|---|---|---|
+| C00, S1 | 89 / 144 | 86 / 149 |
+| C00, rules first, then e5-small, safe | 108 / 144 | 86 / 149 |
+| C00, rules first, then bge-m3, safe | 101 / 144 | 95 / 149 |
+| Paraphrases, rules first + bge-m3, safe (S1: 45 · 36 of 72) | 48 / 72 | 38 / 72 |
+| C02, rules first, safe | 5 / 6 | 4 / 6 |
+| False accepts on the draft list (S1: 0 / 15) | 0 / 15 | 0 / 15 |
+
+Verdict by the S2-7 criterion: false accepts equal S1, so a gain in pass rate counts. **bge-m3 rules first, safe is an
+improvement in both languages and the default candidate**; e5-small rules first, safe improves English only (the embedding
+step never fires in Korean). Embedding only, safe, is below S1. The default is unchanged. Cost: bge-m3 p50 273 ms and
+about 2.0 GB; e5-small p50 31 ms and about 1.2 GB. The zero rests on a 24-question calibration set and a 15-question draft
+list; see the limits in [the report](ledger/s2-1-faq-retrieval.md).
+
 ## S1 row: cost
 
 See [ledger/complexity.md](ledger/complexity.md) and the figure [ledger/complexity.png](ledger/complexity.png):

@@ -34,3 +34,42 @@ models:
       margin: 0.03
       out_of_scope: 24
       threshold: 0.86
+safe_models:
+  bge-m3:
+    en:
+      calibration_hash: df30f826260b495b
+      correct: 12
+      false_accepts: 0
+      floor: 0.8051
+      in_scope: 24
+      margin: 0.0
+      out_of_scope: 24
+      threshold: 0.81
+    ko:
+      calibration_hash: d1f8791e025a5224
+      correct: 12
+      false_accepts: 0
+      floor: 0.8188
+      in_scope: 24
+      margin: 0.0
+      out_of_scope: 24
+      threshold: 0.82
+  e5-small:
+    en:
+      calibration_hash: df30f826260b495b
+      correct: 6
+      false_accepts: 0
+      floor: 0.8683
+      in_scope: 24
+      margin: 0.0
+      out_of_scope: 24
+      threshold: 0.87
+    ko:
+      calibration_hash: d1f8791e025a5224
+      correct: 0
+      false_accepts: 0
+      floor: 0.9328
+      in_scope: 24
+      margin: 0.0
+      out_of_scope: 24
+      threshold: 0.995
