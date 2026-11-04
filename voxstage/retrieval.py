@@ -12,7 +12,7 @@ similarity passes a threshold (and leads the runner-up by a margin). Otherwise i
 
 Evaluate it like any manager: `python -m voxstage.evaluate run voxstage.retrieval:embed_e5 --lang en`
 (`embed_*`: embeddings only; `hybrid_*`: the keyword rules first, embeddings when no rule matches). `flow_embed_*` and
-`flow_hybrid_*` are the same with the whole S1 flow manager around them, for the stage table. The `*_safe` variants
+`flow_hybrid_*` are the same with the whole S1 flow manager around them, for the stage table. The `*_safe` versions
 (S2-1c) use the thresholds chosen with a safety floor (`calibrate <model> --safe`, section `safe_models`).
 
 Held-out: only `dataset.authoring_view` (id, question, answer) is read for indexing. The held-out fields of the FAQ file
