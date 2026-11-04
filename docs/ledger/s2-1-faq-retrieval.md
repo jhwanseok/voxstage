@@ -130,6 +130,73 @@ again with lower values. At the chosen thresholds the sweep matches the evaluati
 disappear only at 0.75, where paraphrases fall to 47/72. This is an observation about the draft list, not a new threshold:
 the headline threshold stays the one chosen on the calibration set.
 
+## S2-1c: conservative thresholds, false accepts back to S1's level (run 2026-11-04)
+
+Goal set by the owner: bring false accepts down to S1's 0. Branch `wip/S2-1c`; no extra download.
+
+**What changed, and what did not.** The S2-1 selection rule already was "zero false accepts on the calibration set first,
+then the most correct answers", so running it again would return the same values. What was wrong is that those thresholds
+sit on the highest out-of-scope calibration score (e5-small en 0.835 against 0.834; bge-m3 en 0.675 against 0.673), with no
+room for a question that scores a little higher. The new rule (`safety_floor`, `calibrate --safe`) keeps the objective and
+adds a floor, computed from the calibration scores only: **threshold >= max + (max - median)** of the out-of-scope top-1
+scores. The rule was fixed before any C00 run; the calibration files, the frozen S2-1 values (`models`) and every S1 number
+are untouched. The new values are in `safe_models` of `domains/retrieval.yaml` (same calibration hashes).
+
+| Model | Language | Threshold (was) | Margin | Floor | Correct / false accepts on calibration |
+|---|---|---|---|---|---|
+| e5-small | en | 0.87 (0.835) | 0 | 0.8683 | 6 / 24, 0 / 24 |
+| e5-small | ko | 0.995 (0.86) | 0 | 0.9328 | 0 / 24, 0 / 24 |
+| bge-m3 | en | 0.81 (0.675) | 0 | 0.8051 | 12 / 24, 0 / 24 |
+| bge-m3 | ko | 0.82 (0.69) | 0 | 0.8188 | 12 / 24, 0 / 24 |
+
+The e5-small Korean floor lies above every in-scope calibration score, so the rule leaves nothing: the threshold ends at
+the top of the grid and e5-small Korean answers nothing by embedding. This is the rule's result, not a tuned one; it is
+reported as it is.
+
+### C00 with the whole flow manager (clean = noisy for C00); false accepts on the draft list
+
+| Configuration | en C00 | en question / paraphrase / ASR | en FA | ko C00 | ko question / paraphrase / ASR | ko FA |
+|---|---|---|---|---|---|---|
+| S1 rules | 89 / 144 | 24/24, 45/72, 20/48 | 0 / 15 | 86 / 149 | 24/24, 36/72, 26/53 | 0 / 15 |
+| e5-small rules first (S2-1, plain) | 120 | 24/24, 55/72, 41/48 | 3 | 107 | 24/24, 42/72, 41/53 | 1 |
+| bge-m3 rules first (S2-1b, plain) | 126 | 24/24, 59/72, 43/48 | 2 | 113 | 24/24, 48/72, 41/53 | 1 |
+| **e5-small rules first, safe** | 108 | 24/24, 50/72, 34/48 | **0** | 86 | 24/24, 36/72, 26/53 | **0** |
+| e5-small embedding only, safe | 76 | 24/24, 21/72, 31/48 | 0 | 0 | 0/24, 0/72, 0/53 | 0 |
+| **bge-m3 rules first, safe** | 101 | 24/24, 48/72, 29/48 | **0** | 95 | 24/24, 38/72, 33/53 | **0** |
+| bge-m3 embedding only, safe | 65 | 24/24, 23/72, 18/48 | 0 | 68 | 24/24, 16/72, 28/53 | 0 |
+
+Other capabilities: C02 (side question in a flow) is 5/6 en and 4/6 ko with rules first for both models, no loss against
+S1; with embeddings only it drops (e5 en 3/6, ko 0/6; bge-m3 en 3/6, ko 1/6). Overall, all capabilities, clean · noisy:
+e5 rules first en 187 · 200 of 247, ko 158 · 166 of 253 (S1: 168 · 181, 158 · 166); bge-m3 rules first en 180 · 193, ko
+167 · 175. The embedding-only rows were run clean only for the cost of time; their C00 is the same in noisy mode.
+
+### Verdict by the S2-7 criterion
+
+False accepts are **0 / 15 in both languages for every safe configuration, equal to S1**, so none of them is worse on
+false accepts, and the rules-first ones raise the pass rate:
+
+- **bge-m3 rules first, safe: counted as an improvement over S1** (C00 en 89 to 101, ko 86 to 95; Korean paraphrases
+  36 to 38 of 72, ASR variants 26 to 33 of 53; C02 no loss). It is the **candidate for a default**: the only configuration
+  that gains in both languages with zero false accepts. Cost is the heavy one: 2293 MB model, p50 273 ms per embedding
+  query (only for utterances the rules did not answer), about 2.0 GB resident.
+- **e5-small rules first, safe: improvement in English only** (89 to 108); Korean equals S1 exactly because the embedding
+  step never fires. The cheap option (493 MB, p50 31 ms, about 1.2 GB) if Korean is not needed from embeddings.
+- Embedding-only safe rows lose to S1 on C00 (en 65 and 76 against 89) and on C02; they are not candidates.
+
+The default has **not** been changed; that is the owner's decision.
+
+### Limits (read before trusting the zero)
+
+- The calibration set is 24 out-of-scope questions per language, mostly far from the domain (weather, jokes); the
+  near-domain questions that were false accepts in S2-1 are rare in it. A threshold with zero false accepts on 24 items
+  can be a result of that set being easy, not of the threshold being safe. The floor adds room but is a heuristic.
+- The zero on the test side is counted on the five-questions-per-pack draft list (15 per language, "draft, not reviewed by
+  the owner"). It is a signal, not a rate; a larger and reviewed out-of-scope list would be the real test.
+- The price of the zeros is the pass rate: against plain S2-1 rules first, C00 falls (bge-m3 126 to 101 en, 113 to 95 ko;
+  e5-small 120 to 108 en, 107 to 86 ko). The two thresholds draw one line between "accept more" and "accept fewer"; this
+  run moved to the cautious end because the owner asked for it.
+- Latency and memory are those of the models above (same code, same models); not measured again.
+
 ## Not done
 
 - Score fusion (not built, by decision S2-4) and extra indexed example questions (not in S2-1, decision S2-5).
