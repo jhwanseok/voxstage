@@ -196,6 +196,7 @@ The default has **not** been changed; that is the owner's decision.
   e5-small 120 to 108 en, 107 to 86 ko). The two thresholds draw one line between "accept more" and "accept fewer"; this
   run moved to the cautious end because the owner asked for it.
 - Latency and memory are those of the models above (same code, same models); not measured again.
+- Test record: unit tests of this change OK; full suite on `dev` after the merge: 410 tests OK (178 s), run in a venv rebuilt in the repository's `.venv` (the earlier temp venv was lost).
 
 ## Not done
 
